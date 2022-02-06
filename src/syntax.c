@@ -2,6 +2,7 @@
 
 #include "syntax.h"
 #include "lex.h"
+#include "precedence.h"
 
 // TODO should I unify this somehow with normal pattern rules?
 typedef struct BlockSyntaxRule {
@@ -15,16 +16,6 @@ typedef struct SyntaxTable {
 
 static SyntaxTable syn_tab;
 static MetaType generic_block_ty; // TODO remove
-
-PrecId prec_unique_id(Word *name) {
-    static PrecId prec_counter = 0;
-
-    return prec_counter++;
-}
-
-int prec_cmp(PrecId a, PrecId b) {
-    return b - a;
-}
 
 void syntax_init(void) {
     syn_tab.pool = Bump_new();
@@ -345,11 +336,6 @@ Expr *syntax_parse(IterCtx *ctx, Expr *exprs, size_t len) {
     for (size_t i = 0; i < len; ++i)
         slice[i] = &exprs[i];
 
-#if 0
-    free(slice);
-
-    return NULL;
-#else
     Expr *expr = parse_block(ctx, slice, len, generic_block_ty);
 
     Expr_dump(expr);
@@ -357,5 +343,4 @@ Expr *syntax_parse(IterCtx *ctx, Expr *exprs, size_t len) {
     free(slice);
 
     return expr;
-#endif
 }
