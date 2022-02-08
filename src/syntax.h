@@ -2,7 +2,7 @@
 #define SYNTAX_H
 
 #include "types.h"
-#include "lex.h"
+#include "expr.h"
 #include "rules.h"
 
 /*
@@ -15,6 +15,9 @@ typedef struct IterContext {
     Bump pool;
 } IterCtx;
 
+IterCtx IterCtx_new(void);
+void IterCtx_del(IterCtx *ctx);
+
 void syntax_init(void);
 void syntax_quit(void);
 
@@ -22,9 +25,6 @@ void syntax_dump(void);
 
 MetaType syntax_def_block(Word *name, MetaType start, MetaType stop);
 void syntax_def_rule(Rule *rule); // deepcopies rule
-
-IterCtx IterCtx_new(void);
-void IterCtx_del(IterCtx *ctx);
 
 Expr *syntax_parse(IterCtx *ctx, Expr *exprs, size_t len);
 

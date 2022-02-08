@@ -1,7 +1,6 @@
 #include <string.h>
 
 #include "syntax.h"
-#include "lex.h"
 #include "precedence.h"
 
 // TODO should I unify this somehow with normal pattern rules?
@@ -95,7 +94,7 @@ void IterCtx_del(IterCtx *ctx) {
     Bump_del(&ctx->pool);
 }
 
-static Expr *Expr_new(IterCtx *ctx, Type ty, MetaType mty) {
+static Expr *alloc_expr(IterCtx *ctx, Type ty, MetaType mty) {
     Expr *expr = Bump_alloc(&ctx->pool, sizeof(*expr));
 
     expr->ty = ty;
@@ -104,175 +103,12 @@ static Expr *Expr_new(IterCtx *ctx, Type ty, MetaType mty) {
     return expr;
 }
 
-static bool pattern_matches(Pattern *pat, Expr *expr) {
-    if (pat->ty.id != TY_NONE)
-        if (pat->ty.id != expr->ty.id)
-            return false;
-
-    if (pat->mty.id != MTY_NONE)
-        if (pat->mty.id != expr->mty.id)
-            return false;
-
-    return true;
-}
-
-// assumes length of exprs is enough to fit rule
-static bool rule_matches(Rule *rule, Expr **exprs) {
-    for (size_t i = 0; i < rule->len; ++i)
-        if (!pattern_matches(&rule->pattern[i], exprs[i]))
-            return false;
-
-    return true;
-}
-
-static Expr *construct_rule_expr(IterCtx *ctx, Rule *rule, Expr **slice) {
-    // TODO counting children should be done at construction of Rule
-    size_t num_children = 0;
-
-    for (size_t i = 0; i < rule->len; ++i)
-        if (rule->pattern[i].ty.id != TY_NONE)
-            ++num_children;
-
-    // create the new expr
-    Expr *expr = Expr_new(ctx, rule->ty, rule->mty);
-
-    expr->len = num_children;
-    expr->exprs = Bump_alloc(&ctx->pool, expr->len * sizeof(*expr->exprs));
-
-    for (size_t i = 0, j = 0; i < rule->len; ++i)
-        if (rule->pattern[i].ty.id != TY_NONE)
-            expr->exprs[j++] = slice[i];
-
-    return expr;
-}
-
-/*
- * treeifies a block as much as possible, and then returns its new length.
- *
- * this is truly the guts of the parser. right now this is using a very
- * brute-forcey algorithm, similar to precedence climbing but rather than
- * climbing the precedences we're starting from the top and descending.
- *
- * so definitely a LOT of room for improvement, but it works!
- */
-static size_t treeify_block(IterCtx *ctx, Expr **exprs, size_t len) {
-    // walk down precedences (highest to lowest) and combine exprs into branches
-    for (size_t i = 0; i < syn_tab.rules.len; ++i) {
-        Rule *rule = syn_tab.rules.data[i];
-
-        // TODO right associativity -> walk backwards
-        if (rule->len <= len) {
-            for (size_t j = 0; j <= len - rule->len; ++j) {
-                if (rule_matches(rule, &exprs[j])) {
-                    // rule matched, store it and modify expr slice
-                    exprs[j] = construct_rule_expr(ctx, rule, &exprs[j]);
-
-                    size_t move_size = (len - (j + rule->len)) * sizeof(*exprs);
-
-                    if (move_size > 0)
-                        memmove(&exprs[j + 1], &exprs[j + rule->len], move_size);
-
-                    len -= rule->len - 1;
-
-                    // terminate treeification early if no more matches will be
-                    // possible
-                    if (len <= 1)
-                        goto treeify_done;
-
-                    /*
-                     * TODO what I really want to do here is restart rule
-                     * checking from the first rule in the current precedence
-                     * level, and checking each rule in the precedence level
-                     * at the same time instead of one at a time.
-                     *
-                     * this will mean redoing the way rules are stored,
-                     * ordering them by precedence instead. for now this hack
-                     * works OK-ish, it generates some weird results but not
-                     * invalid results.
-                     */
-                    --j;
-                    continue;
-                }
-            }
-        }
-    }
-
-treeify_done:
-    return len;
-}
-
 #define MAX_BLOCK_LVL 1024
 
 // parses Expr tree within a block
 static Expr *parse_block(IterCtx *ctx, Expr **slice, size_t len, MetaType mty) {
-    // recursively parse sub-blocks
-    Expr **exprs = malloc(len * sizeof(*exprs));
-    size_t idx = 0;
-
-    size_t match_indices[MAX_BLOCK_LVL];
-    BlockRule *matches[MAX_BLOCK_LVL];
-    size_t match = 0;
-
-    for (size_t i = 0; i < len; ++i) {
-        Expr *cur = slice[i];
-
-        // match any BlockRules TODO hash this or something ffs
-        for (size_t j = 0; j < syn_tab.brules.len; ++j) {
-            BlockRule *brule = syn_tab.brules.data[j];
-
-            if (cur->mty.id == brule->start.id) {
-                // start block
-                matches[match] = brule;
-                match_indices[match] = i;
-                ++match;
-
-                break;
-            } else if (cur->mty.id == brule->stop.id) {
-                // stop block
-                if (match == 0)
-                    goto parse_block_error;
-
-                BlockRule *top = matches[--match];
-
-                if (top != brule)
-                    goto parse_block_error;
-
-                if (match == 0) {
-                    size_t start_idx = match_indices[match];
-
-                    cur = parse_block(ctx, &slice[start_idx + 1],
-                                      i - start_idx - 1, brule->mty);
-                }
-
-                break;
-            }
-        }
-
-        if (match == 0)
-            exprs[idx++] = cur;
-    }
-
-    // treeify this block
-    size_t block_len = treeify_block(ctx, exprs, idx);
-
-    // copy exprs to block (once actually parsing all rules this will be
-    // unnecessary)
-    Expr *expr = Expr_new(ctx, TYPE(TY_NONE), mty);
-    size_t exprs_size = idx * sizeof(*expr->exprs);
-
-    expr->exprs = Bump_alloc(&ctx->pool, exprs_size);
-    expr->len = block_len;
-
-    memcpy(expr->exprs, exprs, exprs_size);
-
-    return expr;
-
-parse_block_error:
-    // TODO more informative errors
-    fungus_error("block parsing failed.");
-    global_error = true;
-
-    return NULL;
+    // TODO incorporate rule tree
+    fungus_panic("treeification with RuleTrees is not implemented atm.");
 }
 
 Expr *syntax_parse(IterCtx *ctx, Expr *exprs, size_t len) {
