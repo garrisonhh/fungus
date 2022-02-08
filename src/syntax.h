@@ -26,8 +26,6 @@ void syntax_def_rule(Rule *rule); // deepcopies rule
 IterCtx IterCtx_new(void);
 void IterCtx_del(IterCtx *ctx);
 
-void Expr_dump(Expr *expr);
-
 Expr *syntax_parse(IterCtx *ctx, Expr *exprs, size_t len);
 
 #endif

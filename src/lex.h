@@ -3,29 +3,9 @@
 
 #include <stddef.h>
 
-#include "words.h"
-#include "types.h"
+#include "expr.h"
 
 // raw expr generation =========================================================
-
-typedef struct Expr {
-    MetaType mty; // code typing
-    Type ty; // value typing
-
-    union {
-        // literal
-        Word _string;
-        long _int;
-        double _float;
-        bool _bool;
-
-        // block + rules
-        struct {
-            struct Expr **exprs;
-            size_t len;
-        };
-    };
-} Expr;
 
 typedef struct RawExprBuffer {
     Expr *exprs;
