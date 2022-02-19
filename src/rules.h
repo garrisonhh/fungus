@@ -23,7 +23,7 @@ typedef Expr *(*RuleHook)(Expr *);
 
 // used to store rule data at the end of an atom
 typedef struct Rule {
-    PrecId prec;
+    Prec prec;
     Type ty; // type returned by rule
     MetaType mty; // type of rule itself
     RuleHook interpret; // NULL for subrules (fragments of a rule)
@@ -38,7 +38,9 @@ typedef struct RuleTreeNode {
 } RTNode;
 
 typedef struct RuleTree {
+    PrecGraph prec_graph;
     Bump pool;
+
     Vec roots;
 } RuleTree;
 
@@ -46,7 +48,7 @@ typedef struct RuleTree {
 typedef struct RuleDef {
     RuleAtom *pattern;
     size_t len;
-    PrecId prec;
+    Prec prec;
     Type ty;
     MetaType mty;
     RuleHook interpret;

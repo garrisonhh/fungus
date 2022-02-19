@@ -18,6 +18,14 @@
 
 #define ARRAY_SIZE(ARR) (sizeof(ARR) / sizeof(ARR[0]))
 
+/*
+ * for comparison functions:
+ * cmp(a, b) > 0 // a > b
+ * cmp(a, b) == 0 // a == b
+ * cmp(a, b) < 0 // a < b
+ */
+typedef enum Comparison { LT = -1, EQ = 0, GT = 1 } Comparison;
+
 // term codes ==================================================================
 
 #define TERM_TABLE\

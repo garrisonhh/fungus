@@ -4,7 +4,7 @@
 #include "lex.h"
 #include "syntax.h"
 
-static void define_math_rule(RuleTree *rt, const char *sym, PrecId prec,
+static void define_math_rule(RuleTree *rt, const char *sym, Prec prec,
                              RuleHook hook) {
     const Type num_types[] = { TYPE(TY_INT), TYPE(TY_FLOAT) };
 
@@ -34,23 +34,43 @@ static void define_math_rule(RuleTree *rt, const char *sym, PrecId prec,
 }
 
 static void register_fungus(void) {
-    // precedences
-    Word as_prec_word = WORD("AddSubPrecedence");
-    Word md_prec_word = WORD("MulDivPrecedence");
-    Word highest_prec_word = WORD("HighestPrecedence");
-
-    PrecId as_prec = prec_unique_id(&as_prec_word);
-    PrecId md_prec = prec_unique_id(&md_prec_word);
-    PrecId highest_prec = prec_unique_id(&highest_prec_word);
-
-    // rules
     RuleTree test = RuleTree_new();
 
+    // precedences
+    PrecDef lowest_def = {
+        .name = WORD("LowestPrecedence")
+    };
+    Prec lowest = Prec_define(&test.prec_graph, &lowest_def);
+
+    Prec addsub_above[] = { lowest };
+    PrecDef addsub_def = {
+        .name = WORD("AddSubPrecedence"),
+        .above = addsub_above,
+        .above_len = ARRAY_SIZE(addsub_above),
+    };
+    Prec addsub = Prec_define(&test.prec_graph, &addsub_def);
+
+    Prec muldiv_above[] = { addsub };
+    PrecDef muldiv_def = {
+        .name = WORD("MulDivPrecedence"),
+        .above = muldiv_above,
+        .above_len = ARRAY_SIZE(muldiv_above),
+    };
+    Prec muldiv = Prec_define(&test.prec_graph, &muldiv_def);
+
+    Prec highest_above[] = { addsub, muldiv };
+    PrecDef highest_def = {
+        .name = WORD("HighestPrecedence"),
+        .above = highest_above,
+        .above_len = ARRAY_SIZE(highest_above),
+    };
+    Prec highest = Prec_define(&test.prec_graph, &highest_def);
+
     // basic math operators
-    define_math_rule(&test, "+", as_prec, NULL);
-    define_math_rule(&test, "-", as_prec, NULL);
-    define_math_rule(&test, "*", md_prec, NULL);
-    define_math_rule(&test, "/", md_prec, NULL);
+    define_math_rule(&test, "+", addsub, NULL);
+    define_math_rule(&test, "-", addsub, NULL);
+    define_math_rule(&test, "*", muldiv, NULL);
+    define_math_rule(&test, "/", muldiv, NULL);
 
     // blocks
     Word lparen_sym = WORD("(");
@@ -70,10 +90,7 @@ static void register_fungus(void) {
     RuleDef parens_def = {
         .pattern = parens_pat,
         .len = ARRAY_SIZE(parens_pat),
-        .prec = highest_prec,
-        // TODO this isn't right, maybe a type placeholder? like TY_MUST_INFER
-        // so that the compiler knows the type is unknown while making the tree?
-        // maybe another function hook? idk
+        .prec = highest,
         .ty = TYPE(TY_NONE),
         .mty = parens_mty
     };

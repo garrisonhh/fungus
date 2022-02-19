@@ -2,6 +2,7 @@
 
 RuleTree RuleTree_new(void) {
     return (RuleTree){
+        .prec_graph = PrecGraph_new(),
         .pool = Bump_new(),
         .roots = Vec_new()
     };
@@ -10,6 +11,7 @@ RuleTree RuleTree_new(void) {
 void RuleTree_del(RuleTree *rt) {
     Vec_del(&rt->roots);
     Bump_del(&rt->pool);
+    PrecGraph_del(&rt->prec_graph);
 }
 
 static void *RT_alloc(RuleTree *rt, size_t nbytes) {
@@ -103,23 +105,20 @@ static void RTNode_dump(RTNode *node, char *buf, char *tail) {
         tail += sprintf(tail, "_");
     }
 
-    // TODO print modifiers
     if (node->atom.modifiers) {
-        tail += sprintf(tail, " [");
+        tail += sprintf(tail, " ");
 
         if (node->atom.modifiers & RAM_REPEAT)
             tail += sprintf(tail, "*");
         if (node->atom.modifiers & RAM_OPTIONAL)
             tail += sprintf(tail, "?");
-
-        tail += sprintf(tail, "]");
     }
 
     tail += sprintf(tail, ") ");
 
     // print rule if exists
     if (node->rule) {
-        printf("%s-> ", buf);
+        printf("  %s-> ", buf);
 
         TypeEntry *rule_entry = metatype_get(node->rule->mty);
 
@@ -133,5 +132,11 @@ static void RTNode_dump(RTNode *node, char *buf, char *tail) {
 void RuleTree_dump(RuleTree *rt) {
     char buf[1024];
 
+    puts("rules:");
     RTNode_nexts_dump(&rt->roots, buf, buf);
+    puts("");
+
+    puts("precedences:");
+    PrecGraph_dump(&rt->prec_graph);
+    puts("");
 }
