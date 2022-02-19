@@ -4,8 +4,8 @@
 #include "types.h"
 
 typedef struct Expr {
-    MetaType mty; // code typing
     Type ty; // value typing
+    MetaType mty; // code typing
 
     union {
         // literal

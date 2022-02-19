@@ -21,11 +21,6 @@ void IterCtx_del(IterCtx *ctx);
 void syntax_init(void);
 void syntax_quit(void);
 
-void syntax_dump(void);
-
-MetaType syntax_def_block(Word *name, MetaType start, MetaType stop);
-void syntax_def_rule(Rule *rule); // deepcopies rule
-
 Expr *syntax_parse(IterCtx *ctx, Expr *exprs, size_t len);
 
 #endif

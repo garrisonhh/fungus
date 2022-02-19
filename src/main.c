@@ -4,50 +4,86 @@
 #include "lex.h"
 #include "syntax.h"
 
-// TODO rewrite this holy shit lmao
+static void define_math_rule(RuleTree *rt, const char *sym, PrecId prec,
+                             RuleHook hook) {
+    const Type num_types[] = { TYPE(TY_INT), TYPE(TY_FLOAT) };
+
+    Word word = WORD(sym);
+    MetaType mty = metatype_define(&word);
+
+    for (size_t i = 0; i < ARRAY_SIZE(num_types); ++i) {
+        Type ty = num_types[i];
+
+        RuleAtom pat[] = {
+            { .ty = ty },
+            { .mty = mty },
+            { .ty = ty },
+        };
+
+        RuleDef def = {
+            .pattern = pat,
+            .len = ARRAY_SIZE(pat),
+            .prec = prec,
+            .ty = ty,
+            .mty = mty,
+            .interpret = hook
+        };
+
+        RuleTree_define_rule(rt, &def);
+    }
+}
+
 static void register_fungus(void) {
+    // precedences
     Word as_prec_word = WORD("AddSubPrecedence");
     Word md_prec_word = WORD("MulDivPrecedence");
+    Word highest_prec_word = WORD("HighestPrecedence");
 
     PrecId as_prec = prec_unique_id(&as_prec_word);
     PrecId md_prec = prec_unique_id(&md_prec_word);
+    PrecId highest_prec = prec_unique_id(&highest_prec_word);
 
-    Pattern int_pat = { .ty = TYPE(TY_INT) };
+    // rules
+    RuleTree test = RuleTree_new();
 
-#define MATH_RULES\
-    X(add, "+", as_prec)\
-    X(sub, "-", as_prec)\
-    X(mul, "*", md_prec)\
-    X(div, "/", md_prec)\
-    X(mod, "%", md_prec)\
+    // basic math operators
+    define_math_rule(&test, "+", as_prec, NULL);
+    define_math_rule(&test, "-", as_prec, NULL);
+    define_math_rule(&test, "*", md_prec, NULL);
+    define_math_rule(&test, "/", md_prec, NULL);
 
-#define X(NAME, SYM, PREC) {\
-    Word sym = WORD(SYM), name = WORD(#NAME);\
-    MetaType sym_mty = lex_def_symbol(&sym);\
-    MetaType rule_mty = metatype_define(&name);\
-    Pattern pat[] = { int_pat, { .mty = sym_mty }, int_pat, };\
-    Rule rule = {\
-        .pattern = pat,\
-        .len = ARRAY_SIZE(pat),\
-        .prec = PREC,\
-        .ty = TYPE(TY_INT),\
-        .mty = rule_mty\
-    };\
-    syntax_def_rule(&rule);\
-}
+    // blocks
+    Word lparen_sym = WORD("(");
+    Word rparen_sym = WORD(")");
+    Word parens_name = WORD("parens");
 
-    MATH_RULES
+    MetaType lparen_mty = metatype_define(&lparen_sym);
+    MetaType rparen_mty = metatype_define(&rparen_sym);
+    MetaType parens_mty = metatype_define(&parens_name);
 
-#undef X
-#undef MATH_RULES
+    RuleAtom parens_pat[] = {
+        { .mty = lparen_mty },
+        { .modifiers = RAM_REPEAT },
+        { .mty = rparen_mty },
+    };
 
-    /*
-    Word true_kw = WORD("true");
-    Word false_kw = WORD("false");
+    RuleDef parens_def = {
+        .pattern = parens_pat,
+        .len = ARRAY_SIZE(parens_pat),
+        .prec = highest_prec,
+        // TODO this isn't right, maybe a type placeholder? like TY_MUST_INFER
+        // so that the compiler knows the type is unknown while making the tree?
+        // maybe another function hook? idk
+        .ty = TYPE(TY_NONE),
+        .mty = parens_mty
+    };
 
-    lex_def_keyword(&true_kw);
-    lex_def_keyword(&false_kw);
-    */
+    RuleTree_define_rule(&test, &parens_def);
+
+#if 1
+    RuleTree_dump(&test);
+    exit(0);
+#endif
 }
 
 #define REPL_BUF_SIZE 1024
@@ -105,7 +141,6 @@ int main(void) {
 
 #if 1
     types_dump();
-    syntax_dump();
 #endif
 
     repl();
