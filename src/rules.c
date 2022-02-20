@@ -2,16 +2,20 @@
 
 RuleTree RuleTree_new(void) {
     return (RuleTree){
-        .prec_graph = PrecGraph_new(),
+        .precedences = PrecGraph_new(),
+        .types = TypeGraph_new(),
+        .metatypes = TypeGraph_new(),
         .pool = Bump_new(),
         .roots = Vec_new()
     };
 }
 
 void RuleTree_del(RuleTree *rt) {
+    PrecGraph_del(&rt->precedences);
+    TypeGraph_del(&rt->metatypes);
+    TypeGraph_del(&rt->types);
     Vec_del(&rt->roots);
     Bump_del(&rt->pool);
-    PrecGraph_del(&rt->prec_graph);
 }
 
 static void *RT_alloc(RuleTree *rt, size_t nbytes) {
@@ -137,6 +141,6 @@ void RuleTree_dump(RuleTree *rt) {
     puts("");
 
     puts("precedences:");
-    PrecGraph_dump(&rt->prec_graph);
+    PrecGraph_dump(&rt->precedences);
     puts("");
 }

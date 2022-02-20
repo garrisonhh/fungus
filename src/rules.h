@@ -13,10 +13,9 @@ typedef enum RuleAtomModifiers {
 
 typedef struct RuleAtom {
     // if ty or mty is NONE, pattern matches any ty or mty
-    Type ty;
-    MetaType mty;
+    Type ty, mty;
 
-    unsigned modifiers; // bitfield
+    unsigned modifiers; // bitfield using RuleAtomModifiers
 } RuleAtom;
 
 typedef Expr *(*RuleHook)(Expr *);
@@ -24,8 +23,7 @@ typedef Expr *(*RuleHook)(Expr *);
 // used to store rule data at the end of an atom
 typedef struct Rule {
     Prec prec;
-    Type ty; // type returned by rule
-    MetaType mty; // type of rule itself
+    Type ty, mty; // the types of the rule's value, and of the rule itself
     RuleHook interpret; // NULL for subrules (fragments of a rule)
 } Rule;
 
@@ -38,7 +36,8 @@ typedef struct RuleTreeNode {
 } RTNode;
 
 typedef struct RuleTree {
-    PrecGraph prec_graph;
+    PrecGraph precedences;
+    TypeGraph types, metatypes;
     Bump pool;
 
     Vec roots;
@@ -49,8 +48,7 @@ typedef struct RuleDef {
     RuleAtom *pattern;
     size_t len;
     Prec prec;
-    Type ty;
-    MetaType mty;
+    Type ty, mty;
     RuleHook interpret;
 } RuleDef;
 

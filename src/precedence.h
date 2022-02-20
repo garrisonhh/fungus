@@ -1,6 +1,11 @@
 #ifndef PRECEDENCE_H
 #define PRECEDENCE_H
 
+/*
+ * precedence is represented by a directed acyclic graph, allowing for intuitive
+ * and symbolic runtime definition of precedences.
+ */
+
 #include "utils.h"
 #include "words.h"
 
@@ -20,6 +25,8 @@ typedef struct PrecEntry {
 typedef struct PrecGraph {
     Bump pool;
     Vec entries; // entries indexed by id
+
+    // TODO name => id hashmap
 } PrecGraph;
 
 typedef struct PrecDef {

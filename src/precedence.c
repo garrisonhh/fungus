@@ -18,7 +18,7 @@ static void *PG_alloc(PrecGraph *pg, size_t n_bytes) {
 
 static PrecEntry *PG_get(PrecGraph *pg, Prec handle) {
     if (handle.id > pg->entries.len)
-        fungus_panic("attempted to get an invalid precedence id.");
+        fungus_panic("attempted to get an invalid precedence.");
 
     return pg->entries.data[handle.id];
 }
@@ -38,7 +38,7 @@ static bool PG_higher_than(PrecGraph *pg, PrecEntry *entry, Prec object) {
 }
 
 Prec Prec_define(PrecGraph *pg, PrecDef *def) {
-    // create entry
+    // create entry from def
     PrecEntry *entry = PG_alloc(pg, sizeof(*entry));
     Prec handle = (Prec){ pg->entries.len };
 
@@ -47,12 +47,12 @@ Prec Prec_define(PrecGraph *pg, PrecDef *def) {
         .above_len = def->above_len
     };
 
+    for (size_t i = 0; i < def->above_len; ++i)
+        entry->above[i] = def->above[i];
+
     Vec_push(&pg->entries, entry);
 
-    // copy above list
-    memcpy(entry->above, def->above, def->above_len * sizeof(*def->above));
-
-    // add to below lists
+    // add to any below lists
     for (size_t i = 0; i < def->below_len; ++i) {
         PrecEntry *below_entry = PG_get(pg, def->below[i]);
 
