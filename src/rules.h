@@ -1,10 +1,9 @@
 #ifndef RULES_H
 #define RULES_H
 
-#include "data.h"
 #include "types.h"
 #include "precedence.h"
-#include "lex.h"
+#include "expr.h"
 
 typedef enum RuleAtomModifiers {
     RAM_REPEAT = 0x1,
@@ -36,10 +35,7 @@ typedef struct RuleTreeNode {
 } RTNode;
 
 typedef struct RuleTree {
-    PrecGraph precedences;
-    TypeGraph types, metatypes;
     Bump pool;
-
     Vec roots;
 } RuleTree;
 

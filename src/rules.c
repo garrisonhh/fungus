@@ -2,18 +2,12 @@
 
 RuleTree RuleTree_new(void) {
     return (RuleTree){
-        .precedences = PrecGraph_new(),
-        .types = TypeGraph_new(),
-        .metatypes = TypeGraph_new(),
         .pool = Bump_new(),
         .roots = Vec_new()
     };
 }
 
 void RuleTree_del(RuleTree *rt) {
-    PrecGraph_del(&rt->precedences);
-    TypeGraph_del(&rt->metatypes);
-    TypeGraph_del(&rt->types);
     Vec_del(&rt->roots);
     Bump_del(&rt->pool);
 }
@@ -80,6 +74,7 @@ next_atom:
     cur_node->rule = rule;
 }
 
+/* TODO
 static void RTNode_dump(RTNode *node, char *buf, char *tail);
 
 static void RTNode_nexts_dump(Vec *nexts, char *buf, char *tail) {
@@ -132,15 +127,13 @@ static void RTNode_dump(RTNode *node, char *buf, char *tail) {
     // recur on children
     RTNode_nexts_dump(&node->nexts, buf, tail);
 }
+*/
 
 void RuleTree_dump(RuleTree *rt) {
-    char buf[1024];
+    // char buf[1024];
 
     puts("rules:");
-    RTNode_nexts_dump(&rt->roots, buf, buf);
-    puts("");
-
-    puts("precedences:");
-    PrecGraph_dump(&rt->precedences);
+    // RTNode_nexts_dump(&rt->roots, buf, buf);
+    puts("TODO redo");
     puts("");
 }

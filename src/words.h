@@ -30,7 +30,7 @@ Word *Word_copy_of(Word *src, Bump *pool);
 
 #define WORD(STR) Word_new(STR, strlen(STR))
 
-bool Word_eq(Word *a, Word *b);
-bool Word_eq_view(Word *a, View *b);
+bool Word_eq(const Word *a, const Word *b);
+bool Word_eq_view(const Word *a, const View *b);
 
 #endif

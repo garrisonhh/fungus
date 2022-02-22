@@ -1,5 +1,7 @@
 #include "types.h"
 
+const Type INVALID_TYPE = { -1 };
+
 #define MAX_TYPES 256
 
 typedef struct TypeEntry {
@@ -49,6 +51,18 @@ Type Type_define(TypeGraph *tg, TypeDef *def) {
     Vec_push(&tg->entries, entry);
 
     return handle;
+}
+
+// TODO use hashmap
+Type Type_get(TypeGraph *tg, Word *name) {
+    for (size_t i = 0; i < tg->entries.len; ++i) {
+        TypeEntry *entry = tg->entries.data[i];
+
+        if (Word_eq(entry->name, name))
+            return (Type){ i };
+    }
+
+    return INVALID_TYPE;
 }
 
 const Word *Type_name(TypeGraph *tg, Type ty) {

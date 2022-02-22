@@ -1,9 +1,7 @@
 #ifndef SYNTAX_H
 #define SYNTAX_H
 
-#include "types.h"
-#include "expr.h"
-#include "rules.h"
+#include "fungus.h"
 
 /*
  * TODO precedence as a directed graph. atm precedence is simply first-come-
@@ -18,9 +16,6 @@ typedef struct IterContext {
 IterCtx IterCtx_new(void);
 void IterCtx_del(IterCtx *ctx);
 
-void syntax_init(void);
-void syntax_quit(void);
-
-Expr *syntax_parse(IterCtx *ctx, Expr *exprs, size_t len);
+Expr *parse(Fungus *, IterCtx *ctx, Expr *exprs, size_t len);
 
 #endif

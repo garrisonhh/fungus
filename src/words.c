@@ -20,12 +20,12 @@ Word *Word_copy_of(Word *src, Bump *pool) {
     return copy;
 }
 
-bool Word_eq(Word *a, Word *b) {
+bool Word_eq(const Word *a, const Word *b) {
     // NOTE if this is broken, fnv-1a may have to go
     return a->len == b->len && a->hash == b->hash;
 }
 
-bool Word_eq_view(Word *a, View *b) {
+bool Word_eq_view(const Word *a, const View *b) {
     Word bw = Word_new(b->str, b->len);
 
     return Word_eq(a, &bw);

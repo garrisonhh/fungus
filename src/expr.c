@@ -1,5 +1,6 @@
 #include "expr.h"
 
+/*
 #define EXPR_INDENT 2
 
 static void Expr_dump_r(Expr *expr, int level) {
@@ -50,8 +51,11 @@ static void Expr_dump_r(Expr *expr, int level) {
         break;
     }
 }
+*/
 
-void Expr_dump(Expr *expr) {
-    Expr_dump_r(expr, 0);
+void Expr_dump(TypeGraph *tg, Expr *expr) {
+    puts("TODO expr dump");
+
+    // Expr_dump_r(expr, 0);
 }
 

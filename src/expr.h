@@ -4,15 +4,14 @@
 #include "types.h"
 
 typedef struct Expr {
-    Type ty; // value typing
-    MetaType mty; // code typing
+    Type ty, mty;
 
     union {
         // literal
-        Word _string;
-        long _int;
-        double _float;
-        bool _bool;
+        Word string_;
+        long int_;
+        double float_;
+        bool bool_;
 
         // block + rules
         struct {
@@ -22,6 +21,6 @@ typedef struct Expr {
     };
 } Expr;
 
-void Expr_dump(Expr *expr);
+void Expr_dump(TypeGraph *tg, Expr *expr);
 
 #endif

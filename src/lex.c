@@ -6,9 +6,9 @@
 #include <ctype.h>
 
 #include "lex.h"
+#include "fungus.h"
 #include "data.h"
 #include "utils.h"
-#include "types.h"
 
 // LZip ========================================================================
 
@@ -65,7 +65,7 @@ static Expr *RawExprBuf_alloc(RawExprBuf *rebuf) {
     return &rebuf->exprs[rebuf->len++];
 }
 
-static Expr *RawExprBuf_next(RawExprBuf *rebuf, Type ty, MetaType mty) {
+static Expr *RawExprBuf_next(RawExprBuf *rebuf, Type ty, Type mty) {
     Expr *expr = RawExprBuf_alloc(rebuf);
 
     expr->ty = ty;
@@ -76,84 +76,22 @@ static Expr *RawExprBuf_next(RawExprBuf *rebuf, Type ty, MetaType mty) {
 
 // lexing ======================================================================
 
-// TODO unit lookups are dumb stupid just-get-it-working design, have so much
-// easy optimization potential
-typedef struct LexTable {
-    Bump pool;
-    Vec symbols, keywords;
-} LexTable;
-
-static LexTable lex_tab;
-
-void lex_init(void) {
-    lex_tab.pool = Bump_new();
-    lex_tab.symbols = Vec_new();
-    lex_tab.keywords = Vec_new();
+Lexer Lexer_new(void) {
+    return (Lexer){
+        .pool = Bump_new(),
+        .symbols = Vec_new(),
+        .keywords = Vec_new()
+    };
 }
 
-void lex_quit(void) {
-    Vec_del(&lex_tab.keywords);
-    Vec_del(&lex_tab.symbols);
-    Bump_del(&lex_tab.pool);
+void Lexer_del(Lexer *lex) {
+    Vec_del(&lex->keywords);
+    Vec_del(&lex->symbols);
+    Bump_del(&lex->pool);
 }
 
 static bool is_wordable(char c) {
     return c == '_' || isalnum(c);
-}
-
-// sorts by descending length
-static int lex_unit_cmp(const void *a, const void *b) {
-    return (int)(*(Word **)b)->len - (int)(*(Word **)a)->len;
-}
-
-MetaType lex_def_symbol(Word *symbol) {
-    // validate symbol
-    if (symbol->len == 0)
-        goto invalid_symbol;
-
-    for (size_t i = 0; i < symbol->len; ++i)
-        if (!ispunct(symbol->str[i]))
-            goto invalid_symbol;
-
-    // register symbol
-    Word *copy = Word_copy_of(symbol, &lex_tab.pool);
-
-    Vec_push(&lex_tab.symbols, copy);
-    Vec_qsort(&lex_tab.symbols, lex_unit_cmp); // TODO this is inefficient af
-
-    return metatype_define(copy);
-
-invalid_symbol:
-    fungus_error(">>%.*s<< is not a valid symbol.",
-                 (int)symbol->len, symbol->str);
-    global_error = true;
-
-    return METATYPE(0);
-}
-
-MetaType lex_def_keyword(Word *keyword) {
-    // validate keyword
-    if (keyword->len == 0 || !is_wordable(keyword->str[0]))
-        goto invalid_keyword;
-
-    for (size_t i = 1; i < keyword->len; ++i)
-        if (!is_wordable(keyword->str[i]))
-            goto invalid_keyword;
-
-    // register keyword
-    Word *copy = Word_copy_of(keyword, &lex_tab.pool);
-
-    Vec_push(&lex_tab.keywords, copy);
-    Vec_qsort(&lex_tab.keywords, lex_unit_cmp); // TODO this is inefficient af
-
-    return metatype_define(keyword);
-
-invalid_keyword:
-    fungus_panic(">>%.*s<< is not a valid keyword.",
-                 (int)keyword->len, keyword->str);
-    global_error = true;
-
-    return METATYPE(0);
 }
 
 static void skip_whitespace(LZip *z) {
@@ -186,7 +124,7 @@ static Word parse_string(View *lit) {
     return Word_new(str, len);
 }
 
-static bool match_string(RawExprBuf *rebuf, LZip *z) {
+static bool match_string(Fungus *fun, RawExprBuf *rebuf, LZip *z) {
     char c = LZip_peek(z);
 
     if (c == '"') {
@@ -204,10 +142,9 @@ static bool match_string(RawExprBuf *rebuf, LZip *z) {
         } while (!(c == '"' && prev != '\\'));
 
         // emit token
-        Expr *expr = RawExprBuf_next(rebuf, TYPE(TY_STRING),
-                                     METATYPE(MTY_LITERAL));
+        Expr *expr = RawExprBuf_next(rebuf, fun->t_string, fun->t_literal);
 
-        expr->_string = parse_string(&v);
+        expr->string_ = parse_string(&v);
 
         return true;
     }
@@ -215,7 +152,7 @@ static bool match_string(RawExprBuf *rebuf, LZip *z) {
     return false;
 }
 
-static bool match_int(RawExprBuf *rebuf, LZip *zip) {
+static bool match_int(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
     // strtol wrangling
     const char *start = zip->str + zip->idx;
     char *end;
@@ -237,14 +174,14 @@ static bool match_int(RawExprBuf *rebuf, LZip *zip) {
     }
 
     // token
-    Expr *expr = RawExprBuf_next(rebuf, TYPE(TY_INT), METATYPE(MTY_LITERAL));
+    Expr *expr = RawExprBuf_next(rebuf, fun->t_int, fun->t_literal);
 
-    expr->_int = num;
+    expr->int_ = num;
 
     return true;
 }
 
-static bool match_float(RawExprBuf *rebuf, LZip *zip) {
+static bool match_float(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
     // strtod wrangling
     const char *start = zip->str + zip->idx;
     char *end;
@@ -263,29 +200,30 @@ static bool match_float(RawExprBuf *rebuf, LZip *zip) {
     }
 
     // token
-    Expr *expr = RawExprBuf_next(rebuf, TYPE(TY_FLOAT), METATYPE(MTY_LITERAL));
+    Expr *expr = RawExprBuf_next(rebuf, fun->t_float, fun->t_literal);
 
-    expr->_float = num;
+    expr->float_ = num;
 
     return true;
 }
 
-static bool match_symbol(RawExprBuf *rebuf, LZip *zip) {
+static bool match_symbol(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
+    Lexer *lex = &fun->lexer;
     size_t remaining = zip->len - zip->idx;
 
-    for (size_t i = 0; i < lex_tab.symbols.len; ++i) {
-        Word *sym = lex_tab.symbols.data[i];
+    for (size_t i = 0; i < lex->symbols.len; ++i) {
+        Word *sym = lex->symbols.data[i];
 
         if (remaining >= sym->len
             && !strncmp(zip->str + zip->idx, sym->str, sym->len)) {
-            TypeEntry *entry = metatype_get_by_name(sym);
-            MetaType mty = METATYPE(entry->id);
-
-            if (!entry)
-                mty = metatype_define(sym);
-
-            RawExprBuf_next(rebuf, TYPE(TY_NONE), mty);
             zip->idx += sym->len;
+
+            Type type = Type_get(&fun->types, sym);
+
+            if (type.id == INVALID_TYPE.id)
+                fungus_panic("matched invalid symbol type");
+
+            RawExprBuf_next(rebuf, fun->t_noruntime, fun->t_lexeme);
 
             return true;
         }
@@ -294,23 +232,24 @@ static bool match_symbol(RawExprBuf *rebuf, LZip *zip) {
     return false;
 }
 
-static bool match_keyword(RawExprBuf *rebuf, LZip *zip) {
+static bool match_keyword(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
+    Lexer *lex = &fun->lexer;
     size_t remaining = zip->len - zip->idx;
 
-    for (size_t i = 0; i < lex_tab.keywords.len; ++i) {
-        Word *kw = lex_tab.keywords.data[i];
+    for (size_t i = 0; i < lex->keywords.len; ++i) {
+        Word *kw = lex->keywords.data[i];
 
         if (remaining >= kw->len
             && !strncmp(zip->str + zip->idx, kw->str, kw->len)
             && !is_wordable(zip->str[zip->idx + kw->len])) {
-            TypeEntry *entry = metatype_get_by_name(kw);
-            MetaType mty = METATYPE(entry->id);
-
-            if (!entry)
-                mty = metatype_define(kw);
-
-            RawExprBuf_next(rebuf, TYPE(TY_NONE), mty);
             zip->idx += kw->len;
+
+            Type type = Type_get(&fun->types, kw);
+
+            if (type.id == INVALID_TYPE.id)
+                fungus_panic("matched invalid keyword type");
+
+            RawExprBuf_next(rebuf, fun->t_noruntime, fun->t_lexeme);
 
             return true;
         }
@@ -319,7 +258,8 @@ static bool match_keyword(RawExprBuf *rebuf, LZip *zip) {
     return false;
 }
 
-static bool err_no_match(RawExprBuf *rebuf, LZip *zip) {
+static bool err_no_match(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
+    (void)fun;
     (void)rebuf;
 
     fungus_error("failed to tokenize at:");
@@ -330,11 +270,11 @@ static bool err_no_match(RawExprBuf *rebuf, LZip *zip) {
     return false;
 }
 
-RawExprBuf tokenize(const char *str, size_t len) {
+RawExprBuf tokenize(Fungus *fun, const char *str, size_t len) {
     RawExprBuf rebuf = RawExprBuf_new();
     LZip zip = LZip_new(str, len);
 
-    bool (*match_funcs[])(RawExprBuf *, LZip *) = {
+    bool (*match_funcs[])(Fungus *, RawExprBuf *, LZip *) = {
         match_symbol,
         match_keyword,
         match_string,
@@ -347,29 +287,12 @@ RawExprBuf tokenize(const char *str, size_t len) {
         skip_whitespace(&zip);
 
         for (size_t i = 0; i < ARRAY_SIZE(match_funcs); ++i)
-            if (match_funcs[i](&rebuf, &zip))
+            if (match_funcs[i](fun, &rebuf, &zip))
                 break;
 
         if (global_error)
             goto err_exit;
     }
-
-#if 1
-    term_format(TERM_YELLOW);
-    printf("    %-16s%-16s\n", "type", "metatype");
-    term_format(TERM_RESET);
-
-    for (size_t i = 0; i < rebuf.len; ++i) {
-        Expr *expr = &rebuf.exprs[i];
-        Word *ty_name = type_get(expr->ty)->name;
-        Word *mty_name = metatype_get(expr->mty)->name;
-
-        printf("    %-16.*s%-16.*s\n", (int)ty_name->len, ty_name->str,
-               (int)mty_name->len, mty_name->str);
-    }
-
-    printf("\n");
-#endif
 
     return rebuf;
 
