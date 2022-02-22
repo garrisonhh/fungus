@@ -33,11 +33,11 @@ static bool RuleAtom_eq(RuleAtom *a, RuleAtom *b) {
            && a->modifiers == b->modifiers;
 }
 
-void RuleTree_define_rule(RuleTree *rt, RuleDef *def) {
+void Rule_define(RuleTree *rt, RuleDef *def) {
     // validate RuleDef
     bool valid = def->len && def->pattern;
 
-    if (!valid) // FIXME better error handling
+    if (!valid) // TODO better error handling
         fungus_panic("invalid rule definition.");
 
     // create Rule

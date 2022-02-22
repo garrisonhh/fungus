@@ -90,6 +90,26 @@ void Lexer_del(Lexer *lex) {
     Bump_del(&lex->pool);
 }
 
+static void dump_word_vec(Vec *vec) {
+    for (size_t i = 0; i < vec->len; ++i) {
+        Word *word = vec->data[i];
+
+        printf("%.*s ", (int)word->len, word->str);
+    }
+}
+
+void Lexer_dump(Lexer *lex) {
+    term_format(TERM_CYAN);
+    puts("Lexer:");
+    term_format(TERM_RESET);
+
+    printf("symbols: ");
+    dump_word_vec(&lex->symbols);
+    printf("\nkeywords: ");
+    dump_word_vec(&lex->keywords);
+    printf("\n\n");
+}
+
 static bool is_wordable(char c) {
     return c == '_' || isalnum(c);
 }
@@ -300,4 +320,15 @@ err_exit:
     RawExprBuf_del(&rebuf);
 
     return (RawExprBuf){0};
+}
+
+void RawExprBuf_dump(Fungus *fun, RawExprBuf *rebuf) {
+    term_format(TERM_CYAN);
+    puts("RawExprBuf:");
+    term_format(TERM_RESET);
+
+    for (size_t i = 0; i < rebuf->len; ++i)
+        Expr_dump(fun, &rebuf->exprs[i]);
+
+    puts("");
 }

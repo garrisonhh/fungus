@@ -80,17 +80,27 @@ Comparison Prec_cmp(PrecGraph *pg, Prec a, Prec b) {
 }
 
 void PrecGraph_dump(PrecGraph *pg) {
+    term_format(TERM_CYAN);
+    puts("PrecGraph:");
+    term_format(TERM_RESET);
+
     for (size_t i = 0; i < pg->entries.len; ++i) {
         PrecEntry *entry = pg->entries.data[i];
 
-        printf("  %.*s\n", (int)entry->name->len, entry->name->str);
+        printf("%.*s", (int)entry->name->len, entry->name->str);
 
-        for (size_t j = 0; j < entry->above_len; ++j) {
-            Word *above_name = PG_get(pg, entry->above[j])->name;
+        if (entry->above_len) {
+            printf(" >");
 
-            printf("    %.*s\n", (int)above_name->len, above_name->str);
+            for (size_t j = 0; j < entry->above_len; ++j) {
+                Word *above_name = PG_get(pg, entry->above[j])->name;
+
+                printf(" %.*s", (int)above_name->len, above_name->str);
+            }
         }
 
         puts("");
     }
+
+    puts("");
 }

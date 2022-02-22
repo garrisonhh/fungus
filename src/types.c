@@ -86,17 +86,27 @@ bool Type_is(TypeGraph *tg, Type ty, Type other) {
 }
 
 void TypeGraph_dump(TypeGraph *tg) {
+    term_format(TERM_CYAN);
+    puts("TypeGraph:");
+    term_format(TERM_RESET);
+
     for (size_t i = 0; i < tg->entries.len; ++i) {
         TypeEntry *entry = tg->entries.data[i];
 
-        printf("  %.*s\n", (int)entry->name->len, entry->name->str);
+        printf("%.*s", (int)entry->name->len, entry->name->str);
 
-        for (size_t j = 0; j < entry->is_len; ++j) {
-            const Word *parent_name = TG_get(tg, entry->is[j])->name;
+        if (entry->is_len) {
+            printf(" >");
 
-            printf("    %.*s\n", (int)parent_name->len, parent_name->str);
+            for (size_t j = 0; j < entry->is_len; ++j) {
+                const Word *super_name = TG_get(tg, entry->is[j])->name;
+
+                printf(" %.*s", (int)super_name->len, super_name->str);
+            }
         }
 
         puts("");
     }
+
+    puts("");
 }

@@ -1,6 +1,7 @@
 #include <ctype.h>
 
 #include "fungus.h"
+#include "lex.h"
 
 // sorts by descending length
 static int lexeme_cmp(const void *a, const void *b) {
@@ -69,20 +70,18 @@ static void Fungus_define_base(Fungus *fun) {
      */
     // runtime
     TypeDef string_def = { WORD("String") };
-    fun->t_string = Type_define(&fun->types, &string_def);
-
     TypeDef bool_def = { WORD("Bool") };
-    fun->t_bool = Type_define(&fun->types, &bool_def);
-
     TypeDef number_def = { WORD("Number") };
+
+    fun->t_string = Type_define(&fun->types, &string_def);
+    fun->t_bool = Type_define(&fun->types, &bool_def);
     fun->t_number = Type_define(&fun->types, &number_def);
 
     Type is_number[] = { fun->t_number };
-
     TypeDef int_def = { WORD("Int"), is_number, ARRAY_SIZE(is_number) };
-    fun->t_int = Type_define(&fun->types, &int_def);
-
     TypeDef float_def = { WORD("Float"), is_number, ARRAY_SIZE(is_number) };
+
+    fun->t_int = Type_define(&fun->types, &int_def);
     fun->t_float = Type_define(&fun->types, &float_def);
 
     // meta
@@ -90,13 +89,12 @@ static void Fungus_define_base(Fungus *fun) {
     fun->t_metatype = Type_define(&fun->types, &metatype_def);
 
     Type is_metatype[] = { fun->t_metatype };
-
     TypeDef literal_def =
         { WORD("Literal"), is_metatype, ARRAY_SIZE(is_metatype) };
-    fun->t_literal = Type_define(&fun->types, &literal_def);
-
     TypeDef lexeme_def =
         { WORD("Lexeme"), is_metatype, ARRAY_SIZE(is_metatype) };
+
+    fun->t_literal = Type_define(&fun->types, &literal_def);
     fun->t_lexeme = Type_define(&fun->types, &lexeme_def);
 
     /*
@@ -144,6 +142,10 @@ Fungus Fungus_new(void) {
 
     Fungus_define_base(&fun);
 
+#if 1
+    Fungus_dump(&fun);
+#endif
+
     return fun;
 }
 
@@ -155,5 +157,11 @@ void Fungus_del(Fungus *fun) {
 }
 
 void Fungus_dump(Fungus *fun) {
-    // TODO
+    term_format(TERM_YELLOW);
+    puts("Fungus Definitions");
+    term_format(TERM_RESET);
+
+    Lexer_dump(&fun->lexer);
+    TypeGraph_dump(&fun->types);
+    PrecGraph_dump(&fun->precedences);
 }

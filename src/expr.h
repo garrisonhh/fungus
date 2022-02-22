@@ -3,6 +3,8 @@
 
 #include "types.h"
 
+typedef struct Fungus Fungus;
+
 typedef struct Expr {
     Type ty, mty;
 
@@ -21,6 +23,6 @@ typedef struct Expr {
     };
 } Expr;
 
-void Expr_dump(TypeGraph *tg, Expr *expr);
+void Expr_dump(Fungus *fun, Expr *expr);
 
 #endif

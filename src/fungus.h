@@ -2,16 +2,10 @@
 #define FUNGUS_H
 
 #include "expr.h"
+#include "lex.h"
 #include "types.h"
 #include "precedence.h"
 #include "rules.h"
-
-// TODO lookups are dumb stupid just-get-it-working design, have so much easy
-// optimization potential
-typedef struct Lexer {
-    Bump pool;
-    Vec symbols, keywords;
-} Lexer;
 
 typedef struct Fungus {
     Lexer lexer;
@@ -21,8 +15,7 @@ typedef struct Fungus {
 
     /*
      * base types
-     *
-     * noruntime is for filling expr->ty on lexemes
+     * noruntime - for lexemes and other metatypes with no runtime value
      */
     Type t_noruntime;
     Type t_string, t_bool, t_number, t_int, t_float;

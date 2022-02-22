@@ -51,7 +51,7 @@ typedef struct RuleDef {
 RuleTree RuleTree_new(void);
 void RuleTree_del(RuleTree *);
 
-void RuleTree_define_rule(RuleTree *, RuleDef *def);
+void Rule_define(RuleTree *, RuleDef *def);
 
 void RuleTree_dump(RuleTree *);
 

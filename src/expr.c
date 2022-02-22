@@ -1,9 +1,9 @@
 #include "expr.h"
+#include "fungus.h"
 
-/*
 #define EXPR_INDENT 2
 
-static void Expr_dump_r(Expr *expr, int level) {
+static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
     printf("%*s", level * EXPR_INDENT, "");
 
     // check validity
@@ -13,49 +13,44 @@ static void Expr_dump_r(Expr *expr, int level) {
     }
 
     // print data
-    TypeEntry *entry = type_get(expr->ty);
+    const Word *ty_name = Type_name(&fun->types, expr->ty);
+    const Word *mty_name = Type_name(&fun->types, expr->mty);
 
-    printf("%.*s ", (int)entry->name->len, entry->name->str);
+    printf("[ %.*s | %.*s ] ",
+           (int)mty_name->len, mty_name->str,
+           (int)ty_name->len, ty_name->str);
 
-    switch (expr->mty.id) {
-    case MTY_LITERAL:
-        // print value
-        switch (expr->ty.id) {
-        case TY_STRING:
-            printf(">>%.*s<<", (int)expr->_string.len, expr->_string.str);
-            break;
-        case TY_INT:
-            printf("%ld", expr->_int);
-            break;
-        case TY_FLOAT:
-            printf("%lf", expr->_float);
-            break;
-        case TY_BOOL:
-            printf("%s", expr->_bool ? "true" : "false");
-            break;
-        }
+    if (expr->mty.id == fun->t_literal.id) {
+        // literals
+        if (expr->ty.id == fun->t_string.id)
+            printf(">>%.*s<<", (int)expr->string_.len, expr->string_.str);
+        else if (expr->ty.id == fun->t_int.id)
+            printf("%ld", expr->int_);
+        else if (expr->ty.id == fun->t_float.id)
+            printf("%lf", expr->float_);
+        else if (expr->ty.id == fun->t_bool.id)
+            printf("%s", expr->bool_ ? "true" : "false");
+        else
+            fungus_panic("unknown literal type!");
 
-        printf("\n");
+        puts("");
+    } else if (Type_is(&fun->types, expr->mty, fun->t_lexeme)) {
+        // lexemes
+        puts("raw lexeme");
+    } else {
+        fungus_panic("unknown expr type!");
 
-        break;
-    default:
-        // print metatype name
-        entry = metatype_get(expr->mty);
-
-        printf("%.*s\n", (int)entry->name->len, entry->name->str);
+        /* TODO block/childed
+        puts("");
 
         // print child values
         for (size_t i = 0; i < expr->len; ++i)
             Expr_dump_r(expr->exprs[i], level + 1);
-
-        break;
+        */
     }
 }
-*/
 
-void Expr_dump(TypeGraph *tg, Expr *expr) {
-    puts("TODO expr dump");
-
-    // Expr_dump_r(expr, 0);
+void Expr_dump(Fungus *fun, Expr *expr) {
+    Expr_dump_r(fun, expr, 0);
 }
 

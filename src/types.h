@@ -36,7 +36,7 @@ void TypeGraph_del(TypeGraph *);
 Type Type_define(TypeGraph *, TypeDef *def);
 Type Type_get(TypeGraph *, Word *name); // may return INVALID_TYPE
 const Word *Type_name(TypeGraph *, Type ty);
-bool Type_is(TypeGraph *, Type ty, Type other);
+bool Type_is(TypeGraph *, Type ty, Type super);
 
 void TypeGraph_dump(TypeGraph *);
 

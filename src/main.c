@@ -31,6 +31,10 @@ void repl(Fungus *fun) {
         // tokenize
         RawExprBuf rebuf = tokenize(fun, buf, len);
 
+#if 1
+        RawExprBuf_dump(fun, &rebuf);
+#endif
+
         if (global_error)
             goto reset_lex;
 
