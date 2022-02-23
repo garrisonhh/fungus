@@ -13,12 +13,8 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
     }
 
     // print data
-    const Word *ty_name = Type_name(&fun->types, expr->ty);
-    const Word *mty_name = Type_name(&fun->types, expr->mty);
-
-    printf("[ %.*s | %.*s ] ",
-           (int)mty_name->len, mty_name->str,
-           (int)ty_name->len, ty_name->str);
+    Fungus_print_types(fun, expr->ty, expr->mty);
+    printf(" ");
 
     if (expr->mty.id == fun->t_literal.id) {
         // literals

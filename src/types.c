@@ -45,8 +45,12 @@ Type Type_define(TypeGraph *tg, TypeDef *def) {
         .is_len = def->is_len
     };
 
-    for (size_t i = 0; i < def->is_len; ++i)
+    for (size_t i = 0; i < def->is_len; ++i) {
+        if (def->is[i].id == handle.id)
+            fungus_panic("type is itself???");
+
         entry->is[i] = def->is[i];
+    }
 
     Vec_push(&tg->entries, entry);
 

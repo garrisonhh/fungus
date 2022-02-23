@@ -69,10 +69,14 @@ static void Fungus_define_base(Fungus *fun) {
      * base types
      */
     // runtime
+    TypeDef notype_def = { WORD("NoType") };
+    TypeDef anytype_def = { WORD("AnyType") };
     TypeDef string_def = { WORD("String") };
     TypeDef bool_def = { WORD("Bool") };
     TypeDef number_def = { WORD("Number") };
 
+    fun->t_notype = Type_define(&fun->types, &notype_def);
+    fun->t_anytype = Type_define(&fun->types, &anytype_def);
     fun->t_string = Type_define(&fun->types, &string_def);
     fun->t_bool = Type_define(&fun->types, &bool_def);
     fun->t_number = Type_define(&fun->types, &number_def);
@@ -89,13 +93,29 @@ static void Fungus_define_base(Fungus *fun) {
     fun->t_metatype = Type_define(&fun->types, &metatype_def);
 
     Type is_metatype[] = { fun->t_metatype };
+    TypeDef anymetatype_def =
+        { WORD("AnyMetaType"), is_metatype, ARRAY_SIZE(is_metatype) };
     TypeDef literal_def =
         { WORD("Literal"), is_metatype, ARRAY_SIZE(is_metatype) };
     TypeDef lexeme_def =
         { WORD("Lexeme"), is_metatype, ARRAY_SIZE(is_metatype) };
+    TypeDef parens_def =
+        { WORD("Parens"), is_metatype, ARRAY_SIZE(is_metatype) };
 
+    fun->t_anymetatype = Type_define(&fun->types, &anymetatype_def);
     fun->t_literal = Type_define(&fun->types, &literal_def);
     fun->t_lexeme = Type_define(&fun->types, &lexeme_def);
+    fun->t_parens = Type_define(&fun->types, &parens_def);
+
+    // TODO basic type literals
+
+    /*
+     * lexemes (rely on t_lexeme)
+     */
+    Type t_true_literal = Fungus_define_keyword(fun, WORD("true"));
+    Type t_false_literal = Fungus_define_keyword(fun, WORD("false"));
+    Type lparen = Fungus_define_symbol(fun, WORD("("));
+    Type rparen = Fungus_define_symbol(fun, WORD(")"));
 
     /*
      * precedences
@@ -129,7 +149,42 @@ static void Fungus_define_base(Fungus *fun) {
     };
     Prec highest = Prec_define(&fun->precedences, &highest_def);
 
-    // TODO math, parens, etc.
+    /*
+     * rules
+     */
+    RuleAtom true_pat[] = {{ t_true_literal }};
+    RuleDef true_def = {
+        .pattern = true_pat,
+        .len = ARRAY_SIZE(true_pat),
+        .prec = highest,
+        .ty = fun->t_bool,
+        .mty = t_true_literal,
+    };
+    Rule_define(&fun->rules, &true_def);
+
+    RuleAtom false_pat[] = {{ t_false_literal }};
+    RuleDef false_def = {
+        .pattern = false_pat,
+        .len = ARRAY_SIZE(false_pat),
+        .prec = highest,
+        .ty = fun->t_bool,
+        .mty = t_false_literal,
+    };
+    Rule_define(&fun->rules, &false_def);
+
+    RuleAtom parens_rule_pat[] = {
+        { lparen },
+        { fun->t_anymetatype },
+        { rparen },
+    };
+    RuleDef parens_rule_def = {
+        .pattern = parens_rule_pat,
+        .len = ARRAY_SIZE(parens_rule_pat),
+        .prec = highest,
+        .ty = fun->t_anytype,
+        .mty = fun->t_parens,
+    };
+    Rule_define(&fun->rules, &parens_rule_def);
 }
 
 Fungus Fungus_new(void) {
@@ -164,4 +219,37 @@ void Fungus_dump(Fungus *fun) {
     Lexer_dump(&fun->lexer);
     TypeGraph_dump(&fun->types);
     PrecGraph_dump(&fun->precedences);
+    RuleTree_dump(fun, &fun->rules);
+}
+
+// ensure ty is not a metatype and mty is
+static void ensure_valid_types(Fungus *fun, Type ty, Type mty) {
+    if (!Type_is(&fun->types, ty, fun->t_metatype)
+        && Type_is(&fun->types, mty, fun->t_metatype)) {
+        return;
+    }
+
+    fungus_panic("received invalid type pair to a Fungus_print_types func");
+}
+
+void Fungus_print_types(Fungus *fun, Type ty, Type mty) {
+    ensure_valid_types(fun, ty, mty);
+
+    const Word *ty_name = Type_name(&fun->types, ty);
+    const Word *mty_name = Type_name(&fun->types, mty);
+
+    printf("[ %.*s | %.*s ]",
+           (int)ty_name->len, ty_name->str,
+           (int)mty_name->len, mty_name->str);
+}
+
+size_t Fungus_sprint_types(Fungus *fun, char *str, Type ty, Type mty) {
+    ensure_valid_types(fun, ty, mty);
+
+    const Word *ty_name = Type_name(&fun->types, ty);
+    const Word *mty_name = Type_name(&fun->types, mty);
+
+    return sprintf(str, "[ %.*s | %.*s ]",
+                   (int)ty_name->len, ty_name->str,
+                   (int)mty_name->len, mty_name->str);
 }

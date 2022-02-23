@@ -1,4 +1,5 @@
 #include "rules.h"
+#include "fungus.h"
 
 RuleTree RuleTree_new(void) {
     return (RuleTree){
@@ -12,8 +13,8 @@ void RuleTree_del(RuleTree *rt) {
     Bump_del(&rt->pool);
 }
 
-static void *RT_alloc(RuleTree *rt, size_t nbytes) {
-    return Bump_alloc(&rt->pool, nbytes);
+static void *RT_alloc(RuleTree *rt, size_t n_bytes) {
+    return Bump_alloc(&rt->pool, n_bytes);
 }
 
 static RTNode *RT_new_node(RuleTree *rt, RuleAtom *atom) {
@@ -28,9 +29,7 @@ static RTNode *RT_new_node(RuleTree *rt, RuleAtom *atom) {
 }
 
 static bool RuleAtom_eq(RuleAtom *a, RuleAtom *b) {
-    return a->ty.id == b->ty.id
-           && a->mty.id == b->mty.id
-           && a->modifiers == b->modifiers;
+    return a->mty.id == b->mty.id && a->modifiers == b->modifiers;
 }
 
 void Rule_define(RuleTree *rt, RuleDef *def) {
@@ -74,66 +73,45 @@ next_atom:
     cur_node->rule = rule;
 }
 
-/* TODO
-static void RTNode_dump(RTNode *node, char *buf, char *tail);
+static void RTNode_dump(Fungus *fun, RTNode *node, char *buf, char *tail);
 
-static void RTNode_nexts_dump(Vec *nexts, char *buf, char *tail) {
+static void RTNode_nexts_dump(Fungus *fun, Vec *nexts, char *buf, char *tail) {
     for (size_t i = 0; i < nexts->len; ++i)
-        RTNode_dump(nexts->data[i], buf, tail);
+        RTNode_dump(fun, nexts->data[i], buf, tail);
 }
 
-static void RTNode_dump(RTNode *node, char *buf, char *tail) {
-    // sprintf atom pattern
-    tail += sprintf(tail, "(");
+static void RTNode_dump(Fungus *fun, RTNode *node, char *buf, char *tail) {
+    const Word *ty_name = Type_name(&fun->types, node->atom.mty);
 
-    if (node->atom.ty.id != TY_NONE) {
-        TypeEntry *entry = type_get(node->atom.ty);
-
-        tail += sprintf(tail, "%.*s", (int)entry->name->len, entry->name->str);
-    } else {
-        tail += sprintf(tail, "_");
-    }
-
-    tail += sprintf(tail, " ");
-
-    if (node->atom.mty.id != MTY_NONE) {
-        TypeEntry *entry = metatype_get(node->atom.mty);
-
-        tail += sprintf(tail, "%.*s", (int)entry->name->len, entry->name->str);
-    } else {
-        tail += sprintf(tail, "_");
-    }
+    tail += sprintf(tail, "%.*s", (int)ty_name->len, ty_name->str);
 
     if (node->atom.modifiers) {
-        tail += sprintf(tail, " ");
-
         if (node->atom.modifiers & RAM_REPEAT)
             tail += sprintf(tail, "*");
         if (node->atom.modifiers & RAM_OPTIONAL)
             tail += sprintf(tail, "?");
     }
 
-    tail += sprintf(tail, ") ");
+    tail += sprintf(tail, " ");
 
     // print rule if exists
     if (node->rule) {
-        printf("  %s-> ", buf);
-
-        TypeEntry *rule_entry = metatype_get(node->rule->mty);
-
-        printf("%.*s\n", (int)rule_entry->name->len, rule_entry->name->str);
+        printf("%s-> ", buf);
+        Fungus_print_types(fun, node->rule->ty, node->rule->mty);
+        puts("");
     }
 
     // recur on children
-    RTNode_nexts_dump(&node->nexts, buf, tail);
+    RTNode_nexts_dump(fun, &node->nexts, buf, tail);
 }
-*/
 
-void RuleTree_dump(RuleTree *rt) {
-    // char buf[1024];
+void RuleTree_dump(Fungus *fun, RuleTree *rt) {
+    char buf[1024];
 
-    puts("rules:");
-    // RTNode_nexts_dump(&rt->roots, buf, buf);
-    puts("TODO redo");
+    term_format(TERM_CYAN);
+    puts("RuleTree:");
+    term_format(TERM_RESET);
+
+    RTNode_nexts_dump(fun, &rt->roots, buf, buf);
     puts("");
 }

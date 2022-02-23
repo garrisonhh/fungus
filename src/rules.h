@@ -11,9 +11,7 @@ typedef enum RuleAtomModifiers {
 } RuleAtomModifier;
 
 typedef struct RuleAtom {
-    // if ty or mty is NONE, pattern matches any ty or mty
-    Type ty, mty;
-
+    Type mty;
     unsigned modifiers; // bitfield using RuleAtomModifiers
 } RuleAtom;
 
@@ -53,6 +51,6 @@ void RuleTree_del(RuleTree *);
 
 void Rule_define(RuleTree *, RuleDef *def);
 
-void RuleTree_dump(RuleTree *);
+void RuleTree_dump(Fungus *, RuleTree *);
 
 #endif

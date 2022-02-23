@@ -5,6 +5,11 @@
 
 #include "expr.h"
 
+/*
+ * TODO the lexer should just return a token stream, where tokens are just a
+ * metatype and an index into the file string. all other work can be done later.
+ */
+
 typedef struct Fungus Fungus; // forward decl to fix header hell
 
 typedef struct RawExprBuffer {
