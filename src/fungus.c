@@ -121,6 +121,13 @@ static void Fungus_define_base(Fungus *fun) {
     Type lex_plus = Fungus_define_symbol(fun, WORD("+"));
     Type lex_minus = Fungus_define_symbol(fun, WORD("-"));
 
+#define TERNARY_TEST
+
+#ifdef TERNARY_TEST
+    Type lex_question = Fungus_define_symbol(fun, WORD("?"));
+    Type lex_colon = Fungus_define_symbol(fun, WORD(":"));
+#endif
+
     /*
      * precedences
      */
@@ -176,23 +183,27 @@ static void Fungus_define_base(Fungus *fun) {
     };
     Rule_define(fun, &false_def);
 
-    // special lhs rule
-    /*
-    TypeDef lhs_def =
-        { WORD("LHS"), is_metatype, ARRAY_SIZE(is_metatype) };
-    Type lhs = Type_define(&fun->types, &lhs_def);
+#ifdef TERNARY_TEST
+    TypeDef ternary_typedef =
+        { WORD("TernaryExpr"), is_metatype, ARRAY_SIZE(is_metatype) };
+    Type ternary = Type_define(&fun->types, &ternary_typedef);
 
-    PatNode lhs_pat[] = {{ fun->t_literal }};
-    RuleDef lhs_rule_def = {
-        .pattern = lhs_pat,
-        .len = ARRAY_SIZE(lhs_pat),
+    PatNode ternary_pat[] = {
+        { fun->t_runtype },
+        { lex_question },
+        { fun->t_runtype },
+        { lex_colon },
+        { fun->t_runtype },
+    };
+    RuleDef ternary_def = {
+        .pattern = ternary_pat,
+        .len = ARRAY_SIZE(ternary_pat),
         .prec = fun->p_highest,
         .ty = fun->t_runtype,
-        .mty = lhs
+        .mty = ternary
     };
-
-    fun->t_lhs = Rule_define(fun, &lhs_rule_def);
-    */
+    Rule_define(fun, &ternary_def);
+#endif
 
     /*
      * PatNode parens_rule_pat[] = {
@@ -304,8 +315,7 @@ static void ensure_valid_types(Fungus *fun, Type ty, Type mty) {
     if (actual_ty && actual_mty)
         return;
 
-    printf("this type l%s%sks fishy ><> ",
-           actual_ty ? "o" : "O", actual_mty ? "o" : "O");
+    printf("l%s%sks fishy ><> ", actual_ty ? "o" : "O", actual_mty ? "o" : "O");
 }
 
 void Fungus_print_types(Fungus *fun, Type ty, Type mty) {

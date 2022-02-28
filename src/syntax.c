@@ -2,89 +2,17 @@
 
 #include "syntax.h"
 
-static bool node_match(Fungus *fun, RuleNode *node, Expr *expr) {
-    return Type_is(&fun->types, expr->mty, node->ty)
-           || Type_is(&fun->types, expr->ty, node->ty);
-}
-
-// returns whether the rule expansion was terminal, and outputs a rule
-static bool flat_match(Fungus *fun, Expr **exprs, size_t len, Rule **out_rule) {
-    assert(len > 0);
-
-#if 1
-    puts(">>> flat matching >>>");
-
-    for (size_t i = 0; i < len; ++i)
-        Expr_dump(fun, exprs[i]);
-
-    puts("<<< flat matching <<<");
-#endif
-
-    RuleNode *state = fun->rules.root;
-
-    for (size_t i = 0; i < len; ++i) {
-        Expr *expr = exprs[i];
-
-        bool matched = false;
-
-#if 1
-        printf("matching expr: ");
-        Fungus_print_types(fun, expr->ty, expr->mty);
-        printf("\n");
-#endif
-
-        for (size_t j = 0; j < state->nexts.len; ++j) {
-            RuleNode *pot_state = state->nexts.data[j];
-
-#if 1
-            const Word *tn = Type_name(&fun->types, pot_state->ty);
-
-            printf("  %.*s ? ", (int)tn->len, tn->str);
-#endif
-
-            if (node_match(fun, pot_state, expr)) {
-                state = pot_state;
-                matched = true;
-                break;
-            }
-
-            printf("no match\n");
-        }
-
-#if 1
-        printf("%s\n", matched ? "matched!!!" : "no matches :(");
-#endif
-
-        // could not match the array
-        if (!matched) {
-            *out_rule = NULL;
-
-#if 1
-            puts("early terminal failure");
-#endif
-
-            return true;
-        }
-    }
-
-    // may have successfully found a rule
-    *out_rule = state->rule;
-
-#if 1
-    if (state->nexts.len)
-        printf("non-terminal");
-    else
-        printf("terminal");
-
-    if (state->rule)
-        printf(" success\n");
-    else
-        printf(" faiilure\n");
-#endif
-
-    return state->nexts.len == 0;
-}
-
+/*
+ * TODO I think my best bet for handling precedence is using tree manipulations
+ * to handle operator precedence. operator precedence only actually affects
+ * infix-y expressions, so I will just need to recursively delve into the AST
+ *
+ * TODO determining whether another rule actually has a lhs or rhs (like parens
+ * never have either) will likely require access to the Rule struct data for
+ * another rule, I should either store Rule pointers in Exprs (bad idea for long
+ * term rewriteability) or allow access to Rule data in the RuleTree from the
+ * metatype of an expr
+ */
 static Expr *flat_collapse(Fungus *fun, Rule *rule, Expr **exprs, size_t len) {
     // alloc expr
     TypeGraph *types = &fun->types;
@@ -112,27 +40,108 @@ static Expr *flat_collapse(Fungus *fun, Rule *rule, Expr **exprs, size_t len) {
         if (!Type_is(types, exprs[i]->ty, fun->t_notype))
             expr->exprs[j++] = exprs[i];
 
-#if 1
-    const Word *name = Type_name(&fun->types, rule->mty);
+    return expr;
+}
 
-    printf("collapsing with rule %.*s:\n", (int)name->len, name->str);
+static bool node_match(Fungus *fun, RuleNode *node, Expr *expr) {
+    return Type_is(&fun->types, expr->mty, node->ty)
+           || Type_is(&fun->types, expr->ty, node->ty);
+}
+
+#define VERBOSE_FLAT_MATCH
+
+/*
+ * TODO RuleTree matching is a tree search, and I need to implement an actual
+ * tree search algorithm. right now `flat_match` cannot recursively backtrack or do any
+ * actual tree stuff.
+ */
+// returns whether the rule expansion was terminal, and outputs a rule
+static bool flat_match(Fungus *fun, Expr **exprs, size_t len, Rule **o_rule) {
+    assert(len > 0);
+
+#ifdef VERBOSE_FLAT_MATCH
+    puts(">>> flat matching >>>");
 
     for (size_t i = 0; i < len; ++i)
         Expr_dump(fun, exprs[i]);
 
-    printf(">>> into >>>\n");
-
-    Expr_dump(fun, expr);
+    puts("<<< flat matching <<<");
 #endif
 
-    return expr;
+    RuleNode *state = fun->rules.root;
+
+    for (size_t i = 0; i < len; ++i) {
+        Expr *expr = exprs[i];
+
+        bool matched = false;
+
+#ifdef VERBOSE_FLAT_MATCH
+        printf("matching expr: ");
+        Fungus_print_types(fun, expr->ty, expr->mty);
+        printf("\n");
+#endif
+
+        for (size_t j = 0; j < state->nexts.len; ++j) {
+            RuleNode *pot_state = state->nexts.data[j];
+
+#ifdef VERBOSE_FLAT_MATCH
+            const Word *tn = Type_name(&fun->types, pot_state->ty);
+
+            printf("  %.*s ? ", (int)tn->len, tn->str);
+#endif
+
+            if (node_match(fun, pot_state, expr)) {
+                state = pot_state;
+                matched = true;
+                break;
+            }
+
+#ifdef VERBOSE_FLAT_MATCH
+            printf("no match\n");
+#endif
+        }
+
+#ifdef VERBOSE_FLAT_MATCH
+        printf("%s\n", matched ? "matched!!!" : "no matches :(");
+#endif
+
+        // could not match the array
+        if (!matched) {
+            *o_rule = NULL;
+
+#ifdef VERBOSE_FLAT_MATCH
+            puts("early terminal failure");
+#endif
+
+            return true;
+        }
+    }
+
+    // may have successfully found a rule
+    *o_rule = state->rule;
+
+#ifdef VERBOSE_FLAT_MATCH
+    if (state->nexts.len)
+        printf("non-terminal");
+    else
+        printf("terminal");
+
+    if (state->rule)
+        printf(" success\n");
+    else
+        printf(" faiilure\n");
+#endif
+
+    return state->nexts.len == 0;
 }
 
 #define MATCH_STACK_SIZE 256
 
-static Expr *match(Fungus *fun, Expr **exprs, size_t len, Prec min_prec,
-                   size_t *out_match_len) {
-    PrecGraph *precs = &fun->precedences;
+/*
+ * TODO consider matching on a token stream in some form rather than an Expr *
+ * array, get those data-oriented gains
+ */
+static Expr *match(Fungus *fun, Expr **exprs, size_t len, size_t *o_match_len) {
     Expr *stack[MATCH_STACK_SIZE];
     size_t sp = 0;
     Rule *best_match = NULL;
@@ -145,38 +154,23 @@ static Expr *match(Fungus *fun, Expr **exprs, size_t len, Prec min_prec,
 
     // parse rhs
     while (idx < len) {
-        // get next expr; either from a higher precedence rule or the immediate
-        // next expr
+        // get next expr
         size_t next_match_len;
-        Expr *next_expr = NULL;
+        Expr *next_expr = match(fun, &exprs[idx], len - idx, &next_match_len);
 
-        next_expr = match(fun, &exprs[idx], len - idx, min_prec,
-                          &next_match_len);
-
-        if (next_expr) {
-            idx += next_match_len;
-        } else {
-            next_expr = exprs[idx];
-            ++idx;
-        }
+        assert(next_expr);
 
         stack[sp++] = next_expr;
+        idx += next_match_len;
 
         // attempt to match a rule
         Rule *matched = NULL;
         bool terminal = flat_match(fun, stack, sp, &matched);
 
-        if (matched && Prec_cmp(precs, matched->prec, min_prec) != LT) {
+        if (matched) {
             best_match = matched;
             best_match_sp = sp;
             best_match_len = idx;
-
-#if 1
-            const Word *name = Type_name(&fun->types, matched->mty);
-
-            printf("matched rule %.*s with %zu!\n", (int)name->len, name->str,
-                   best_match_sp);
-#endif
         }
 
         if (terminal)
@@ -185,11 +179,11 @@ static Expr *match(Fungus *fun, Expr **exprs, size_t len, Prec min_prec,
 
     if (!best_match) {
         // no matches found, return lhs
-        *out_match_len = 1;
+        *o_match_len = 1;
 
         return stack[0];
     } else {
-        *out_match_len = best_match_len;
+        *o_match_len = best_match_len;
 
         return flat_collapse(fun, best_match, stack, best_match_sp);
     }
@@ -199,7 +193,7 @@ static Expr *match(Fungus *fun, Expr **exprs, size_t len, Prec min_prec,
 // roots, and then just calling match() directly
 static Expr *match_roots(Fungus *fun, Expr **exprs, size_t len) {
     size_t match_len;
-    Expr *ast = match(fun, exprs, len, fun->p_lowest, &match_len);
+    Expr *ast = match(fun, exprs, len, &match_len);
 
     if (match_len != len) // TODO more intelligent error
         fungus_panic("failed to match the full expression!");
