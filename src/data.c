@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdalign.h>
 
 #include "data.h"
@@ -22,18 +23,52 @@ void Vec_del(Vec *v) {
     free(v->data);
 }
 
-// ensures a slot is available, returns pointer to that slot
-void **Vec_alloc(Vec *v) {
-    if (v->len + 1 >= v->cap) {
+// add one slot
+static void Vec_biggify(Vec *v) {
+    if (++v->len >= v->cap) {
         v->cap *= 2;
         v->data = realloc(v->data, v->cap * sizeof(*v->data));
     }
+}
 
-  return &v->data[v->len++];
+// subtract one slot
+static void Vec_smolify(Vec *v) {
+    if (--v->len <= v->cap / 2) {
+        v->cap /= 2;
+        v->data = realloc(v->data, v->cap * sizeof(*v->data));
+    }
+}
+
+// ensures a slot is available, returns pointer to that slot
+void **Vec_alloc(Vec *v) {
+    Vec_biggify(v);
+
+    return &v->data[v->len - 1];
+}
+
+void Vec_clear(Vec *v) {
+    v->len = 0;
+    v->cap = VEC_INIT_CAP;
+    v->data = realloc(v->data, v->cap * sizeof(*v->data));
 }
 
 void Vec_push(Vec *v, const void *item) {
-    *Vec_alloc(v) = (void *)item;
+    *(const void **)Vec_alloc(v) = item;
+}
+
+// inserts idx into a slot in O(n) time to maintain sorted order
+void Vec_ordered_insert(Vec *v, size_t idx, const void *item) {
+    if (idx > v->len) {
+        fprintf(stderr, "attempted to insert item in Vec past end of array.\n");
+        exit(-1);
+    }
+
+    Vec_alloc(v);
+
+    for (size_t i = v->len - 1; i > idx; --i)
+        v->data[i] = v->data[i - 1];
+
+    v->data[idx] = (void *)item;
 }
 
 void Vec_qsort(Vec *v, int (*cmp)(const void *, const void *)) {
@@ -99,4 +134,17 @@ void *Bump_alloc(Bump *b, size_t nbytes) {
     b->bump += nbytes;
 
     return ptr;
+}
+
+void Bump_clear(Bump *b) {
+    // free all pages but the first
+    for (size_t i = 1; i < b->pages.len; ++i)
+        free(b->pages.data[i]);
+
+    for (size_t i = 0; i < b->lost_n_found.len; ++i)
+        free(b->lost_n_found.data[i]);
+
+    // reset bump
+    b->page = b->pages.data[0];
+    b->bump = 0;
 }

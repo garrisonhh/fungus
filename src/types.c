@@ -74,6 +74,10 @@ const Word *Type_name(TypeGraph *tg, Type ty) {
 }
 
 bool Type_is(TypeGraph *tg, Type ty, Type other) {
+    // check self
+    if (ty.id == other.id)
+        return true;
+
     TypeEntry *entry = TG_get(tg, ty);
 
     // check direct parents

@@ -70,13 +70,16 @@ static void Fungus_define_base(Fungus *fun) {
      */
     // runtime
     TypeDef notype_def = { WORD("NoType") };
-    TypeDef anytype_def = { WORD("AnyType") };
-    TypeDef string_def = { WORD("String") };
-    TypeDef bool_def = { WORD("Bool") };
-    TypeDef number_def = { WORD("Number") };
+    TypeDef runtype_def = { WORD("RunType") };
 
     fun->t_notype = Type_define(&fun->types, &notype_def);
-    fun->t_anytype = Type_define(&fun->types, &anytype_def);
+    fun->t_runtype = Type_define(&fun->types, &runtype_def);
+
+    Type is_runtype[] = { fun->t_runtype };
+    TypeDef string_def = { WORD("String"), is_runtype, ARRAY_SIZE(is_runtype) };
+    TypeDef bool_def = { WORD("Bool"), is_runtype, ARRAY_SIZE(is_runtype) };
+    TypeDef number_def = { WORD("Number"), is_runtype, ARRAY_SIZE(is_runtype) };
+
     fun->t_string = Type_define(&fun->types, &string_def);
     fun->t_bool = Type_define(&fun->types, &bool_def);
     fun->t_number = Type_define(&fun->types, &number_def);
@@ -93,8 +96,6 @@ static void Fungus_define_base(Fungus *fun) {
     fun->t_metatype = Type_define(&fun->types, &metatype_def);
 
     Type is_metatype[] = { fun->t_metatype };
-    TypeDef anymetatype_def =
-        { WORD("AnyMetaType"), is_metatype, ARRAY_SIZE(is_metatype) };
     TypeDef literal_def =
         { WORD("Literal"), is_metatype, ARRAY_SIZE(is_metatype) };
     TypeDef lexeme_def =
@@ -102,20 +103,23 @@ static void Fungus_define_base(Fungus *fun) {
     TypeDef parens_def =
         { WORD("Parens"), is_metatype, ARRAY_SIZE(is_metatype) };
 
-    fun->t_anymetatype = Type_define(&fun->types, &anymetatype_def);
     fun->t_literal = Type_define(&fun->types, &literal_def);
     fun->t_lexeme = Type_define(&fun->types, &lexeme_def);
     fun->t_parens = Type_define(&fun->types, &parens_def);
 
-    // TODO basic type literals
-
     /*
-     * lexemes (rely on t_lexeme)
+     * lexemes (Fungus_define_x funcs rely on t_lexeme)
      */
-    Type t_true_literal = Fungus_define_keyword(fun, WORD("true"));
-    Type t_false_literal = Fungus_define_keyword(fun, WORD("false"));
-    Type lparen = Fungus_define_symbol(fun, WORD("("));
-    Type rparen = Fungus_define_symbol(fun, WORD(")"));
+    Type lex_true = Fungus_define_keyword(fun, WORD("true"));
+    Type lex_false = Fungus_define_keyword(fun, WORD("false"));
+
+    // Type lex_lparen = Fungus_define_symbol(fun, WORD("("));
+    // Type lex_rparen = Fungus_define_symbol(fun, WORD(")"));
+    Type lex_star = Fungus_define_symbol(fun, WORD("*"));
+    Type lex_rslash = Fungus_define_symbol(fun, WORD("/"));
+    Type lex_percent = Fungus_define_symbol(fun, WORD("%"));
+    Type lex_plus = Fungus_define_symbol(fun, WORD("+"));
+    Type lex_minus = Fungus_define_symbol(fun, WORD("-"));
 
     /*
      * precedences
@@ -123,9 +127,9 @@ static void Fungus_define_base(Fungus *fun) {
     PrecDef lowest_def = {
         .name = WORD("LowestPrecedence")
     };
-    Prec lowest = Prec_define(&fun->precedences, &lowest_def);
+    fun->p_lowest = Prec_define(&fun->precedences, &lowest_def);
 
-    Prec addsub_above[] = { lowest };
+    Prec addsub_above[] = { fun->p_lowest };
     PrecDef addsub_def = {
         .name = WORD("AddSubPrecedence"),
         .above = addsub_above,
@@ -147,44 +151,102 @@ static void Fungus_define_base(Fungus *fun) {
         .above = highest_above,
         .above_len = ARRAY_SIZE(highest_above),
     };
-    Prec highest = Prec_define(&fun->precedences, &highest_def);
+    fun->p_highest = Prec_define(&fun->precedences, &highest_def);
 
     /*
      * rules
      */
-    RuleAtom true_pat[] = {{ t_true_literal }};
+    PatNode true_pat[] = {{ lex_true }};
     RuleDef true_def = {
         .pattern = true_pat,
         .len = ARRAY_SIZE(true_pat),
-        .prec = highest,
+        .prec = fun->p_highest,
         .ty = fun->t_bool,
-        .mty = t_true_literal,
+        .mty = lex_true,
     };
-    Rule_define(&fun->rules, &true_def);
+    Rule_define(fun, &true_def);
 
-    RuleAtom false_pat[] = {{ t_false_literal }};
+    PatNode false_pat[] = {{ lex_false }};
     RuleDef false_def = {
         .pattern = false_pat,
         .len = ARRAY_SIZE(false_pat),
-        .prec = highest,
+        .prec = fun->p_highest,
         .ty = fun->t_bool,
-        .mty = t_false_literal,
+        .mty = lex_false,
     };
-    Rule_define(&fun->rules, &false_def);
+    Rule_define(fun, &false_def);
 
-    RuleAtom parens_rule_pat[] = {
-        { lparen },
-        { fun->t_anymetatype },
-        { rparen },
+    // special lhs rule
+    /*
+    TypeDef lhs_def =
+        { WORD("LHS"), is_metatype, ARRAY_SIZE(is_metatype) };
+    Type lhs = Type_define(&fun->types, &lhs_def);
+
+    PatNode lhs_pat[] = {{ fun->t_literal }};
+    RuleDef lhs_rule_def = {
+        .pattern = lhs_pat,
+        .len = ARRAY_SIZE(lhs_pat),
+        .prec = fun->p_highest,
+        .ty = fun->t_runtype,
+        .mty = lhs
     };
-    RuleDef parens_rule_def = {
-        .pattern = parens_rule_pat,
-        .len = ARRAY_SIZE(parens_rule_pat),
-        .prec = highest,
-        .ty = fun->t_anytype,
-        .mty = fun->t_parens,
+
+    fun->t_lhs = Rule_define(fun, &lhs_rule_def);
+    */
+
+    /*
+     * PatNode parens_rule_pat[] = {
+     *     { lex_lparen },
+     *     { fun->t_metatype }, // TODO supertype -> concrete type inference
+     *     { lex_rparen },
+     * };
+     * RuleDef parens_rule_def = {
+     *     .pattern = parens_rule_pat,
+     *     .len = ARRAY_SIZE(parens_rule_pat),
+     *     .prec = fun->p_highest,
+     *     .ty = fun->t_runtype, // TODO supertype -> concrete type inference
+     *     .mty = fun->t_parens,
+     * };
+     * Rule_define(fun, &parens_rule_def);
+     */
+
+    /*
+     * math
+     */
+    typedef struct BinaryMathOperator {
+        Word name;
+        Type sym;
+        Prec prec;
+    } BinMathOp;
+
+    BinMathOp binary_math_ops[] = {
+      /*  name:             sym:         prec:   */
+        { WORD("Multiply"), lex_star,    muldiv },
+        { WORD("Divide"),   lex_rslash,  muldiv },
+        { WORD("Modulus"),  lex_percent, muldiv },
+        { WORD("Add"),      lex_plus,    addsub },
+        { WORD("Subtract"), lex_minus,   addsub },
     };
-    Rule_define(&fun->rules, &parens_rule_def);
+
+    for (size_t i = 0; i < ARRAY_SIZE(binary_math_ops); ++i) {
+        BinMathOp *op = &binary_math_ops[i];
+
+        // rule metatype
+        Type op_is[] = { fun->t_metatype };
+        TypeDef op_def = { op->name, op_is, ARRAY_SIZE(op_is) };
+        Type op_ty = Type_define(&fun->types, &op_def);
+
+        // rule itself
+        PatNode bin_pat[] = {{ fun->t_number }, { op->sym }, { fun->t_number }};
+        RuleDef bin_def = {
+            .pattern = bin_pat,
+            .len = ARRAY_SIZE(bin_pat),
+            .prec = op->prec,
+            .ty = fun->t_number,
+            .mty = op_ty
+        };
+        Rule_define(fun, &bin_def);
+    }
 }
 
 Fungus Fungus_new(void) {
@@ -192,7 +254,9 @@ Fungus Fungus_new(void) {
         .lexer = Lexer_new(),
         .types = TypeGraph_new(),
         .precedences = PrecGraph_new(),
-        .rules = RuleTree_new()
+        .rules = RuleTree_new(),
+
+        .temp = Bump_new()
     };
 
     Fungus_define_base(&fun);
@@ -205,10 +269,20 @@ Fungus Fungus_new(void) {
 }
 
 void Fungus_del(Fungus *fun) {
+    Bump_del(&fun->temp);
+
     RuleTree_del(&fun->rules);
     PrecGraph_del(&fun->precedences);
     TypeGraph_del(&fun->types);
     Lexer_del(&fun->lexer);
+}
+
+void *Fungus_tmp_alloc(Fungus *fun, size_t n_bytes) {
+    return Bump_alloc(&fun->temp, n_bytes);
+}
+
+void Fungus_tmp_clear(Fungus *fun) {
+    Bump_clear(&fun->temp);
 }
 
 void Fungus_dump(Fungus *fun) {
@@ -224,12 +298,14 @@ void Fungus_dump(Fungus *fun) {
 
 // ensure ty is not a metatype and mty is
 static void ensure_valid_types(Fungus *fun, Type ty, Type mty) {
-    if (!Type_is(&fun->types, ty, fun->t_metatype)
-        && Type_is(&fun->types, mty, fun->t_metatype)) {
-        return;
-    }
+    bool actual_ty = !Type_is(&fun->types, ty, fun->t_metatype);
+    bool actual_mty = Type_is(&fun->types, mty, fun->t_metatype);
 
-    fungus_panic("received invalid type pair to a Fungus_print_types func");
+    if (actual_ty && actual_mty)
+        return;
+
+    printf("this type l%s%sks fishy ><> ",
+           actual_ty ? "o" : "O", actual_mty ? "o" : "O");
 }
 
 void Fungus_print_types(Fungus *fun, Type ty, Type mty) {

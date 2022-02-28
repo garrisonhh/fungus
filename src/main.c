@@ -39,15 +39,14 @@ void repl(Fungus *fun) {
             goto reset_lex;
 
         // parse
-        IterCtx ctx = IterCtx_new();
-
-        /* Expr *ast = */ parse(fun, &ctx, rebuf.exprs, rebuf.len);
+        Expr *ast = parse(fun, rebuf.exprs, rebuf.len);
 
         if (global_error)
             goto reset_parse;
 
+        Expr_dump(fun, ast);
+
 reset_parse:
-        IterCtx_del(&ctx);
 reset_lex:
         RawExprBuf_del(&rebuf);
 

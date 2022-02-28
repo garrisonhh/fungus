@@ -1,38 +1,41 @@
 #include "rules.h"
 #include "fungus.h"
 
-RuleTree RuleTree_new(void) {
-    return (RuleTree){
-        .pool = Bump_new(),
-        .roots = Vec_new()
-    };
-}
-
-void RuleTree_del(RuleTree *rt) {
-    Vec_del(&rt->roots);
-    Bump_del(&rt->pool);
-}
-
 static void *RT_alloc(RuleTree *rt, size_t n_bytes) {
     return Bump_alloc(&rt->pool, n_bytes);
 }
 
-static RTNode *RT_new_node(RuleTree *rt, RuleAtom *atom) {
-    RTNode *node = RT_alloc(rt, sizeof(*node));
+static RuleNode *RT_new_node(RuleTree *rt, RuleNode *parent, Type ty) {
+    RuleNode *node = RT_alloc(rt, sizeof(*node));
 
-    *node = (RTNode){
+    *node = (RuleNode){
+        .ty = ty,
         .nexts = Vec_new(),
-        .atom = *atom
+        .parent = parent
     };
 
     return node;
 }
 
-static bool RuleAtom_eq(RuleAtom *a, RuleAtom *b) {
-    return a->mty.id == b->mty.id && a->modifiers == b->modifiers;
+RuleTree RuleTree_new(void) {
+    RuleTree rt = {
+        .pool = Bump_new()
+    };
+
+    rt.root = RT_new_node(&rt, NULL, INVALID_TYPE);
+
+    return rt;
 }
 
-void Rule_define(RuleTree *rt, RuleDef *def) {
+void RuleTree_del(RuleTree *rt) {
+    // TODO vecs from rulenodes are leaked
+
+    Bump_del(&rt->pool);
+}
+
+Rule *Rule_define(Fungus *fun, RuleDef *def) {
+    RuleTree *rt = &fun->rules;
+
     // validate RuleDef
     bool valid = def->len && def->pattern;
 
@@ -45,51 +48,56 @@ void Rule_define(RuleTree *rt, RuleDef *def) {
     *rule = (Rule){ def->prec, def->ty, def->mty, def->interpret };
 
     // place node
-    Vec *next_atoms = &rt->roots;
-    RTNode *cur_node;
+    Vec *next_rtnodes = &rt->root->nexts;
+    RuleNode *cur_rtnode = NULL;
 
     for (size_t i = 0; i < def->len; ++i) {
-        RuleAtom *cur_atom = &def->pattern[i];
+        PatNode *cur_patnode = &def->pattern[i];
 
-        for (size_t j = 0; j < next_atoms->len; ++j) {
-            RTNode *maybe_match = next_atoms->data[j];
+        for (size_t j = 0; j < next_rtnodes->len; ++j) {
+            RuleNode *pot_match = next_rtnodes->data[j];
 
-            if (RuleAtom_eq(cur_atom, &maybe_match->atom)) {
-                cur_node = maybe_match;
-                goto next_atom;
+            if (cur_patnode->ty.id == pot_match->ty.id) {
+                // perfect match
+                cur_rtnode = pot_match;
+                goto next_node;
+            } else if (Type_is(&fun->types, cur_patnode->ty, pot_match->ty)) {
+                // supertype match, put this node in front of it so that rule
+                // checking sees the most specific type first
+                cur_rtnode = RT_new_node(rt, cur_rtnode, cur_patnode->ty);
+                Vec_ordered_insert(next_rtnodes, j, cur_rtnode);
+                goto next_node;
             }
         }
 
         // no node match found, create new node
-        cur_node = RT_new_node(rt, cur_atom);
-        Vec_push(next_atoms, cur_node);
+        cur_rtnode = RT_new_node(rt, cur_rtnode, cur_patnode->ty);
+        Vec_push(next_rtnodes, cur_rtnode);
 
+next_node:
         // iterate
-next_atom:
-        next_atoms = &cur_node->nexts;
+        next_rtnodes = &cur_rtnode->nexts;
+
+        // allow repetition
+        if (cur_patnode->modifiers & PAT_REPEAT)
+            Vec_push(&cur_rtnode->nexts, cur_rtnode);
     }
 
-    // add rule to last node
-    cur_node->rule = rule;
+    // add rule to last node and return
+    return cur_rtnode->rule = rule;
 }
 
-static void RTNode_dump(Fungus *fun, RTNode *node, char *buf, char *tail);
-
-static void RTNode_nexts_dump(Fungus *fun, Vec *nexts, char *buf, char *tail) {
-    for (size_t i = 0; i < nexts->len; ++i)
-        RTNode_dump(fun, nexts->data[i], buf, tail);
-}
-
-static void RTNode_dump(Fungus *fun, RTNode *node, char *buf, char *tail) {
-    const Word *ty_name = Type_name(&fun->types, node->atom.mty);
+static void RuleNode_dump(Fungus *fun, RuleNode *node, char *buf, char *tail) {
+    const Word *ty_name = Type_name(&fun->types, node->ty);
 
     tail += sprintf(tail, "%.*s", (int)ty_name->len, ty_name->str);
 
-    if (node->atom.modifiers) {
-        if (node->atom.modifiers & RAM_REPEAT)
-            tail += sprintf(tail, "*");
-        if (node->atom.modifiers & RAM_OPTIONAL)
-            tail += sprintf(tail, "?");
+    // repeating patterns
+    for (size_t i = 0; i < node->nexts.len; ++i) {
+        if (node->nexts.data[i] == node) {
+            tail += sprintf(tail, "[*]");
+            break;
+        }
     }
 
     tail += sprintf(tail, " ");
@@ -102,7 +110,9 @@ static void RTNode_dump(Fungus *fun, RTNode *node, char *buf, char *tail) {
     }
 
     // recur on children
-    RTNode_nexts_dump(fun, &node->nexts, buf, tail);
+    for (size_t i = 0; i < node->nexts.len; ++i)
+        if (node->nexts.data[i] != node)
+            RuleNode_dump(fun, node->nexts.data[i], buf, tail);
 }
 
 void RuleTree_dump(Fungus *fun, RuleTree *rt) {
@@ -112,6 +122,8 @@ void RuleTree_dump(Fungus *fun, RuleTree *rt) {
     puts("RuleTree:");
     term_format(TERM_RESET);
 
-    RTNode_nexts_dump(fun, &rt->roots, buf, buf);
+    for (size_t i = 0; i < rt->root->nexts.len; ++i)
+        RuleNode_dump(fun, rt->root->nexts.data[i], buf, buf);
+
     puts("");
 }

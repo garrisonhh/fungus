@@ -23,6 +23,6 @@ typedef struct Expr {
     };
 } Expr;
 
-void Expr_dump(Fungus *fun, Expr *expr);
+void Expr_dump(Fungus *, Expr *expr);
 
 #endif

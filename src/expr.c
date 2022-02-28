@@ -34,15 +34,11 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
         // lexemes
         puts("raw lexeme");
     } else {
-        fungus_panic("unknown expr type!");
-
-        /* TODO block/childed
+        // print child values
         puts("");
 
-        // print child values
         for (size_t i = 0; i < expr->len; ++i)
-            Expr_dump_r(expr->exprs[i], level + 1);
-        */
+            Expr_dump_r(fun, expr->exprs[i], level + 1);
     }
 }
 

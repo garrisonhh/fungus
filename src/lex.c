@@ -243,7 +243,7 @@ static bool match_symbol(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
             if (type.id == INVALID_TYPE.id)
                 fungus_panic("matched invalid symbol type");
 
-            RawExprBuf_next(rebuf, fun->t_notype, fun->t_lexeme);
+            RawExprBuf_next(rebuf, fun->t_notype, type);
 
             return true;
         }
