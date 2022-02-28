@@ -7,10 +7,15 @@
  * TypeGraph is a generic type system representation, usable for both runtime
  * and comptime fungus types
  *
- * current features:
- * - directed acyclic type graph (Int and Float are also Number)
- * - TODO function types
- * - TODO algebraic types
+ * TODO algebraic, mutable types (probably fully replacing the type graph):
+ * - instead of having type graph, types are stored in expression form. when
+ *   a type is declared to 'extend' another type, it can be added as an 'or'
+ *   clause to the original type.
+ *   - this means fungus programs can be written in a sort of nicely restricted
+ *     duck typing style, basically Zig's comptime system with guarantees that
+ *     are closer to Rust's `where` clauses
+ * - syntax patterns can be expressed as types which match `RunType * CompType`
+ *   - type matching should be expressable in the language as well
  */
 
 typedef struct TypeHandle { unsigned id; } Type;

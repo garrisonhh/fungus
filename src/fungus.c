@@ -92,16 +92,16 @@ static void Fungus_define_base(Fungus *fun) {
     fun->t_float = Type_define(&fun->types, &float_def);
 
     // meta
-    TypeDef metatype_def = { WORD("MetaType") };
-    fun->t_metatype = Type_define(&fun->types, &metatype_def);
+    TypeDef comptype_def = { WORD("CompType") };
+    fun->t_comptype = Type_define(&fun->types, &comptype_def);
 
-    Type is_metatype[] = { fun->t_metatype };
+    Type is_comptype[] = { fun->t_comptype };
     TypeDef literal_def =
-        { WORD("Literal"), is_metatype, ARRAY_SIZE(is_metatype) };
+        { WORD("Literal"), is_comptype, ARRAY_SIZE(is_comptype) };
     TypeDef lexeme_def =
-        { WORD("Lexeme"), is_metatype, ARRAY_SIZE(is_metatype) };
+        { WORD("Lexeme"), is_comptype, ARRAY_SIZE(is_comptype) };
     TypeDef parens_def =
-        { WORD("Parens"), is_metatype, ARRAY_SIZE(is_metatype) };
+        { WORD("Parens"), is_comptype, ARRAY_SIZE(is_comptype) };
 
     fun->t_literal = Type_define(&fun->types, &literal_def);
     fun->t_lexeme = Type_define(&fun->types, &lexeme_def);
@@ -185,7 +185,7 @@ static void Fungus_define_base(Fungus *fun) {
 
 #ifdef TERNARY_TEST
     TypeDef ternary_typedef =
-        { WORD("TernaryExpr"), is_metatype, ARRAY_SIZE(is_metatype) };
+        { WORD("TernaryExpr"), is_comptype, ARRAY_SIZE(is_comptype) };
     Type ternary = Type_define(&fun->types, &ternary_typedef);
 
     PatNode ternary_pat[] = {
@@ -208,7 +208,7 @@ static void Fungus_define_base(Fungus *fun) {
     /*
      * PatNode parens_rule_pat[] = {
      *     { lex_lparen },
-     *     { fun->t_metatype }, // TODO supertype -> concrete type inference
+     *     { fun->t_comptype }, // TODO supertype -> concrete type inference
      *     { lex_rparen },
      * };
      * RuleDef parens_rule_def = {
@@ -242,8 +242,8 @@ static void Fungus_define_base(Fungus *fun) {
     for (size_t i = 0; i < ARRAY_SIZE(binary_math_ops); ++i) {
         BinMathOp *op = &binary_math_ops[i];
 
-        // rule metatype
-        Type op_is[] = { fun->t_metatype };
+        // rule comptype
+        Type op_is[] = { fun->t_comptype };
         TypeDef op_def = { op->name, op_is, ARRAY_SIZE(op_is) };
         Type op_ty = Type_define(&fun->types, &op_def);
 
@@ -307,10 +307,10 @@ void Fungus_dump(Fungus *fun) {
     RuleTree_dump(fun, &fun->rules);
 }
 
-// ensure ty is not a metatype and mty is
+// ensure ty is not a comptype and mty is
 static void ensure_valid_types(Fungus *fun, Type ty, Type mty) {
-    bool actual_ty = !Type_is(&fun->types, ty, fun->t_metatype);
-    bool actual_mty = Type_is(&fun->types, mty, fun->t_metatype);
+    bool actual_ty = !Type_is(&fun->types, ty, fun->t_comptype);
+    bool actual_mty = Type_is(&fun->types, mty, fun->t_comptype);
 
     if (actual_ty && actual_mty)
         return;

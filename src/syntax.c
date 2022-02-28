@@ -11,7 +11,7 @@
  * never have either) will likely require access to the Rule struct data for
  * another rule, I should either store Rule pointers in Exprs (bad idea for long
  * term rewriteability) or allow access to Rule data in the RuleTree from the
- * metatype of an expr
+ * comptype of an expr
  */
 static Expr *flat_collapse(Fungus *fun, Rule *rule, Expr **exprs, size_t len) {
     // alloc expr
@@ -138,6 +138,11 @@ static bool flat_match(Fungus *fun, Expr **exprs, size_t len, Rule **o_rule) {
 #define MATCH_STACK_SIZE 256
 
 /*
+ * TODO it makes much more sense to push rawexprs/tokens on a stack from the
+ * right instead of the left. this will eliminate a crapload of recursive
+ * function calls and unnecessary failed flat_matching, especially now
+ * that I'm doing precedence through tree manipulation.
+ *
  * TODO consider matching on a token stream in some form rather than an Expr *
  * array, get those data-oriented gains
  */
