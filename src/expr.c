@@ -13,10 +13,10 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
     }
 
     // print data
-    Fungus_print_types(fun, expr->ty, expr->mty);
+    Fungus_print_types(fun, expr->ty, expr->cty);
     printf(" ");
 
-    if (expr->mty.id == fun->t_literal.id) {
+    if (expr->cty.id == fun->t_literal.id) {
         // literals
         if (expr->ty.id == fun->t_string.id)
             printf(">>%.*s<<", (int)expr->string_.len, expr->string_.str);
@@ -30,7 +30,7 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
             fungus_panic("unknown literal type!");
 
         puts("");
-    } else if (Type_is(&fun->types, expr->mty, fun->t_lexeme)) {
+    } else if (Type_is(&fun->types, expr->cty, fun->t_lexeme)) {
         // lexemes
         puts("raw lexeme");
     } else {

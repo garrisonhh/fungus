@@ -65,11 +65,11 @@ static Expr *RawExprBuf_alloc(RawExprBuf *rebuf) {
     return &rebuf->exprs[rebuf->len++];
 }
 
-static Expr *RawExprBuf_next(RawExprBuf *rebuf, Type ty, Type mty) {
+static Expr *RawExprBuf_next(RawExprBuf *rebuf, Type ty, Type cty) {
     Expr *expr = RawExprBuf_alloc(rebuf);
 
     expr->ty = ty;
-    expr->mty = mty;
+    expr->cty = cty;
 
     return expr;
 }

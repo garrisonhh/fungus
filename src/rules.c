@@ -45,7 +45,12 @@ Rule *Rule_define(Fungus *fun, RuleDef *def) {
     // create Rule
     Rule *rule = RT_alloc(rt, sizeof(*rule));
 
-    *rule = (Rule){ def->prec, def->ty, def->mty, def->interpret };
+    *rule = (Rule){
+        .name = Word_copy_of(&def->name, &fun->rules.pool),
+        .prec = def->prec,
+        .cty = def->cty,
+        .hook = def->hook
+    };
 
     // place node
     Vec *next_rtnodes = &rt->root->nexts;
@@ -88,9 +93,9 @@ next_node:
 }
 
 static void RuleNode_dump(Fungus *fun, RuleNode *node, char *buf, char *tail) {
-    const Word *ty_name = Type_name(&fun->types, node->ty);
+    const Word *name = Type_name(&fun->types, node->ty);
 
-    tail += sprintf(tail, "%.*s", (int)ty_name->len, ty_name->str);
+    tail += sprintf(tail, "%.*s", (int)name->len, name->str);
 
     // repeating patterns
     for (size_t i = 0; i < node->nexts.len; ++i) {
@@ -104,9 +109,9 @@ static void RuleNode_dump(Fungus *fun, RuleNode *node, char *buf, char *tail) {
 
     // print rule if exists
     if (node->rule) {
-        printf("%s-> ", buf);
-        Fungus_print_types(fun, node->rule->ty, node->rule->mty);
-        puts("");
+        name = node->rule->name;
+
+        printf("%.*s: %s\n", (int)name->len, name->str, buf);
     }
 
     // recur on children

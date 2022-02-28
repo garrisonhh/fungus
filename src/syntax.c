@@ -16,39 +16,33 @@
 static Expr *flat_collapse(Fungus *fun, Rule *rule, Expr **exprs, size_t len) {
     // alloc expr
     TypeGraph *types = &fun->types;
-    Expr *expr = Fungus_tmp_alloc(fun, sizeof(*expr));
-
-    *expr = (Expr){
-        .ty = rule->ty,
-        .mty = rule->mty
-    };
-
-    // count runtime vals
-    size_t num_runtime = 0;
+    size_t num_children = 0;
 
     for (size_t i = 0; i < len; ++i)
         if (!Type_is(types, exprs[i]->ty, fun->t_notype))
-            ++num_runtime;
+            ++num_children;
 
-    // collapse rule
-    expr->len = num_runtime;
-    expr->exprs = Fungus_tmp_alloc(fun, expr->len * sizeof(*expr->exprs));
+    Expr *expr = Fungus_tmp_expr(fun, num_children);
 
+    // copy children to rule
     size_t j = 0;
 
     for (size_t i = 0; i < len; ++i)
         if (!Type_is(types, exprs[i]->ty, fun->t_notype))
             expr->exprs[j++] = exprs[i];
 
+    // apply rule
+    rule->hook(fun, rule, expr);
+
     return expr;
 }
 
 static bool node_match(Fungus *fun, RuleNode *node, Expr *expr) {
-    return Type_is(&fun->types, expr->mty, node->ty)
+    return Type_is(&fun->types, expr->cty, node->ty)
            || Type_is(&fun->types, expr->ty, node->ty);
 }
 
-#define VERBOSE_FLAT_MATCH
+// #define VERBOSE_FLAT_MATCH
 
 /*
  * TODO RuleTree matching is a tree search, and I need to implement an actual
@@ -77,7 +71,7 @@ static bool flat_match(Fungus *fun, Expr **exprs, size_t len, Rule **o_rule) {
 
 #ifdef VERBOSE_FLAT_MATCH
         printf("matching expr: ");
-        Fungus_print_types(fun, expr->ty, expr->mty);
+        Fungus_print_types(fun, expr->ty, expr->cty);
         printf("\n");
 #endif
 
@@ -154,8 +148,13 @@ static Expr *match(Fungus *fun, Expr **exprs, size_t len, size_t *o_match_len) {
 
     size_t idx = 0;
 
-    // always pop lhs (first element in rule)
+    // always pop and match lhs (first element in rule)
     stack[sp++] = exprs[idx++];
+
+    Rule *lhs_rule = NULL;
+
+    if (flat_match(fun, stack, 1, &lhs_rule) && lhs_rule)
+        stack[0] = flat_collapse(fun, lhs_rule, stack, 1);
 
     // parse rhs
     while (idx < len) {

@@ -6,7 +6,7 @@
 typedef struct Fungus Fungus;
 
 typedef struct Expr {
-    Type ty, mty;
+    Type ty, cty;
 
     union {
         // literal

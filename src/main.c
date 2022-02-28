@@ -44,7 +44,12 @@ void repl(Fungus *fun) {
         if (global_error)
             goto reset_parse;
 
+#if 1
+        term_format(TERM_CYAN);
+        puts("AST:");
+        term_format(TERM_RESET);
         Expr_dump(fun, ast);
+#endif
 
 reset_parse:
 reset_lex:

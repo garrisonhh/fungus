@@ -16,23 +16,29 @@ typedef struct PatNode {
     unsigned modifiers; // bitfield using modifiers
 } PatNode;
 
-typedef Expr *(*RuleHook)(Expr *);
+typedef struct Rule Rule;
+
+// RuleHooks take an untyped expr filled with raw pattern match data as
+// children, and adds type info + whatever else it needs to do
+typedef void (*RuleHook)(Fungus *fun, Rule *rule, Expr *expr);
 
 // fill this out in order to define a rule
 typedef struct RuleDef {
+    Word name;
     PatNode *pattern;
     size_t len;
     Prec prec;
-    Type ty, mty;
-    RuleHook interpret;
+    Type cty;
+    RuleHook hook;
 } RuleDef;
 
 // used to store rule data at the end of an atom
-typedef struct Rule {
+struct Rule {
+    Word *name;
     Prec prec;
-    Type ty, mty; // the types of the rule's value, and of the rule itself
-    RuleHook interpret; // NULL for subrules (fragments of a rule)
-} Rule;
+    Type cty; // available for use with some rules, must probably won't use it
+    RuleHook hook;
+};
 
 // nodes could use hashmaps instead of vecs to store nexts, but I'm not sure
 // this would actually result in a performance improvement
