@@ -5,10 +5,13 @@
 #include "precedence.h"
 #include "expr.h"
 
+#ifndef MAX_RULE_LEN
+#define MAX_RULE_LEN 64
+#endif
+
 enum PatternNodeModifiers {
     PAT_REPEAT = 0x1,
-    // PAT_OPTIONAL = 0x2, TODO unimplementable with current Rule_define impl,
-    // need a recursive impl I think
+    // PAT_OPTIONAL = 0x2, TODO
 };
 
 typedef struct PatNode {

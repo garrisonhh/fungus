@@ -42,13 +42,14 @@ static bool node_match(Fungus *fun, RuleNode *node, Expr *expr) {
            || Type_is(&fun->types, expr->ty, node->ty);
 }
 
-// returns terminicity
+#if 0
+// returns terminicity, outputs any rule matches
 static bool match_r(Fungus *fun, Expr **exprs, size_t len, RuleNode *state,
                     Rule **o_rule) {
     if (len == 0) {
-        // reached end of matches
         *o_rule = state->rule;
 
+        // reached end of tree branch
         return state->rule || !state->nexts.len;
     } else {
         // parse_r on children
@@ -68,16 +69,58 @@ static bool match_r(Fungus *fun, Expr **exprs, size_t len, RuleNode *state,
         return false;
     }
 }
+#endif
 
-/*
- * attempt to match a rule to an expr slice. returns whether slice was fully
- * explored (terminal), and any rule matched.
- */
-static bool match(Fungus *fun, Expr **exprs, size_t len, Rule **o_rule) {
-    return match_r(fun, exprs, len, fun->rules.root, o_rule);
+static Rule *match_r(Fungus *fun, Expr **exprs, size_t len, RuleNode *state,
+                     size_t depth, size_t *o_match_len) {
+    // check if fully explored exprs, this should always be longest!
+    if (len == 0) {
+        if (state->rule)
+            *o_match_len = depth;
+
+        return state->rule;
+    }
+
+    // check if this node could be the best match!
+    Rule *best_match = NULL;
+
+    if (depth > *o_match_len) {
+        if (state->rule)
+            *o_match_len = depth;
+
+        best_match = state->rule;
+    }
+
+    // match on children
+    Expr *expr = exprs[0];
+
+    for (size_t i = 0; i < state->nexts.len; ++i) {
+        RuleNode *pot_state = state->nexts.data[i];
+
+        if (node_match(fun, pot_state, expr)) {
+            Rule *found = match_r(fun, exprs + 1, len - 1, pot_state, depth + 1,
+                                  o_match_len);
+
+            if (found) {
+                // full matches should be returned immediately
+                if (*o_match_len == depth + len)
+                    return found;
+
+                best_match = found;
+            }
+        }
+    }
+
+    return best_match;
 }
 
-#define MATCH_STACK_SIZE 256
+static Rule *match(Fungus *fun, Expr **exprs, size_t len, size_t *o_match_len) {
+    assert(o_match_len);
+
+    *o_match_len = 0;
+
+    return match_r(fun, exprs, len, fun->rules.root, 0, o_match_len);
+}
 
 /*
  * TODO it makes much more sense to push rawexprs/tokens on a stack from the
@@ -88,8 +131,9 @@ static bool match(Fungus *fun, Expr **exprs, size_t len, Rule **o_rule) {
  * TODO consider matching on a token stream in some form rather than an Expr *
  * array, get those data-oriented gains
  */
-static Expr *parse_r(Fungus *fun, Expr **exprs, size_t len, size_t *o_match_len) {
-    Expr *stack[MATCH_STACK_SIZE];
+static Expr *parse_r(Fungus *fun, Expr **exprs, size_t len,
+                     size_t *o_match_len) {
+    Expr *stack[MAX_RULE_LEN];
     size_t sp = 0;
     Rule *best_match = NULL;
     size_t best_match_sp = 0, best_match_len = 0;
@@ -99,9 +143,10 @@ static Expr *parse_r(Fungus *fun, Expr **exprs, size_t len, size_t *o_match_len)
     // always pop and parse_r lhs (first element in rule)
     stack[sp++] = exprs[idx++];
 
-    Rule *lhs_rule = NULL;
+    size_t lhs_match_len;
+    Rule *lhs_rule = match(fun, stack, 1, &lhs_match_len);
 
-    if (match(fun, stack, 1, &lhs_rule) && lhs_rule)
+    if (lhs_rule)
         stack[0] = collapse(fun, lhs_rule, stack, 1);
 
     // parse rhs
@@ -115,17 +160,17 @@ static Expr *parse_r(Fungus *fun, Expr **exprs, size_t len, size_t *o_match_len)
         stack[sp++] = next_expr;
         idx += next_match_len;
 
-        // attempt to parse_r a rule
-        Rule *matched = NULL;
-        bool terminal = match(fun, stack, sp, &matched);
+        // attempt to match a rule
+        size_t match_len;
+        Rule *matched = match(fun, stack, sp, &match_len);
 
         if (matched) {
             best_match = matched;
             best_match_sp = sp;
-            best_match_len = idx;
+            best_match_len = match_len;
         }
 
-        if (terminal)
+        if (match_len == sp)
             break;
     }
 
@@ -141,6 +186,43 @@ static Expr *parse_r(Fungus *fun, Expr **exprs, size_t len, size_t *o_match_len)
         return collapse(fun, best_match, stack, best_match_sp);
     }
 }
+
+#if 0
+typedef struct PStack {
+    Expr *data[MAX_RULE_LEN];
+    size_t sp, len;
+} PStack;
+
+static PStack PStack_new(void) {
+    return (PStack){
+        .sp = MAX_RULE_LEN - 1
+    };
+}
+
+static inline Expr **PStack_raw(PStack *ps) {
+    return &ps->data[ps->sp];
+}
+
+static void PStack_push(PStack *ps, Expr *expr) {
+    ps->data[ps->sp--] = expr;
+    ++ps->len;
+}
+
+static void PStack_collapse(PStack *ps, Fungus *fun, Rule *rule, size_t len) {
+    assert(len < ps->len);
+
+    Expr *collapsed = collapse(fun, rule, PStack_raw(ps), len);
+
+    ps->sp += len;
+    ps->len -= len;
+
+    PStack_push(ps, collapsed);
+}
+
+static Expr *parse_r2(Fungus *fun, Expr **exprs, size_t len) {
+    PStack ps = PStack_new();
+}
+#endif
 
 // exprs are raw TODO intake tokens instead
 Expr *parse(Fungus *fun, Expr *exprs, size_t len) {

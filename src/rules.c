@@ -37,10 +37,13 @@ Rule *Rule_define(Fungus *fun, RuleDef *def) {
     RuleTree *rt = &fun->rules;
 
     // validate RuleDef
-    bool valid = def->len && def->pattern;
+    bool valid = def->len && def->len < MAX_RULE_LEN && def->pattern;
 
-    if (!valid) // TODO better error handling
-        fungus_panic("invalid rule definition.");
+    if (!valid) {
+        // TODO more intelligent errors for this
+        fungus_error("invalid rule definition: %.*s",
+                     (int)def->name.len, def->name.str);
+    }
 
     // create Rule
     Rule *rule = RT_alloc(rt, sizeof(*rule));
