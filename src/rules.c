@@ -35,6 +35,7 @@ void RuleTree_del(RuleTree *rt) {
 
 Rule *Rule_define(Fungus *fun, RuleDef *def) {
     RuleTree *rt = &fun->rules;
+    TypeGraph *types = &fun->types;
 
     // validate RuleDef
     bool valid = def->len && def->len < MAX_RULE_LEN && def->pattern;
@@ -51,8 +52,13 @@ Rule *Rule_define(Fungus *fun, RuleDef *def) {
     *rule = (Rule){
         .name = Word_copy_of(&def->name, &fun->rules.pool),
         .prec = def->prec,
+        .assoc = def->assoc,
         .cty = def->cty,
-        .hook = def->hook
+        .hook = def->hook,
+
+        .prefixed = Type_is(types, def->pattern[0].ty, fun->t_lexeme),
+        .postfixed = Type_is(types, def->pattern[def->len - 1].ty,
+                             fun->t_lexeme),
     };
 
     // place node

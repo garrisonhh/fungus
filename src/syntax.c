@@ -14,8 +14,10 @@
  * comptype of an expr
  */
 static Expr *collapse(Fungus *fun, Rule *rule, Expr **exprs, size_t len) {
-    // alloc expr
     TypeGraph *types = &fun->types;
+    PrecGraph *precs = &fun->precedences;
+
+    // alloc expr
     size_t num_children = 0;
 
     for (size_t i = 0; i < len; ++i)
@@ -24,17 +26,50 @@ static Expr *collapse(Fungus *fun, Rule *rule, Expr **exprs, size_t len) {
 
     Expr *expr = Fungus_tmp_expr(fun, num_children);
 
+    expr->prec = rule->prec;
+    expr->prefixed = rule->prefixed;
+    expr->postfixed = rule->postfixed;
+
     // copy children to rule
     size_t j = 0;
 
     for (size_t i = 0; i < len; ++i)
-        if (!Type_is(types, exprs[i]->ty, fun->t_notype))
+        if (!Type_is(types, exprs[i]->cty, fun->t_lexeme))
             expr->exprs[j++] = exprs[i];
+
+    // collapse is right associative by default, got to swap stuff around
+    // for left associative rules! TODO a left-associative collapse would
+    // do a lot less work, I think. long term plan tho.
+    Expr *ret_expr = expr;
+
+    if (rule->assoc != ASSOC_RIGHT) {
+        Expr *right = expr->exprs[expr->len - 1];
+
+        if (!Type_is(&fun->types, right->cty, fun->t_literal)
+            && !expr->postfixed && !right->prefixed
+            && Prec_cmp(precs, expr->prec, right->prec) >= 0) {
+            // find leftmost expression of right expr
+            Expr **rl = &right->exprs[0];
+
+            while (!Type_is(types, (*rl)->cty, fun->t_literal)
+                   && !(*rl)->prefixed
+                   && Prec_cmp(precs, expr->prec, (*rl)->prec) >= 0) {
+                rl = &(*rl)->exprs[0];
+            }
+
+            // swap tree nodes
+            Expr **lr = &expr->exprs[expr->len - 1];
+
+            *lr = *rl;
+            *rl = expr;
+            ret_expr = right;
+        }
+    }
 
     // apply rule
     rule->hook(fun, rule, expr);
 
-    return expr;
+    return ret_expr;
 }
 
 static bool node_match(Fungus *fun, RuleNode *node, Expr *expr) {
@@ -173,22 +208,14 @@ static Expr *parse_slice(Fungus *fun, Expr **exprs, size_t len) {
 Expr *parse(Fungus *fun, Expr *exprs, size_t len) {
     Fungus_tmp_clear(fun);
 
+    if (len == 0)
+        return NULL;
+
     // create array of ptrs so parser can swallow it
     Expr **expr_slice = Fungus_tmp_alloc(fun, len * sizeof(*expr_slice));
 
     for (size_t i = 0; i < len; ++i)
         expr_slice[i] = &exprs[i];
-
-    // parse recursively
-#if 0
-    size_t match_len;
-    Expr *ast = parse_r(fun, expr_slice, len, &match_len);
-
-    if (match_len != len) // TODO more intelligent error
-        fungus_panic("failed to match the full expression!");
-
-    return ast;
-#endif
 
     return parse_slice(fun, expr_slice, len);
 }

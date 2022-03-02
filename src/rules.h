@@ -19,6 +19,8 @@ typedef struct PatNode {
     unsigned modifiers; // bitfield using modifiers
 } PatNode;
 
+typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
+
 typedef struct Rule Rule;
 
 // RuleHooks take an untyped expr filled with raw pattern match data as
@@ -31,6 +33,7 @@ typedef struct RuleDef {
     PatNode *pattern;
     size_t len;
     Prec prec;
+    Associativity assoc;
     Type cty;
     RuleHook hook;
 } RuleDef;
@@ -39,8 +42,13 @@ typedef struct RuleDef {
 struct Rule {
     Word *name;
     Prec prec;
-    Type cty; // available for use with some rules, must probably won't use it
+    Associativity assoc;
+    Type cty; // available for hook usage, necessary for some rules
     RuleHook hook;
+
+    // flags
+    unsigned prefixed: 1; // if rule has a lexeme at start
+    unsigned postfixed: 1; // if rule has a lexeme at end
 };
 
 // nodes could use hashmaps instead of vecs to store nexts, but I'm not sure

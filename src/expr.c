@@ -1,3 +1,5 @@
+#include <assert.h>
+
 #include "expr.h"
 #include "fungus.h"
 
@@ -45,4 +47,3 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
 void Expr_dump(Fungus *fun, Expr *expr) {
     Expr_dump_r(fun, expr, 0);
 }
-
