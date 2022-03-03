@@ -3,10 +3,6 @@
 #include "syntax.h"
 
 /*
- * TODO I think my best bet for handling precedence is using tree manipulations
- * to handle operator precedence. operator precedence only actually affects
- * infix-y expressions, so I will just need to recursively delve into the AST
- *
  * TODO determining whether another rule actually has a lhs or rhs (like parens
  * never have either) will likely require access to the Rule struct data for
  * another rule, I should either store Rule pointers in Exprs (bad idea for long
@@ -45,6 +41,8 @@ static Expr *collapse(Fungus *fun, Rule *rule, Expr **exprs, size_t len) {
     if (rule->assoc != ASSOC_RIGHT) {
         Expr *right = expr->exprs[expr->len - 1];
 
+        // TODO could cut down on these operations by taking advantage of
+        // commutativity for some left associative rules
         if (!Type_is(&fun->types, right->cty, fun->t_literal)
             && !expr->postfixed && !right->prefixed
             && Prec_cmp(precs, expr->prec, right->prec) >= 0) {

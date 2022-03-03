@@ -10,7 +10,7 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
 
     // check validity
     if (!expr) {
-        printf("(null)\n");
+        printf("(null expr)\n");
         return;
     }
 
@@ -46,4 +46,9 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
 
 void Expr_dump(Fungus *fun, Expr *expr) {
     Expr_dump_r(fun, expr, 0);
+}
+
+void Expr_dump_array(Fungus *fun, Expr **exprs, size_t len) {
+    for (size_t i = 0; i < len; ++i)
+        Expr_dump(fun, exprs[i]);
 }

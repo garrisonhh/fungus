@@ -303,8 +303,11 @@ RawExprBuf tokenize(Fungus *fun, const char *str, size_t len) {
         err_no_match
     };
 
-    while (!LZip_done(&zip)) {
+    while (true) {
         skip_whitespace(&zip);
+
+        if (LZip_done(&zip))
+            break;
 
         for (size_t i = 0; i < ARRAY_SIZE(match_funcs); ++i)
             if (match_funcs[i](fun, &rebuf, &zip))

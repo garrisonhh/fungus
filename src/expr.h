@@ -31,13 +31,6 @@ typedef struct Expr {
 } Expr;
 
 void Expr_dump(Fungus *, Expr *);
-
-static inline void Expr_dump_array(Fungus *fun, Expr **exprs, size_t len) {
-    for (size_t i = 0; i < len; ++i)
-        Expr_dump(fun, exprs[i]);
-}
-
-// returns addr of leftmost expr of a rule expr's children for ast manipulation
-Expr **Expr_left(Fungus *, Expr *);
+void Expr_dump_array(Fungus *, Expr **exprs, size_t len);
 
 #endif
