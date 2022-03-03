@@ -102,6 +102,7 @@ void Fungus_define_base(Fungus *fun) {
     Type lex_percent = Fungus_define_symbol(fun, WORD("%"));
     Type lex_plus = Fungus_define_symbol(fun, WORD("+"));
     Type lex_minus = Fungus_define_symbol(fun, WORD("-"));
+    Type lex_dstar = Fungus_define_symbol(fun, WORD("**"));
 
 #define TERNARY_TEST
 
@@ -134,7 +135,15 @@ void Fungus_define_base(Fungus *fun) {
     };
     Prec muldiv = Prec_define(&fun->precedences, &muldiv_def);
 
-    Prec highest_above[] = { addsub, muldiv };
+    Prec expprec_above[] = { muldiv };
+    PrecDef expprec_def = {
+        .name = WORD("ExpPrecedence"),
+        .above = expprec_above,
+        .above_len = ARRAY_SIZE(expprec_above)
+    };
+    Prec expprec = Prec_define(&fun->precedences, &expprec_def);
+
+    Prec highest_above[] = { addsub, muldiv, expprec };
     PrecDef highest_def = {
         .name = WORD("HighestPrecedence"),
         .above = highest_above,
@@ -211,15 +220,17 @@ void Fungus_define_base(Fungus *fun) {
         Word name;
         Type sym;
         Prec prec;
+        Associativity assoc;
     } BinMathOp;
 
     BinMathOp binary_math_ops[] = {
-      /*  name:             sym:         prec:   */
-        { WORD("Multiply"), lex_star,    muldiv },
-        { WORD("Divide"),   lex_rslash,  muldiv },
-        { WORD("Modulus"),  lex_percent, muldiv },
-        { WORD("Add"),      lex_plus,    addsub },
-        { WORD("Subtract"), lex_minus,   addsub },
+      /*  name:                 sym:         prec:   */
+        { WORD("Multiply"),     lex_star,    muldiv },
+        { WORD("Divide"),       lex_rslash,  muldiv },
+        { WORD("Modulus"),      lex_percent, muldiv },
+        { WORD("Add"),          lex_plus,    addsub },
+        { WORD("Subtract"),     lex_minus,   addsub },
+        { WORD("Exponentiate"), lex_dstar,   expprec, ASSOC_RIGHT },
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(binary_math_ops); ++i) {
@@ -234,6 +245,7 @@ void Fungus_define_base(Fungus *fun) {
             .pattern = bin_pat,
             .len = ARRAY_SIZE(bin_pat),
             .prec = op->prec,
+            .assoc = op->assoc,
             .cty = op_type,
             .hook = binary_math_hook
         };
