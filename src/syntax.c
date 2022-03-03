@@ -3,15 +3,60 @@
 #include "syntax.h"
 
 /*
+ * not very well named. this function ensures exprs with children properly
+ * respect associativity, and calls all the right hooks.
+ */
+static Expr *resolve_childed(Fungus *fun, Rule *rule, Expr *expr) {
+    TypeGraph *types = &fun->types;
+    PrecGraph *precs = &fun->precedences;
+
+    // collapse is left associative by default, do tree swap to fix
+    Expr *left = expr->exprs[0];
+
+    if (!Type_is(types, left->cty, fun->t_literal)
+        && !expr->prefixed && !left->postfixed) {
+        Comparison cmp = Prec_cmp(precs, expr->prec, left->prec);
+
+        if (cmp == GT || (cmp == EQ && rule->assoc == ASSOC_RIGHT)) {
+            // find rightmost expression of left expr
+            Expr **lr = &left->exprs[left->len - 1];
+
+            while (!Type_is(types, (*lr)->cty, fun->t_literal)
+                   && !(*lr)->postfixed
+                   && Prec_cmp(precs, expr->prec, (*lr)->prec) >= 0) {
+                lr = &(*lr)->exprs[(*lr)->len - 1];
+            }
+
+            // swap tree nodes
+            Expr **rl = &expr->exprs[0];
+
+            *rl = *lr;
+            *lr = expr;
+
+            // call hooks and return
+            rule->hook(fun, rule, expr);
+
+            // TODO must call RuleHook on left expr again, it might have
+            // a new outcome
+
+            return left;
+        }
+    }
+
+    // this expr needs nothing special done!
+    rule->hook(fun, rule, expr);
+
+    return expr;
+}
+
+/*
  * TODO determining whether another rule actually has a lhs or rhs (like parens
  * never have either) will likely require access to the Rule struct data for
- * another rule, I should either store Rule pointers in Exprs (bad idea for long
- * term rewriteability) or allow access to Rule data in the RuleTree from the
- * comptype of an expr
+ * another rule, I should allow access to Rule data in the RuleTree from the
+ * comptype of an expr!
  */
 static Expr *collapse(Fungus *fun, Rule *rule, Expr **exprs, size_t len) {
     TypeGraph *types = &fun->types;
-    PrecGraph *precs = &fun->precedences;
 
     // alloc expr
     size_t num_children = 0;
@@ -33,37 +78,13 @@ static Expr *collapse(Fungus *fun, Rule *rule, Expr **exprs, size_t len) {
         if (!Type_is(types, exprs[i]->cty, fun->t_lexeme))
             expr->exprs[j++] = exprs[i];
 
-    // collapse is left associative by default, do tree swap to fix!
-    Expr *ret_expr = expr;
-    Expr *left = expr->exprs[0];
+    // fix associativity + call hooks
+    if (num_children)
+        expr = resolve_childed(fun, rule, expr);
+    else
+        rule->hook(fun, rule, expr);
 
-    if (!Type_is(&fun->types, left->cty, fun->t_literal)
-        && !expr->prefixed && !left->postfixed) {
-        Comparison cmp = Prec_cmp(precs, expr->prec, left->prec);
-
-        if (cmp == GT || (cmp == EQ && rule->assoc == ASSOC_RIGHT)) {
-            // find rightmost expression of left expr
-            Expr **lr = &left->exprs[left->len - 1];
-
-            while (!Type_is(types, (*lr)->cty, fun->t_literal)
-                   && !(*lr)->postfixed
-                   && Prec_cmp(precs, expr->prec, (*lr)->prec) >= 0) {
-                lr = &(*lr)->exprs[(*lr)->len - 1];
-            }
-
-            // swap tree nodes
-            Expr **rl = &expr->exprs[0];
-
-            *rl = *lr;
-            *lr = expr;
-            ret_expr = left;
-        }
-    }
-
-    // apply rule
-    rule->hook(fun, rule, expr);
-
-    return ret_expr;
+    return expr;
 }
 
 static bool node_match(Fungus *fun, RuleNode *node, Expr *expr) {
@@ -127,18 +148,40 @@ static Rule *match(Fungus *fun, Expr **exprs, size_t len, size_t *o_match_len) {
 // will heavily mutate and invalidate slice
 static Expr *parse_slice(Fungus *fun, Expr **exprs, size_t len) {
     while (len > 1) {
-        size_t match_len;
-        Rule *matched = match(fun, exprs, len, &match_len);
+        bool found_match = false;
 
-        if (matched) {
-            // collapse
-            Expr *collapsed = collapse(fun, matched, exprs, match_len);
+        // iterate through exprs until a rule is found and can be collapsed
+        for (size_t i = 0; i < len; ++i) {
+            // match on this slice
+            Expr **slice = &exprs[i];
+            size_t slice_len = len - i;
 
-            exprs += match_len - 1;
-            len -= match_len - 1;
-            exprs[0] = collapsed;
-        } else {
-            // no match found, error!
+            size_t match_len;
+            Rule *matched = match(fun, slice, slice_len, &match_len);
+
+            // collapse once matched
+            if (matched) {
+                Expr *collapsed = collapse(fun, matched, slice, match_len);
+
+                // sew up expr array around this collapse
+                Expr **sewn_exprs = exprs + match_len - 1;
+
+                for (size_t j = 0; j < i; ++j)
+                    sewn_exprs[j] = exprs[j];
+
+                exprs = sewn_exprs;
+                len = len - (match_len - 1);
+
+                exprs[i] = collapsed;
+
+                // break to outer loop
+                found_match = true;
+                break;
+            }
+        }
+
+        if (!found_match) {
+            // matching unsuccessful!
             fungus_error("no matches found for exprs:");
             Expr_dump_array(fun, exprs, len);
             global_error = true;
