@@ -5,6 +5,12 @@
 #include "precedence.h"
 #include "expr.h"
 
+/*
+ * TODO making Rule into a handle will solve a lot of problems with Expr, like
+ * storing prefixed/postfixed-ness currently and simplifying both rulehooks
+ * and (planned) ir hooks
+ */
+
 #ifndef MAX_RULE_LEN
 #define MAX_RULE_LEN 64
 #endif
