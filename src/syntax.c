@@ -3,6 +3,13 @@
 #include "syntax.h"
 
 /*
+ * TODO after experimentation it is clear that matching on runtypes doesn't make
+ * much sense, and type checking expressions using rulehooks doesn't make sense
+ * until exprs are fully constructed and associativity is determined. This will
+ * be buggy until those problems are resolved for some rules.
+ */
+
+/*
  * not very well named. this function ensures exprs with children properly
  * respect associativity, and calls all the right hooks.
  */

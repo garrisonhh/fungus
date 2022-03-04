@@ -191,6 +191,7 @@ void Fungus_define_base(Fungus *fun) {
         .pattern = ternary_pat,
         .len = ARRAY_SIZE(ternary_pat),
         .prec = fun->p_highest,
+        .assoc = ASSOC_RIGHT,
         .cty = ternary,
         .hook = ternary_hook
     };
