@@ -8,14 +8,14 @@ Feature goals for the first version:
 
 - [X] compile-time lexemes (symbols and keywords)
 - [X] unified compile-time and runtime type system
+  - [ ] algebraic types
 - [X] compile-time operator precedence
 - [X] compile-time syntax rule definitions for parsing tokens into an AST
-- [] syntax rule ambiguity checking
-- [] algebraic types
-- [] strong static type analysis of AST
-- [] IR generation from AST
-- [] IR compile-time evaluation
-- [] C generation from IR
+  - [ ] syntax rule ambiguity checking
+  - [ ] strong static type analysis of AST
+- [ ] IR generation from AST
+  - [ ] IR compile-time evaluation
+- [ ] C generation from IR
 
 ## getting started
 
