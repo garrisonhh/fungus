@@ -14,12 +14,16 @@ static RuleNode *RT_new_node(RuleTree *rt, RuleNode *parent, Type ty) {
         .parent = parent
     };
 
+    if (parent)
+        Vec_push(&parent->nexts, node);
+
     return node;
 }
 
 RuleTree RuleTree_new(void) {
     RuleTree rt = {
-        .pool = Bump_new()
+        .pool = Bump_new(),
+        .entries = Vec_new(),
     };
 
     rt.root = RT_new_node(&rt, NULL, INVALID_TYPE);
@@ -27,13 +31,68 @@ RuleTree RuleTree_new(void) {
     return rt;
 }
 
-void RuleTree_del(RuleTree *rt) {
-    // TODO vecs from rulenodes are leaked
+static void RuleNode_del(RuleNode *node) {
+    for (size_t i = 0; i < node->nexts.len; ++i)
+        RuleNode_del(node->nexts.data[i]);
 
+    Vec_del(&node->nexts);
+}
+
+void RuleTree_del(RuleTree *rt) {
+    RuleNode_del(rt->root);
+    Vec_del(&rt->entries);
     Bump_del(&rt->pool);
 }
 
-Rule *Rule_define(Fungus *fun, RuleDef *def) {
+static void RuleNode_place(RuleTree *rt, RuleNode *node, PatNode *pat,
+                           size_t len, RuleHandle rule) {
+    if (len == 0) {
+        // reached end of pattern
+        node->terminates = true;
+        node->rule = rule;
+
+        return;
+    }
+
+    // optional modifier
+    if (pat->modifiers & PAT_OPTIONAL)
+        RuleNode_place(rt, node, pat + 1, len - 1, rule);
+
+    // try to match a node
+    RuleNode *placed = NULL;
+
+    for (size_t i = 0; i < node->nexts.len; ++i) {
+        RuleNode *next = node->nexts.data[i];
+
+        if (next->ty.id == pat->ty.id) {
+            placed = next;
+            break;
+        }
+    }
+
+    if (!placed) // no match, create a new node
+        placed = RT_new_node(rt, node, pat->ty);
+
+    // repeat modifier
+    if (pat->modifiers & PAT_REPEAT) {
+        bool already_repeats = false;
+
+        for (size_t i = 0; i < placed->nexts.len; ++i) {
+            if (placed->nexts.data[i] == placed) {
+                already_repeats = true;
+                break;
+            }
+        }
+
+        if (!already_repeats)
+            Vec_push(&placed->nexts, placed);
+    }
+
+    // recur on next pattern
+    RuleNode_place(rt, placed, pat + 1, len - 1, rule);
+}
+
+RuleHandle Rule_define(Fungus *fun, RuleDef *def) {
     RuleTree *rt = &fun->rules;
     TypeGraph *types = &fun->types;
 
@@ -47,9 +106,9 @@ Rule *Rule_define(Fungus *fun, RuleDef *def) {
     }
 
     // create Rule
-    Rule *rule = RT_alloc(rt, sizeof(*rule));
+    RuleEntry *entry = RT_alloc(rt, sizeof(*entry));
 
-    *rule = (Rule){
+    *entry = (RuleEntry){
         .name = Word_copy_of(&def->name, &fun->rules.pool),
         .prec = def->prec,
         .assoc = def->assoc,
@@ -61,44 +120,19 @@ Rule *Rule_define(Fungus *fun, RuleDef *def) {
                              fun->t_lexeme),
     };
 
-    // place node
-    Vec *next_rtnodes = &rt->root->nexts;
-    RuleNode *cur_rtnode = NULL;
+    // store handle + entries
+    RuleHandle handle = { rt->entries.len };
 
-    for (size_t i = 0; i < def->len; ++i) {
-        PatNode *cur_patnode = &def->pattern[i];
+    Vec_push(&rt->entries, entry);
 
-        for (size_t j = 0; j < next_rtnodes->len; ++j) {
-            RuleNode *pot_match = next_rtnodes->data[j];
+    // place node entry in tree
+    RuleNode_place(rt, rt->root, def->pattern, def->len, handle);
 
-            if (cur_patnode->ty.id == pot_match->ty.id) {
-                // perfect match
-                cur_rtnode = pot_match;
-                goto next_node;
-            } else if (Type_is(&fun->types, cur_patnode->ty, pot_match->ty)) {
-                // supertype match, put this node in front of it so that rule
-                // checking sees the most specific type first
-                cur_rtnode = RT_new_node(rt, cur_rtnode, cur_patnode->ty);
-                Vec_ordered_insert(next_rtnodes, j, cur_rtnode);
-                goto next_node;
-            }
-        }
+    return handle;
+}
 
-        // no node match found, create new node
-        cur_rtnode = RT_new_node(rt, cur_rtnode, cur_patnode->ty);
-        Vec_push(next_rtnodes, cur_rtnode);
-
-next_node:
-        // iterate
-        next_rtnodes = &cur_rtnode->nexts;
-
-        // allow repetition
-        if (cur_patnode->modifiers & PAT_REPEAT)
-            Vec_push(&cur_rtnode->nexts, cur_rtnode);
-    }
-
-    // add rule to last node and return
-    return cur_rtnode->rule = rule;
+RuleEntry *Rule_get(RuleTree *rt, RuleHandle rule) {
+    return rt->entries.data[rule.id];
 }
 
 static void RuleNode_dump(Fungus *fun, RuleNode *node, char *buf, char *tail) {
@@ -117,8 +151,8 @@ static void RuleNode_dump(Fungus *fun, RuleNode *node, char *buf, char *tail) {
     tail += sprintf(tail, " ");
 
     // print rule if exists
-    if (node->rule) {
-        name = node->rule->name;
+    if (node->terminates) {
+        name = Rule_get(&fun->rules, node->rule)->name;
 
         printf("%.*s: %s\n", (int)name->len, name->str, buf);
     }

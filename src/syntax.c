@@ -13,7 +13,7 @@
  * not very well named. this function ensures exprs with children properly
  * respect associativity, and calls all the right hooks.
  */
-static Expr *resolve_childed(Fungus *fun, Rule *rule, Expr *expr) {
+static Expr *resolve_childed(Fungus *fun, RuleEntry *entry, Expr *expr) {
     TypeGraph *types = &fun->types;
     PrecGraph *precs = &fun->precedences;
 
@@ -24,7 +24,7 @@ static Expr *resolve_childed(Fungus *fun, Rule *rule, Expr *expr) {
         && !expr->prefixed && !left->postfixed) {
         Comparison cmp = Prec_cmp(precs, expr->prec, left->prec);
 
-        if (cmp == GT || (cmp == EQ && rule->assoc == ASSOC_RIGHT)) {
+        if (cmp == GT || (cmp == EQ && entry->assoc == ASSOC_RIGHT)) {
             // find rightmost expression of left expr
             Expr **lr = &left->exprs[left->len - 1];
 
@@ -41,7 +41,7 @@ static Expr *resolve_childed(Fungus *fun, Rule *rule, Expr *expr) {
             *lr = expr;
 
             // call hooks and return
-            rule->hook(fun, rule, expr);
+            entry->hook(fun, entry, expr);
 
             // TODO must call RuleHook on left expr again, it might have
             // a new outcome
@@ -51,7 +51,7 @@ static Expr *resolve_childed(Fungus *fun, Rule *rule, Expr *expr) {
     }
 
     // this expr needs nothing special done!
-    rule->hook(fun, rule, expr);
+    entry->hook(fun, entry, expr);
 
     return expr;
 }
@@ -62,7 +62,7 @@ static Expr *resolve_childed(Fungus *fun, Rule *rule, Expr *expr) {
  * another rule, I should allow access to Rule data in the RuleTree from the
  * comptype of an expr!
  */
-static Expr *collapse(Fungus *fun, Rule *rule, Expr **exprs, size_t len) {
+static Expr *collapse(Fungus *fun, RuleEntry *entry, Expr **exprs, size_t len) {
     TypeGraph *types = &fun->types;
 
     // alloc expr
@@ -74,9 +74,9 @@ static Expr *collapse(Fungus *fun, Rule *rule, Expr **exprs, size_t len) {
 
     Expr *expr = Fungus_tmp_expr(fun, num_children);
 
-    expr->prec = rule->prec;
-    expr->prefixed = rule->prefixed;
-    expr->postfixed = rule->postfixed;
+    expr->prec = entry->prec;
+    expr->prefixed = entry->prefixed;
+    expr->postfixed = entry->postfixed;
 
     // copy children to rule
     size_t j = 0;
@@ -87,9 +87,9 @@ static Expr *collapse(Fungus *fun, Rule *rule, Expr **exprs, size_t len) {
 
     // fix associativity + call hooks
     if (num_children)
-        expr = resolve_childed(fun, rule, expr);
+        expr = resolve_childed(fun, entry, expr);
     else
-        rule->hook(fun, rule, expr);
+        entry->hook(fun, entry, expr);
 
     return expr;
 }
@@ -99,24 +99,25 @@ static bool node_match(Fungus *fun, RuleNode *node, Expr *expr) {
            || Type_is(&fun->types, expr->ty, node->ty);
 }
 
-static Rule *match_r(Fungus *fun, Expr **exprs, size_t len, RuleNode *state,
-                     size_t depth, size_t *o_match_len) {
+static RuleEntry *match_r(Fungus *fun, Expr **exprs, size_t len,
+                          RuleNode *state, size_t depth, size_t *o_match_len) {
     // check if fully explored exprs, this should always be longest!
     if (len == 0) {
-        if (state->rule)
+        if (state->terminates)
             *o_match_len = depth;
 
-        return state->rule;
+        return Rule_get(&fun->rules, state->rule);
     }
 
     // check if this node could be the best match!
-    Rule *best_match = NULL;
+    RuleEntry *best_match = NULL;
 
     if (depth > *o_match_len) {
-        if (state->rule)
+        if (state->terminates) {
             *o_match_len = depth;
 
-        best_match = state->rule;
+            best_match = Rule_get(&fun->rules, state->rule);
+        }
     }
 
     // match on children
@@ -126,8 +127,8 @@ static Rule *match_r(Fungus *fun, Expr **exprs, size_t len, RuleNode *state,
         RuleNode *pot_state = state->nexts.data[i];
 
         if (node_match(fun, pot_state, expr)) {
-            Rule *found = match_r(fun, exprs + 1, len - 1, pot_state, depth + 1,
-                                  o_match_len);
+            RuleEntry *found = match_r(fun, exprs + 1, len - 1, pot_state,
+                                       depth + 1, o_match_len);
 
             if (found) {
                 // full matches should be returned immediately
@@ -142,9 +143,9 @@ static Rule *match_r(Fungus *fun, Expr **exprs, size_t len, RuleNode *state,
     return best_match;
 }
 
-static Rule *match(Fungus *fun, Expr **exprs, size_t len, size_t *o_match_len) {
+static RuleEntry *match(Fungus *fun, Expr **exprs, size_t len, size_t *o_match_len) {
     size_t match_len = 0;
-    Rule *matched = match_r(fun, exprs, len, fun->rules.root, 0, &match_len);
+    RuleEntry *matched = match_r(fun, exprs, len, fun->rules.root, 0, &match_len);
 
     if (o_match_len)
         *o_match_len = match_len;
@@ -164,7 +165,7 @@ static Expr *parse_slice(Fungus *fun, Expr **exprs, size_t len) {
             size_t slice_len = len - i;
 
             size_t match_len;
-            Rule *matched = match(fun, slice, slice_len, &match_len);
+            RuleEntry *matched = match(fun, slice, slice_len, &match_len);
 
             // collapse once matched
             if (matched) {

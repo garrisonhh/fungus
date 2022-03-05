@@ -17,7 +17,7 @@
 
 enum PatternNodeModifiers {
     PAT_REPEAT = 0x1,
-    // PAT_OPTIONAL = 0x2, TODO
+    PAT_OPTIONAL = 0x2,
 };
 
 typedef struct PatNode {
@@ -26,12 +26,14 @@ typedef struct PatNode {
 } PatNode;
 
 typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
+typedef struct RuleHandle { unsigned id; } RuleHandle;
 
-typedef struct Rule Rule;
+typedef struct RuleEntry RuleEntry;
 
 // RuleHooks take an untyped expr filled with raw pattern match data as
 // children, and adds type info + whatever else it needs to do
-typedef void (*RuleHook)(Fungus *fun, Rule *rule, Expr *expr);
+// TODO get rid of this pattern somehow
+typedef void (*RuleHook)(Fungus *fun, RuleEntry *entry, Expr *expr);
 
 // fill this out in order to define a rule
 typedef struct RuleDef {
@@ -45,7 +47,7 @@ typedef struct RuleDef {
 } RuleDef;
 
 // used to store rule data at the end of an atom
-struct Rule {
+struct RuleEntry {
     Word *name;
     Prec prec;
     Associativity assoc;
@@ -61,21 +63,25 @@ struct Rule {
 // this would actually result in a performance improvement
 typedef struct RuleNode {
     struct RuleNode *parent; // null if this node is a root node
-    Rule *rule; // non-null if node terminates
+    RuleHandle rule;
 
     Type ty;
     Vec nexts;
+
+    bool terminates;
 } RuleNode;
 
 typedef struct RuleTree {
     Bump pool;
+    Vec entries;
     RuleNode *root; // dummy rulenode, contains no valid type info
 } RuleTree;
 
 RuleTree RuleTree_new(void);
 void RuleTree_del(RuleTree *);
 
-Rule *Rule_define(Fungus *, RuleDef *def);
+RuleHandle Rule_define(Fungus *, RuleDef *def);
+RuleEntry *Rule_get(RuleTree *, RuleHandle rule);
 
 void RuleTree_dump(Fungus *, RuleTree *);
 

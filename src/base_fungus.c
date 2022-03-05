@@ -3,23 +3,23 @@
 #include "base_fungus.h"
 
 __attribute__((unused))
-static void undefined_hook(Fungus *fun, Rule *rule, Expr *expr) {
+static void undefined_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
     fungus_panic("used undefined rule hook");
 }
 
-static void true_hook(Fungus *fun, Rule *rule, Expr *expr) {
+static void true_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
     expr->ty = fun->t_bool;
     expr->cty = fun->t_literal;
     expr->bool_ = true;
 }
 
-static void false_hook(Fungus *fun, Rule *rule, Expr *expr) {
+static void false_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
     expr->ty = fun->t_bool;
     expr->cty = fun->t_literal;
     expr->bool_ = false;
 }
 
-static void ternary_hook(Fungus *fun, Rule *rule, Expr *expr) {
+static void ternary_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
     assert(expr->len == 3);
 
     if (expr->exprs[1]->ty.id != expr->exprs[2]->ty.id) {
@@ -28,10 +28,10 @@ static void ternary_hook(Fungus *fun, Rule *rule, Expr *expr) {
     }
 
     expr->ty = expr->exprs[1]->ty;
-    expr->cty = rule->cty;
+    expr->cty = entry->cty;
 }
 
-static void binary_math_hook(Fungus *fun, Rule *rule, Expr *expr) {
+static void binary_math_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
     assert(expr->len == 2);
 
     if (expr->exprs[0]->ty.id != expr->exprs[1]->ty.id) {
@@ -40,7 +40,7 @@ static void binary_math_hook(Fungus *fun, Rule *rule, Expr *expr) {
     }
 
     expr->ty = expr->exprs[0]->ty;
-    expr->cty = rule->cty;
+    expr->cty = entry->cty;
 }
 
 void Fungus_define_base(Fungus *fun) {
