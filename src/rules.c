@@ -45,7 +45,7 @@ void RuleTree_del(RuleTree *rt) {
 }
 
 static void RuleNode_place(RuleTree *rt, RuleNode *node, PatNode *pat,
-                           size_t len, RuleHandle rule) {
+                           size_t len, Rule rule) {
     if (len == 0) {
         // reached end of pattern
         node->terminates = true;
@@ -92,7 +92,7 @@ static void RuleNode_place(RuleTree *rt, RuleNode *node, PatNode *pat,
     RuleNode_place(rt, placed, pat + 1, len - 1, rule);
 }
 
-RuleHandle Rule_define(Fungus *fun, RuleDef *def) {
+Rule Rule_define(Fungus *fun, RuleDef *def) {
     RuleTree *rt = &fun->rules;
     TypeGraph *types = &fun->types;
 
@@ -121,7 +121,7 @@ RuleHandle Rule_define(Fungus *fun, RuleDef *def) {
     };
 
     // store handle + entries
-    RuleHandle handle = { rt->entries.len };
+    Rule handle = { rt->entries.len };
 
     Vec_push(&rt->entries, entry);
 
@@ -131,7 +131,7 @@ RuleHandle Rule_define(Fungus *fun, RuleDef *def) {
     return handle;
 }
 
-RuleEntry *Rule_get(RuleTree *rt, RuleHandle rule) {
+RuleEntry *Rule_get(RuleTree *rt, Rule rule) {
     return rt->entries.data[rule.id];
 }
 

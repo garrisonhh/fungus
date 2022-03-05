@@ -26,7 +26,7 @@ typedef struct PatNode {
 } PatNode;
 
 typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
-typedef struct RuleHandle { unsigned id; } RuleHandle;
+typedef struct RuleHandle { unsigned id; } Rule;
 
 typedef struct RuleEntry RuleEntry;
 
@@ -63,7 +63,7 @@ struct RuleEntry {
 // this would actually result in a performance improvement
 typedef struct RuleNode {
     struct RuleNode *parent; // null if this node is a root node
-    RuleHandle rule;
+    Rule rule;
 
     Type ty;
     Vec nexts;
@@ -80,8 +80,8 @@ typedef struct RuleTree {
 RuleTree RuleTree_new(void);
 void RuleTree_del(RuleTree *);
 
-RuleHandle Rule_define(Fungus *, RuleDef *def);
-RuleEntry *Rule_get(RuleTree *, RuleHandle rule);
+Rule Rule_define(Fungus *, RuleDef *def);
+RuleEntry *Rule_get(RuleTree *, Rule rule);
 
 void RuleTree_dump(Fungus *, RuleTree *);
 
