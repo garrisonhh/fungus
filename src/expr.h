@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "precedence.h"
+#include "rules.h"
 
 typedef struct Fungus Fungus;
 
@@ -21,11 +22,7 @@ typedef struct Expr {
             struct Expr **exprs;
             size_t len;
 
-            // TODO get these out of expr somehow? or do a data- : Typeoriented memory
-            // thingy?
-            Prec prec;
-            unsigned prefixed: 1;
-            unsigned postfixed: 1;
+            Rule rule;
         };
     };
 } Expr;

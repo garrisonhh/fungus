@@ -3,7 +3,6 @@
 
 #include "types.h"
 #include "precedence.h"
-#include "expr.h"
 
 /*
  * TODO making Rule into a handle will solve a lot of problems with Expr, like
@@ -14,6 +13,9 @@
 #ifndef MAX_RULE_LEN
 #define MAX_RULE_LEN 64
 #endif
+
+typedef struct Fungus Fungus;
+typedef struct Expr Expr;
 
 enum PatternNodeModifiers {
     PAT_REPEAT = 0x1,
@@ -48,10 +50,12 @@ typedef struct RuleDef {
 
 // used to store rule data at the end of an atom
 struct RuleEntry {
+    Rule handle;
     Word *name;
     Prec prec;
     Associativity assoc;
-    Type cty; // available for hook usage, necessary for some rules
+    // available for hook usage, necessary for some rules TODO consider removal
+    Type cty;
     RuleHook hook;
 
     // flags

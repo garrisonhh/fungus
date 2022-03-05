@@ -107,8 +107,10 @@ Rule Rule_define(Fungus *fun, RuleDef *def) {
 
     // create Rule
     RuleEntry *entry = RT_alloc(rt, sizeof(*entry));
+    Rule handle = { rt->entries.len };
 
     *entry = (RuleEntry){
+        .handle = handle,
         .name = Word_copy_of(&def->name, &fun->rules.pool),
         .prec = def->prec,
         .assoc = def->assoc,
@@ -119,9 +121,6 @@ Rule Rule_define(Fungus *fun, RuleDef *def) {
         .postfixed = Type_is(types, def->pattern[def->len - 1].ty,
                              fun->t_lexeme),
     };
-
-    // store handle + entries
-    Rule handle = { rt->entries.len };
 
     Vec_push(&rt->entries, entry);
 

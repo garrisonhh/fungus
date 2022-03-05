@@ -16,22 +16,27 @@
 static Expr *resolve_childed(Fungus *fun, RuleEntry *entry, Expr *expr) {
     TypeGraph *types = &fun->types;
     PrecGraph *precs = &fun->precedences;
+    RuleTree *rules = &fun->rules;
 
     // collapse is left associative by default, do tree swap to fix
     Expr *left = expr->exprs[0];
+    RuleEntry *expr_entry = Rule_get(rules, expr->rule);
+    RuleEntry *left_entry = Rule_get(rules, left->rule);
 
     if (!Type_is(types, left->cty, fun->t_literal)
-        && !expr->prefixed && !left->postfixed) {
-        Comparison cmp = Prec_cmp(precs, expr->prec, left->prec);
+        && !expr_entry->prefixed && !left_entry->postfixed) {
+        Comparison cmp = Prec_cmp(precs, expr_entry->prec, left_entry->prec);
 
         if (cmp == GT || (cmp == EQ && entry->assoc == ASSOC_RIGHT)) {
             // find rightmost expression of left expr
             Expr **lr = &left->exprs[left->len - 1];
+            RuleEntry *lr_entry = Rule_get(rules, (*lr)->rule);
 
             while (!Type_is(types, (*lr)->cty, fun->t_literal)
-                   && !(*lr)->postfixed
-                   && Prec_cmp(precs, expr->prec, (*lr)->prec) >= 0) {
+                   && !lr_entry->postfixed
+                   && Prec_cmp(precs, expr_entry->prec, lr_entry->prec) >= 0) {
                 lr = &(*lr)->exprs[(*lr)->len - 1];
+                lr_entry = Rule_get(rules, (*lr)->rule);
             }
 
             // swap tree nodes
@@ -74,9 +79,8 @@ static Expr *collapse(Fungus *fun, RuleEntry *entry, Expr **exprs, size_t len) {
 
     Expr *expr = Fungus_tmp_expr(fun, num_children);
 
-    expr->prec = entry->prec;
-    expr->prefixed = entry->prefixed;
-    expr->postfixed = entry->postfixed;
+    if (num_children)
+        expr->rule = entry->handle;
 
     // copy children to rule
     size_t j = 0;
