@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "utils.h"
 
 #define X(NAME, CODE) CODE,
@@ -5,6 +7,26 @@ static const int TERM_CODES[] = { TERM_TABLE };
 #undef X
 
 bool global_error = false;
+
+void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len) {
+    for (size_t i = 0; i < len; ++i) {
+        size_t len = strlen(src[i]);
+
+#ifdef DEBUG
+        if (len >= MAX_NAME_LEN)
+            fungus_panic("name '%s' is longer than MAX_NAME_LEN.", src);
+#endif
+
+        for (size_t j = 0; j < len; ++j) {
+            char c = src[i][j];
+
+            if (c >= 'A' && c <= 'Z')
+                dst[i][j] = c - ('A' - 'a');
+            else
+                dst[i][j] = c;
+        }
+    }
+}
 
 void term_fformat(FILE *fp, TermFmt fmt) {
     fflush(fp);

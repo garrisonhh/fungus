@@ -54,7 +54,7 @@ struct RuleEntry {
     Word *name;
     Prec prec;
     Associativity assoc;
-    // available for hook usage, necessary for some rules TODO consider removal
+    // available for hook usage, necessary for some rules TODO consider removal?
     Type cty;
     RuleHook hook;
 

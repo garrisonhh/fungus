@@ -1,6 +1,7 @@
 #ifndef EXPR_H
 #define EXPR_H
 
+#include "literal_types.h"
 #include "types.h"
 #include "precedence.h"
 #include "rules.h"
@@ -13,9 +14,9 @@ typedef struct Expr {
     union {
         // literals
         Word string_;
-        long int_;
-        double float_;
-        bool bool_;
+        fun_int int_;
+        fun_float float_;
+        fun_bool bool_;
 
         // rules
         struct {

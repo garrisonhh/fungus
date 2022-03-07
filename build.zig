@@ -18,13 +18,23 @@ pub fn build(b: *std.build.Builder) anyerror!void {
 
     // walk all C sources and add to exe
     {
-        const c_flags = .{
+        var c_flags = std.ArrayList([]const u8).init(allocator);
+        defer c_flags.deinit();
+
+        try c_flags.appendSlice(&.{
             "-Wall",
             "-Wextra",
             "-Wpedantic",
             "-Wvla",
             "-std=c11"
-        };
+        });
+
+        const dbg_def = if (mode == std.builtin.Mode.Debug)
+            "-DDEBUG"
+        else
+            "-DNDEBUG";
+
+        try c_flags.append(dbg_def);
 
         const abs_src_dir = b.pathFromRoot("src");
         var src_dir = try std.fs.openDirAbsolute(abs_src_dir,
@@ -38,7 +48,7 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             const path = b.pathJoin(&.{abs_src_dir, entry.path});
 
             if (mem.endsWith(u8, path, ".c"))
-                exe.addCSourceFile(path, &c_flags);
+                exe.addCSourceFile(path, c_flags.items);
         }
     }
 

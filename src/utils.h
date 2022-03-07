@@ -26,6 +26,13 @@
  */
 typedef enum Comparison { LT = -1, EQ = 0, GT = 1 } Comparison;
 
+// table names =================================================================
+
+// when using table macros I usually like to make name arrays nicer looking
+
+#define MAX_NAME_LEN 32
+void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len);
+
 // term codes ==================================================================
 
 #define TERM_TABLE\

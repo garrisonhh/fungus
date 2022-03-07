@@ -23,9 +23,9 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
         if (expr->ty.id == fun->t_string.id)
             printf(">>%.*s<<", (int)expr->string_.len, expr->string_.str);
         else if (expr->ty.id == fun->t_int.id)
-            printf("%ld", expr->int_);
+            printf("%Ld", expr->int_);
         else if (expr->ty.id == fun->t_float.id)
-            printf("%lf", expr->float_);
+            printf("%Lf", expr->float_);
         else if (expr->ty.id == fun->t_bool.id)
             printf("%s", expr->bool_ ? "true" : "false");
         else

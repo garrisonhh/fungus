@@ -4,6 +4,7 @@
 #include "fungus.h"
 #include "lex.h"
 #include "syntax.h"
+#include "ir.h"
 
 static bool eval(Fungus *fun, const char *text, size_t len) {
     // tokenize
@@ -100,16 +101,25 @@ static void compile(Fungus *fun, const char *filename) {
 }
 
 int main(int argc, char **argv) {
+    ir_init();
+
     Fungus fun = Fungus_new();
 
+#ifdef DEBUG
+    // TODO REMOVE
+    IRContext irctx = IRContext_new();
+    ir_test(&fun, &irctx);
+
+    exit(0);
+#endif
+
     // TODO opt parsing eventually
-    if (argc == 1) {
+    if (argc == 1)
         repl(&fun);
-    } else if (argc == 2) {
+    else if (argc == 2)
         compile(&fun, argv[1]);
-    } else {
+    else
         fungus_panic("bad number of arguments!");
-    }
 
     Fungus_del(&fun);
 
