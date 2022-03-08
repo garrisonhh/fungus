@@ -15,7 +15,7 @@ static const char *C_TYPE_OF[ITYPE_COUNT] = { ITYPE_TABLE };
 static const char *C_FMT_OF[II_COUNT] = { IINST_TABLE };
 #undef X
 
-static void gen_op(FILE *to, Fungus *fun, size_t n, IOp *op) {
+static void gen_op(FILE *to, IRContext *ctx, size_t n, IOp *op) {
     IInstType inst_type = IINST_TYPE[op->inst];
 
     if (inst_type == IIT_NOP) {
@@ -37,6 +37,25 @@ static void gen_op(FILE *to, Fungus *fun, size_t n, IOp *op) {
         case IIT_BINARY:
             fprintf(to, C_FMT_OF[op->inst], op->a, op->b);
             break;
+        case IIT_CALL: {
+            IFuncEntry *entry = ir_get_func(ctx, op->call.func);
+
+            // check num_params
+            if (op->call.num_params != entry->num_params)
+                fungus_panic("ir call num params does not match function!");
+
+            // output
+            fprintf(to, "%.*s(", (int)entry->name->len, entry->name->str);
+
+            for (size_t i = 0; i < op->call.num_params; ++i) {
+                if (i) fprintf(to, ", ");
+                fprintf(to, "v%zu", op->call.params[i]);
+            }
+
+            fprintf(to, ")");
+
+            break;
+        }
         default:
             fungus_panic("unexpected inst type `%s` in gen_op",
                          IINST_TYPE_NAME[IINST_TYPE[op->inst]]);
@@ -44,7 +63,7 @@ static void gen_op(FILE *to, Fungus *fun, size_t n, IOp *op) {
     }
 }
 
-static void gen_func(FILE *to, Fungus *fun, IFuncEntry *entry) {
+static void gen_func(FILE *to, IRContext *ctx, IFuncEntry *entry) {
     // params
     // TODO IFunc type inference
     fprintf(to, "%s %.*s(", C_TYPE_OF[entry->ret_ty], (int)entry->name->len,
@@ -60,7 +79,7 @@ static void gen_func(FILE *to, Fungus *fun, IFuncEntry *entry) {
     // operations
     for (size_t i = 0; i < entry->len; ++i) {
         fprintf(to, "%4s", "");
-        gen_op(to, fun, i + entry->num_params, &entry->ops[i]);
+        gen_op(to, ctx, i + entry->num_params, &entry->ops[i]);
         fprintf(to, ";\n");
     }
 
@@ -68,8 +87,10 @@ static void gen_func(FILE *to, Fungus *fun, IFuncEntry *entry) {
 }
 
 void c_gen(FILE *to, Fungus *fun, IRContext *ctx) {
-    fprintf(to, "%s", C_BEGIN_CODE);
+    fprintf(to, "%s\n", C_BEGIN_CODE);
 
-    for (size_t i = 0; i < ctx->funcs.len; ++i)
-        gen_func(to, fun, ctx->funcs.data[i]);
+    for (size_t i = 0; i < ctx->funcs.len; ++i) {
+        if (i) fprintf(to, "\n");
+        gen_func(to, ctx, ctx->funcs.data[i]);
+    }
 }

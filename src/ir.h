@@ -139,6 +139,7 @@ void ir_init(void);
 IRContext IRContext_new(void);
 void IRContext_del(IRContext *);
 
+IFuncEntry *ir_get_func(IRContext *, IFunc func);
 IFunc ir_add_func(IRContext *, IType ret_ty, Word name, IType *params,
                   size_t num_params);
 size_t ir_add_op(IRContext *, IFunc func, IOp op); // copies op

@@ -50,7 +50,7 @@ static void *IC_alloc(IRContext *ctx, size_t n_bytes) {
     return Bump_alloc(&ctx->pool, n_bytes);
 }
 
-static IFuncEntry *IC_get_func(IRContext *ctx, IFunc func) {
+IFuncEntry *ir_get_func(IRContext *ctx, IFunc func) {
     return ctx->funcs.data[func.id];
 }
 
@@ -97,7 +97,7 @@ static void ir_infer_op_type(IRContext *ctx, IFunc func, IOp *op) {
     }
 
     // infer type
-    IFuncEntry *entry = IC_get_func(ctx, func);
+    IFuncEntry *entry = ir_get_func(ctx, func);
 
     switch (IINST_TYPE[op->inst]) {
     case IIT_COUNT:
@@ -125,7 +125,7 @@ static void ir_infer_op_type(IRContext *ctx, IFunc func, IOp *op) {
         break;
     }
     case IIT_CALL: {
-        IFuncEntry *call_entry = IC_get_func(ctx, op->call.func);
+        IFuncEntry *call_entry = ir_get_func(ctx, op->call.func);
 
         op->ty = call_entry->ret_ty;
         break;
@@ -134,7 +134,7 @@ static void ir_infer_op_type(IRContext *ctx, IFunc func, IOp *op) {
 }
 
 size_t ir_add_op(IRContext *ctx, IFunc func, IOp op) {
-    IFuncEntry *entry = IC_get_func(ctx, func);
+    IFuncEntry *entry = ir_get_func(ctx, func);
 
     // allocate op
     if (entry->len >= entry->cap) {
@@ -146,6 +146,15 @@ size_t ir_add_op(IRContext *ctx, IFunc func, IOp op) {
     IOp *copy = &entry->ops[entry->len];
 
     *copy = op;
+
+    // copy function call params
+    if (copy->inst == II_CALL) {
+        copy->call.params =
+            IC_alloc(ctx, copy->call.num_params * sizeof(*copy->call.params));
+
+        for (size_t i = 0; i < copy->call.num_params; ++i)
+            copy->call.params[i] = op.call.params[i];
+    }
 
     ir_infer_op_type(ctx, func, copy);
 
@@ -184,7 +193,7 @@ static void IOp_dump(IRContext *ctx, IOp *op) {
         printf("$%zu $%zu", op->a, op->b);
         break;
     case IIT_CALL: {
-        IFuncEntry *entry = IC_get_func(ctx, op->call.func);
+        IFuncEntry *entry = ir_get_func(ctx, op->call.func);
 
         printf("%.*s(", (int)entry->name->len, entry->name->str);
 
@@ -230,22 +239,38 @@ void ir_dump(IRContext *ctx) {
     puts("IR:");
     term_format(TERM_RESET);
 
-    for (size_t i = 0; i < ctx->funcs.len; ++i)
+    for (size_t i = 0; i < ctx->funcs.len; ++i) {
+        if (i) puts("");
         IFuncEntry_dump(ctx, ctx->funcs.data[i]);
+    }
 
     puts("");
 }
 
 #ifdef DEBUG
 void ir_test(Fungus *fun, IRContext *ctx) {
+    IFunc add = ir_add_func(ctx, ITYPE_I64, WORD("add"),
+                            (IType[]){ ITYPE_I64, ITYPE_I64 }, 2);
+    {
+        size_t v0 = ir_add_op(ctx, add, (IOp){
+            II_ADD, .a = 0, .b = 1
+        });
+        ir_add_op(ctx, add, (IOp){ II_RET, .a = v0 });
+    }
+
     IFunc main = ir_add_func(ctx, ITYPE_I64, WORD("main"), NULL, 0);
-
-    size_t v0 = ir_add_op(ctx, main, (IOp){ II_CONST, ITYPE_I64, .int_ = 1 });
-    size_t v1 = ir_add_op(ctx, main, (IOp){ II_CONST, ITYPE_I64, .int_ = 2 });
-    size_t v2 = ir_add_op(ctx, main, (IOp){ II_ADD, .a = v0, .b = v1 });
-    size_t v3 = ir_add_op(ctx, main, (IOp){ II_MUL, .a = v2, .b = v2 });
-
-    ir_add_op(ctx, main, (IOp){ II_RET, .a = v3 });
+    {
+        size_t v0 = ir_add_op(ctx, main, (IOp){
+            II_CONST, ITYPE_I64, .int_ = 1
+        });
+        size_t v1 = ir_add_op(ctx, main, (IOp){
+            II_CONST, ITYPE_I64, .int_ = 2
+        });
+        size_t v2 = ir_add_op(ctx, main, (IOp){ II_CALL, .call = {
+            .func = add, .params = (size_t[]){ v0, v1 }, .num_params = 2
+        }});
+        ir_add_op(ctx, main, (IOp){ II_RET, .a = v2 });
+    }
 
     ir_dump(ctx);
 }
