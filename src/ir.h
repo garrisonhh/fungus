@@ -8,7 +8,6 @@
  * must be inferred by semantic analysis + codegen via the parameters of an IOp
  */
 
-
 /*
  * TODO representing algebraic types through IType:
  *
@@ -24,15 +23,17 @@
  *   - sum -> enum, tagged union
  *   - prod -> struct
  */
+// table of (type, c type)
 #define ITYPE_TABLE\
-    X(MUST_INFER)\
-    X(NIL)\
-    \
-    X(BOOL)\
-    X(I64)\
-    X(F64)\
+    /* special */\
+    X(MUST_INFER,   "$MUST_INFER$")\
+    X(NIL,          "void")\
+    /* primitives */\
+    X(BOOL,         "bool")\
+    X(I64,          "int64_t")\
+    X(F64,          "double")\
 
-#define X(A) ITYPE_##A,
+#define X(A, B) ITYPE_##A,
 typedef enum IType { ITYPE_TABLE ITYPE_COUNT } IType;
 #undef X
 
@@ -40,19 +41,37 @@ extern char ITYPE_NAME[ITYPE_COUNT][MAX_NAME_LEN];
 
 typedef struct IFuncHandle { unsigned id; } IFunc;
 
-// table of (iinst, type)
+// table of (iinst, type, c fmt)
 #define IINST_TABLE\
     /* special */\
-    X(NOP,      IIT_NOP)\
-    X(RET,      IIT_RET)\
-    X(CONST,    IIT_CONST)\
-    X(CALL,     IIT_CALL)\
+    X(NOP,      IIT_NOP,        NULL)\
+    X(RET,      IIT_RET,        NULL)\
+    X(CONST,    IIT_CONST,      NULL)\
+    X(CALL,     IIT_CALL,       NULL)\
     /* math */\
-    X(ADD,      IIT_BINARY)\
-    X(SUB,      IIT_BINARY)\
-    X(MUL,      IIT_BINARY)\
-    X(DIV,      IIT_BINARY)\
-    X(MOD,      IIT_BINARY)\
+    X(ADD,      IIT_BINARY,     "v%zu + v%zu")\
+    X(SUB,      IIT_BINARY,     "v%zu - v%zu")\
+    X(MUL,      IIT_BINARY,     "v%zu * v%zu")\
+    X(DIV,      IIT_BINARY,     "v%zu / v%zu")\
+    X(MOD,      IIT_BINARY,     "v%zu % v%zu")\
+    /* bit twiddling */\
+    X(BAND,     IIT_BINARY,     "v%zu & v%zu")\
+    X(BOR,      IIT_BINARY,     "v%zu | v%zu")\
+    X(BXOR,     IIT_BINARY,     "v%zu ^ v%zu")\
+    X(BNOT,     IIT_UNARY,      "~v%zu")\
+    X(SHL,      IIT_BINARY,     "v%zu << v%zu")\
+    X(SHR,      IIT_BINARY,     "v%zu >> v%zu")\
+    /* relational */\
+    X(EQ,       IIT_BINARY,     "v%zu == v%zu")\
+    X(NE,       IIT_BINARY,     "v%zu != v%zu")\
+    X(GT,       IIT_BINARY,     "v%zu > v%zu")\
+    X(LT,       IIT_BINARY,     "v%zu < v%zu")\
+    X(GE,       IIT_BINARY,     "v%zu >= v%zu")\
+    X(LE,       IIT_BINARY,     "v%zu <= v%zu")\
+    /* logical */\
+    X(LAND,     IIT_BINARY,     "v%zu && v%zu")\
+    X(LOR,      IIT_BINARY,     "v%zu || v%zu")\
+    X(LNOT,     IIT_UNARY,      "!v%zu")\
 
 #define IINST_TYPE_TABLE\
     X(NOP)\
@@ -62,7 +81,7 @@ typedef struct IFuncHandle { unsigned id; } IFunc;
     X(BINARY)\
     X(CALL)\
 
-#define X(A, B) II_##A,
+#define X(A, B, C) II_##A,
 typedef enum IInstruction { IINST_TABLE II_COUNT } IInst;
 #undef X
 #define X(A) IIT_##A,

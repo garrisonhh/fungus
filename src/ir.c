@@ -4,16 +4,16 @@ char ITYPE_NAME[ITYPE_COUNT][MAX_NAME_LEN];
 char IINST_NAME[II_COUNT][MAX_NAME_LEN];
 char IINST_TYPE_NAME[IIT_COUNT][MAX_NAME_LEN];
 
-#define X(A, B) B,
+#define X(A, B, C) B,
 IInstType IINST_TYPE[II_COUNT] = { IINST_TABLE };
 #undef X
 
 void ir_init(void) {
     // table names
-#define X(A) #A,
+#define X(A, B) #A,
     char *itype_names[ITYPE_COUNT] = { ITYPE_TABLE };
 #undef X
-#define X(A, B) #A,
+#define X(A, B, C) #A,
     char *iinst_names[II_COUNT] = { IINST_TABLE };
 #undef X
 #define X(A) #A,
