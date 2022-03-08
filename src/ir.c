@@ -56,7 +56,8 @@ static IFuncEntry *IC_get_func(IRContext *ctx, IFunc func) {
 
 #define IFUNC_INIT_CAP 4
 
-IFunc ir_add_func(IRContext *ctx, Word name, IType *params, size_t num_params) {
+IFunc ir_add_func(IRContext *ctx, IType ret_ty, Word name, IType *params,
+                  size_t num_params) {
     IFuncEntry *entry = IC_alloc(ctx, sizeof(*entry));
     IFunc handle = (IFunc){ ctx->funcs.len };
 
@@ -65,7 +66,8 @@ IFunc ir_add_func(IRContext *ctx, Word name, IType *params, size_t num_params) {
         .ops = malloc(IFUNC_INIT_CAP * sizeof(*entry->ops)),
         .params = IC_alloc(ctx, num_params),
         .cap = IFUNC_INIT_CAP,
-        .num_params = num_params
+        .num_params = num_params,
+        .ret_ty = ret_ty
     };
 
     for (size_t i = 0; i < num_params; ++i)
@@ -76,19 +78,76 @@ IFunc ir_add_func(IRContext *ctx, Word name, IType *params, size_t num_params) {
     return handle;
 }
 
+static IType itype_of(IFuncEntry *entry, size_t op_addr) {
+    if (op_addr < entry->num_params)
+        return entry->params[op_addr];
+    else
+        return entry->ops[op_addr - entry->num_params].ty;
+}
+
+static void ir_infer_op_type(IRContext *ctx, IFunc func, IOp *op) {
+    // verify op
+    if (op->inst == II_CONST) {
+        if (op->ty == ITYPE_MUST_INFER)
+            fungus_panic("const op itypes must be provided.");
+
+        return;
+    } else if (op->ty != ITYPE_MUST_INFER) {
+        fungus_panic("non-const op itypes are inferred.");
+    }
+
+    // infer type
+    IFuncEntry *entry = IC_get_func(ctx, func);
+
+    switch (IINST_TYPE[op->inst]) {
+    case IIT_COUNT:
+    case IIT_CONST:
+        fungus_panic("unreachable");
+        break;
+    case IIT_NOP:
+    case IIT_RET:
+        op->ty = ITYPE_NIL;
+        break;
+    case IIT_UNARY:
+        op->ty = itype_of(entry, op->a);
+        break;
+    case IIT_BINARY: {
+        IType ty_a = itype_of(entry, op->a);
+
+#ifdef DEBUG
+        IType ty_b = itype_of(entry, op->b);
+
+        if (ty_a != ty_b)
+            fungus_panic("binary op itypes do not match!");
+#endif
+
+        op->ty = ty_a;
+        break;
+    }
+    case IIT_CALL: {
+        IFuncEntry *call_entry = IC_get_func(ctx, op->call.func);
+
+        op->ty = call_entry->ret_ty;
+        break;
+    }
+    }
+}
+
 size_t ir_add_op(IRContext *ctx, IFunc func, IOp op) {
     IFuncEntry *entry = IC_get_func(ctx, func);
 
     // allocate op
-    if (entry->len == entry->cap) {
+    if (entry->len >= entry->cap) {
         entry->cap *= 2;
-        entry->ops = realloc(entry->ops, entry->cap);
+        entry->ops = realloc(entry->ops, entry->cap * sizeof(*entry->ops));
     }
 
     // fill
     IOp *copy = &entry->ops[entry->len];
 
     *copy = op;
+
+    ir_infer_op_type(ctx, func, copy);
 
     return entry->num_params + entry->len++;
 }
@@ -97,31 +156,32 @@ void ir_gen(Fungus *fun, IRContext *ctx, Expr *ast) {
     fungus_panic("TODO ir_gen");
 }
 
+void ir_fprint_const(FILE *fp, IOp *op) {
+    switch (op->ty) {
+    case ITYPE_BOOL: fprintf(fp, "%s", op->bool_ ? "true" : "false"); break;
+    case ITYPE_I64: fprintf(fp, "%Ld", op->int_); break;
+    case ITYPE_F64: fprintf(fp, "%Lf", op->float_); break;
+    default: break;
+    }
+}
+
 static void IOp_dump(IRContext *ctx, IOp *op) {
     printf("%s ", IINST_NAME[op->inst]);
 
     switch (IINST_TYPE[op->inst]) {
-    case IIT_NIL:
+    case IIT_NOP:
     case IIT_COUNT:
         break;
-    case IIT_CONST: {
-        IConst *iconst = &op->iconst;
-
-        printf("%s ", ITYPE_NAME[iconst->type]);
-
-        switch (iconst->type) {
-        case ITYPE_BOOL: printf("`%s`", iconst->bool_ ? "true" : "false"); break;
-        case ITYPE_I64: printf("`%Ld`", iconst->int_); break;
-        case ITYPE_F64: printf("`%Lf`", iconst->float_); break;
-        case ITYPE_COUNT: break;
-        }
+    case IIT_CONST:
+        printf("%s ", ITYPE_NAME[op->ty]);
+        ir_fprint_const(stdout, op);
         break;
-    }
+    case IIT_RET:
     case IIT_UNARY:
-        printf("%zu", op->unary.a);
+        printf("$%zu", op->a);
         break;
     case IIT_BINARY:
-        printf("%zu %zu", op->binary.a, op->binary.b);
+        printf("$%zu $%zu", op->a, op->b);
         break;
     case IIT_CALL: {
         IFuncEntry *entry = IC_get_func(ctx, op->call.func);
@@ -142,7 +202,8 @@ static void IOp_dump(IRContext *ctx, IOp *op) {
 }
 
 static void IFuncEntry_dump(IRContext *ctx, IFuncEntry *entry) {
-    printf("%.*s(", (int)entry->name->len, entry->name->str);
+    printf("%s %.*s(", ITYPE_NAME[entry->ret_ty], (int)entry->name->len,
+           entry->name->str);
 
     for (size_t i = 0; i < entry->num_params; ++i) {
         if (i) printf(", ");
@@ -152,8 +213,15 @@ static void IFuncEntry_dump(IRContext *ctx, IFuncEntry *entry) {
     printf("):\n");
 
     for (size_t i = 0; i < entry->len; ++i) {
-        printf("%4s$%zu = ", "", i + entry->num_params);
-        IOp_dump(ctx, &entry->ops[i]);
+        IOp *op = &entry->ops[i];
+
+        printf("%4s", "");
+
+        // some ops return data, some don't
+        if (op->ty != ITYPE_NIL)
+            printf("$%zu = ", i + entry->num_params);
+
+        IOp_dump(ctx, op);
     }
 }
 
@@ -170,17 +238,14 @@ void ir_dump(IRContext *ctx) {
 
 #ifdef DEBUG
 void ir_test(Fungus *fun, IRContext *ctx) {
-    IFunc main = ir_add_func(ctx, WORD("main"), NULL, 0);
+    IFunc main = ir_add_func(ctx, ITYPE_I64, WORD("main"), NULL, 0);
 
-    size_t v0 = ir_add_op(ctx, main, (IOp){
-        .inst = II_CONST,
-        .iconst = { ITYPE_I64, .int_ = 0 },
-    });
+    size_t v0 = ir_add_op(ctx, main, (IOp){ II_CONST, ITYPE_I64, .int_ = 1 });
+    size_t v1 = ir_add_op(ctx, main, (IOp){ II_CONST, ITYPE_I64, .int_ = 2 });
+    size_t v2 = ir_add_op(ctx, main, (IOp){ II_ADD, .a = v0, .b = v1 });
+    size_t v3 = ir_add_op(ctx, main, (IOp){ II_MUL, .a = v2, .b = v2 });
 
-    size_t v1 = ir_add_op(ctx, main, (IOp){
-        .inst = II_RET,
-        .unary = { v0 }
-    });
+    ir_add_op(ctx, main, (IOp){ II_RET, .a = v3 });
 
     ir_dump(ctx);
 }

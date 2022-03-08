@@ -15,17 +15,19 @@
  * require accounting for two things, parameterizing and sum vs. product
  * - parameterizing is `naming` typed data
  * - algebraic types create structured data
- * -
  *
  * examples
  * - unparameterized
  *   - sum -> raw union
- *   - prod -> tuple, ptr
+ *   - prod -> tuple, ptr, maybe array?
  * - parameterized
  *   - sum -> enum, tagged union
  *   - prod -> struct
  */
 #define ITYPE_TABLE\
+    X(MUST_INFER)\
+    X(NIL)\
+    \
     X(BOOL)\
     X(I64)\
     X(F64)\
@@ -36,22 +38,13 @@ typedef enum IType { ITYPE_TABLE ITYPE_COUNT } IType;
 
 extern char ITYPE_NAME[ITYPE_COUNT][MAX_NAME_LEN];
 
-typedef struct IConst {
-    IType type;
-    union {
-        fun_bool bool_;
-        fun_int int_;
-        fun_float float_;
-    };
-} IConst;
-
 typedef struct IFuncHandle { unsigned id; } IFunc;
 
 // table of (iinst, type)
 #define IINST_TABLE\
     /* special */\
-    X(NOP,      IIT_NIL)\
-    X(RET,      IIT_UNARY)\
+    X(NOP,      IIT_NOP)\
+    X(RET,      IIT_RET)\
     X(CONST,    IIT_CONST)\
     X(CALL,     IIT_CALL)\
     /* math */\
@@ -62,7 +55,8 @@ typedef struct IFuncHandle { unsigned id; } IFunc;
     X(MOD,      IIT_BINARY)\
 
 #define IINST_TYPE_TABLE\
-    X(NIL)\
+    X(NOP)\
+    X(RET)\
     X(CONST)\
     X(UNARY)\
     X(BINARY)\
@@ -79,14 +73,18 @@ extern char IINST_NAME[II_COUNT][MAX_NAME_LEN];
 extern IInstType IINST_TYPE[II_COUNT];
 extern char IINST_TYPE_NAME[IIT_COUNT][MAX_NAME_LEN];
 
-typedef struct IOpUnary { size_t a; } IOpUnary;
-
 typedef struct IOperation {
     IInst inst;
+    IType ty; // if inst is not `const`, this will be inferred
+
     union {
-        IConst iconst;
-        struct { size_t a; } unary;
-        struct { size_t a, b; } binary;
+        // constants
+        fun_bool bool_;
+        fun_int int_;
+        fun_float float_;
+
+        // operations
+        struct { size_t a, b; };
         struct {
             IFunc func;
             size_t *params;
@@ -104,6 +102,8 @@ typedef struct IFuncEntry {
     IType *params;
     size_t len, cap;
     size_t num_params;
+
+    IType ret_ty;
 } IFuncEntry;
 
 typedef struct IRContext {
@@ -120,8 +120,10 @@ void ir_init(void);
 IRContext IRContext_new(void);
 void IRContext_del(IRContext *);
 
-IFunc ir_add_func(IRContext *, Word name, IType *params, size_t num_params);
+IFunc ir_add_func(IRContext *, IType ret_ty, Word name, IType *params,
+                  size_t num_params);
 size_t ir_add_op(IRContext *, IFunc func, IOp op); // copies op
+void ir_fprint_const(FILE *, IOp *op);
 
 void ir_gen(Fungus *fun, IRContext *ctx, Expr *ast);
 void ir_dump(IRContext *ctx);
