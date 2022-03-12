@@ -54,7 +54,7 @@ typedef struct IFuncHandle { unsigned id; } IFunc;
     X(MUL,      IIT_BINARY,     "v%zu * v%zu")\
     X(DIV,      IIT_BINARY,     "v%zu / v%zu")\
     X(MOD,      IIT_BINARY,     "v%zu % v%zu")\
-    /* bit twiddling */\
+    /* bitwise */\
     X(BAND,     IIT_BINARY,     "v%zu & v%zu")\
     X(BOR,      IIT_BINARY,     "v%zu | v%zu")\
     X(BXOR,     IIT_BINARY,     "v%zu ^ v%zu")\

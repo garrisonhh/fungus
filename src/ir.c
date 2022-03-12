@@ -147,8 +147,8 @@ size_t ir_add_op(IRContext *ctx, IFunc func, IOp op) {
 
     *copy = op;
 
-    // copy function call params
     if (copy->inst == II_CALL) {
+        // copy function call params
         copy->call.params =
             IC_alloc(ctx, copy->call.num_params * sizeof(*copy->call.params));
 
@@ -199,7 +199,7 @@ static void IOp_dump(IRContext *ctx, IOp *op) {
 
         for (size_t i = 0; i < op->call.num_params; ++i) {
             if (i) printf(", ");
-            printf("%zu", op->call.params[i]);
+            printf("$%zu", op->call.params[i]);
         }
 
         printf(")");
@@ -216,7 +216,7 @@ static void IFuncEntry_dump(IRContext *ctx, IFuncEntry *entry) {
 
     for (size_t i = 0; i < entry->num_params; ++i) {
         if (i) printf(", ");
-        printf("%zu %s", i, ITYPE_NAME[entry->params[i]]);
+        printf("$%zu: %s", i, ITYPE_NAME[entry->params[i]]);
     }
 
     printf("):\n");

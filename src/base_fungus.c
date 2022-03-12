@@ -31,6 +31,13 @@ static void ternary_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
     expr->cty = entry->cty;
 }
 
+static void parens_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
+    assert(expr->len == 1);
+
+    expr->ty = expr->exprs[0]->ty;
+    expr->cty = entry->cty;
+}
+
 static void binary_math_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
     assert(expr->len == 2);
 
@@ -95,8 +102,8 @@ void Fungus_define_base(Fungus *fun) {
     Type lex_true = Fungus_define_keyword(fun, WORD("true"));
     Type lex_false = Fungus_define_keyword(fun, WORD("false"));
 
-    // Type lex_lparen = Fungus_define_symbol(fun, WORD("("));
-    // Type lex_rparen = Fungus_define_symbol(fun, WORD(")"));
+    Type lex_lparen = Fungus_define_symbol(fun, WORD("("));
+    Type lex_rparen = Fungus_define_symbol(fun, WORD(")"));
     Type lex_star = Fungus_define_symbol(fun, WORD("*"));
     Type lex_rslash = Fungus_define_symbol(fun, WORD("/"));
     Type lex_percent = Fungus_define_symbol(fun, WORD("%"));
@@ -198,25 +205,22 @@ void Fungus_define_base(Fungus *fun) {
     Rule_define(fun, &ternary_def);
 #endif
 
-    /*
-     * PatNode parens_rule_pat[] = {
-     *     { lex_lparen },
-     *     { fun->t_comptype }, // TODO supertype -> concrete type inference
-     *     { lex_rparen },
-     * };
-     * RuleDef parens_rule_def = {
-     *     .pattern = parens_rule_pat,
-     *     .len = ARRAY_SIZE(parens_rule_pat),
-     *     .prec = fun->p_highest,
-     *     .ty = fun->t_runtype, // TODO supertype -> concrete type inference
-     *     .cty = fun->t_parens,
-     * };
-     * Rule_define(fun, &parens_rule_def);
-     */
+    PatNode parens_rule_pat[] = {
+        { lex_lparen },
+        { fun->t_runtype },
+        { lex_rparen },
+    };
+    RuleDef parens_rule_def = {
+        .name = WORD("Parens"),
+        .pattern = parens_rule_pat,
+        .len = ARRAY_SIZE(parens_rule_pat),
+        .prec = fun->p_highest,
+        .cty = fun->t_parens,
+        .hook = parens_hook
+    };
+    Rule_define(fun, &parens_rule_def);
 
-    /*
-     * math
-     */
+    // math
     typedef struct BinaryMathOperator {
         Word name;
         Type sym;

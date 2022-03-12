@@ -97,11 +97,11 @@ Rule Rule_define(Fungus *fun, RuleDef *def) {
     TypeGraph *types = &fun->types;
 
     // validate RuleDef
+    // TODO need MUCH more intelligent errors + validation for this
     bool valid = def->len && def->len < MAX_RULE_LEN && def->pattern;
 
     if (!valid) {
-        // TODO more intelligent errors for this
-        fungus_error("invalid rule definition: %.*s",
+        fungus_panic("invalid rule definition: %.*s",
                      (int)def->name.len, def->name.str);
     }
 

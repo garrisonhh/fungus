@@ -178,13 +178,13 @@ static Expr *parse_slice(Fungus *fun, Expr **exprs, size_t len) {
                 // sew up expr array around this collapse
                 Expr **sewn_exprs = exprs + match_len - 1;
 
-                for (size_t j = 0; j < i; ++j)
-                    sewn_exprs[j] = exprs[j];
+                for (size_t j = i; j > 0; --j)
+                    sewn_exprs[j - 1] = exprs[j - 1];
+
+                sewn_exprs[i] = collapsed;
 
                 exprs = sewn_exprs;
                 len = len - (match_len - 1);
-
-                exprs[i] = collapsed;
 
                 // break to outer loop
                 found_match = true;

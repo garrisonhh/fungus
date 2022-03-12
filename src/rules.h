@@ -4,12 +4,6 @@
 #include "types.h"
 #include "precedence.h"
 
-/*
- * TODO making Rule into a handle will solve a lot of problems with Expr, like
- * storing prefixed/postfixed-ness currently and simplifying both rulehooks
- * and (planned) ir hooks
- */
-
 #ifndef MAX_RULE_LEN
 #define MAX_RULE_LEN 64
 #endif
@@ -27,9 +21,9 @@ typedef struct PatNode {
     unsigned modifiers; // bitfield using modifiers
 } PatNode;
 
-typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
 typedef struct RuleHandle { unsigned id; } Rule;
 
+typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
 typedef struct RuleEntry RuleEntry;
 
 // RuleHooks take an untyped expr filled with raw pattern match data as
