@@ -19,22 +19,18 @@ static void false_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
     expr->bool_ = false;
 }
 
-static void ternary_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
-    assert(expr->len == 3);
-
-    if (expr->exprs[1]->ty.id != expr->exprs[2]->ty.id) {
-        // TODO better error
-        fungus_panic("mismatching ternary expr types");
-    }
-
-    expr->ty = expr->exprs[1]->ty;
-    expr->cty = entry->cty;
-}
-
-static void parens_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
+// one child, and this expr inherits the type of its child
+static void basic_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
     assert(expr->len == 1);
 
     expr->ty = expr->exprs[0]->ty;
+    expr->cty = entry->cty;
+}
+
+static void if_atom_hook(Fungus *fun, RuleEntry *entry, Expr *expr) {
+    assert(expr->len == 2);
+
+    expr->ty = expr->exprs[1]->ty;
     expr->cty = entry->cty;
 }
 
@@ -91,32 +87,48 @@ void Fungus_define_base(Fungus *fun) {
         { WORD("Lexeme"), is_comptype, ARRAY_SIZE(is_comptype) };
     TypeDef parens_typedef =
         { WORD("Parens"), is_comptype, ARRAY_SIZE(is_comptype) };
+    TypeDef stmt_typedef =
+        { WORD("Stmt"), is_comptype, ARRAY_SIZE(is_comptype) };
 
     fun->t_literal = Type_define(&fun->types, &literal_typedef);
     fun->t_lexeme = Type_define(&fun->types, &lexeme_typedef);
     fun->t_parens = Type_define(&fun->types, &parens_typedef);
+    fun->t_stmt = Type_define(&fun->types, &stmt_typedef);
+
+    TypeDef if_typedef =
+        { WORD("If"), is_comptype, ARRAY_SIZE(is_comptype) };
+    TypeDef elif_typedef =
+        { WORD("Elif"), is_comptype, ARRAY_SIZE(is_comptype) };
+    TypeDef else_typedef =
+        { WORD("Else"), is_comptype, ARRAY_SIZE(is_comptype) };
+    TypeDef if_else_typedef =
+        { WORD("IfElseChain"), is_comptype, ARRAY_SIZE(is_comptype) };
+
+    fun->t_if = Type_define(&fun->types, &if_typedef);
+    fun->t_elif = Type_define(&fun->types, &elif_typedef);
+    fun->t_else = Type_define(&fun->types, &else_typedef);
+    fun->t_if_else = Type_define(&fun->types, &if_else_typedef);
 
     /*
      * lexemes (Fungus_define_x funcs rely on t_lexeme)
      */
     Type lex_true = Fungus_define_keyword(fun, WORD("true"));
     Type lex_false = Fungus_define_keyword(fun, WORD("false"));
+    Type lex_if = Fungus_define_keyword(fun, WORD("if"));
+    Type lex_elif = Fungus_define_keyword(fun, WORD("elif"));
+    Type lex_else = Fungus_define_keyword(fun, WORD("else"));
 
     Type lex_lparen = Fungus_define_symbol(fun, WORD("("));
     Type lex_rparen = Fungus_define_symbol(fun, WORD(")"));
+    Type lex_lcurly = Fungus_define_symbol(fun, WORD("{"));
+    Type lex_rcurly = Fungus_define_symbol(fun, WORD("}"));
+    Type lex_semicolon = Fungus_define_symbol(fun, WORD(";"));
     Type lex_star = Fungus_define_symbol(fun, WORD("*"));
     Type lex_rslash = Fungus_define_symbol(fun, WORD("/"));
     Type lex_percent = Fungus_define_symbol(fun, WORD("%"));
     Type lex_plus = Fungus_define_symbol(fun, WORD("+"));
     Type lex_minus = Fungus_define_symbol(fun, WORD("-"));
     Type lex_dstar = Fungus_define_symbol(fun, WORD("**"));
-
-#define TERNARY_TEST
-
-#ifdef TERNARY_TEST
-    Type lex_question = Fungus_define_symbol(fun, WORD("?"));
-    Type lex_colon = Fungus_define_symbol(fun, WORD(":"));
-#endif
 
     /*
      * precedences
@@ -181,30 +193,6 @@ void Fungus_define_base(Fungus *fun) {
     };
     Rule_define(fun, &false_def);
 
-#ifdef TERNARY_TEST
-    TypeDef ternary_typedef =
-        { WORD("TernaryExpr"), is_comptype, ARRAY_SIZE(is_comptype) };
-    Type ternary = Type_define(&fun->types, &ternary_typedef);
-
-    PatNode ternary_pat[] = {
-        { fun->t_bool },
-        { lex_question },
-        { fun->t_runtype },
-        { lex_colon },
-        { fun->t_runtype },
-    };
-    RuleDef ternary_def = {
-        .name = WORD("Ternary"),
-        .pattern = ternary_pat,
-        .len = ARRAY_SIZE(ternary_pat),
-        .prec = fun->p_highest,
-        .assoc = ASSOC_RIGHT,
-        .cty = ternary,
-        .hook = ternary_hook
-    };
-    Rule_define(fun, &ternary_def);
-#endif
-
     PatNode parens_rule_pat[] = {
         { lex_lparen },
         { fun->t_runtype },
@@ -216,9 +204,89 @@ void Fungus_define_base(Fungus *fun) {
         .len = ARRAY_SIZE(parens_rule_pat),
         .prec = fun->p_highest,
         .cty = fun->t_parens,
-        .hook = parens_hook
+        .hook = basic_hook
     };
     Rule_define(fun, &parens_rule_def);
+
+    PatNode stmt_rule_pat[] = {
+        { fun->t_runtype },
+        { lex_semicolon },
+    };
+    RuleDef stmt_rule_def = {
+        .name = WORD("Stmt"),
+        .pattern = stmt_rule_pat,
+        .len = ARRAY_SIZE(stmt_rule_pat),
+        .prec = fun->p_highest,
+        .cty = fun->t_stmt,
+        .hook = basic_hook
+    };
+    Rule_define(fun, &stmt_rule_def);
+
+    // if/elif/else
+    PatNode if_rule_pat[] = {
+        { lex_if },
+        { fun->t_bool },
+        { lex_lcurly },
+        { fun->t_runtype },
+        { lex_rcurly },
+    };
+    RuleDef if_rule_def = {
+        .name = WORD("If"),
+        .pattern = if_rule_pat,
+        .len = ARRAY_SIZE(if_rule_pat),
+        .prec = fun->p_highest,
+        .cty = fun->t_if,
+        .hook = if_atom_hook
+    };
+    Rule_define(fun, &if_rule_def);
+
+    PatNode elif_rule_pat[] = {
+        { lex_elif },
+        { fun->t_bool },
+        { lex_lcurly },
+        { fun->t_runtype },
+        { lex_rcurly },
+    };
+    RuleDef elif_rule_def = {
+        .name = WORD("Elif"),
+        .pattern = elif_rule_pat,
+        .len = ARRAY_SIZE(elif_rule_pat),
+        .prec = fun->p_highest,
+        .cty = fun->t_elif,
+        .hook = if_atom_hook
+    };
+    Rule_define(fun, &elif_rule_def);
+
+    PatNode else_rule_pat[] = {
+        { lex_else },
+        { lex_lcurly },
+        { fun->t_runtype },
+        { lex_rcurly },
+    };
+    RuleDef else_rule_def = {
+        .name = WORD("Else"),
+        .pattern = else_rule_pat,
+        .len = ARRAY_SIZE(else_rule_pat),
+        .prec = fun->p_highest,
+        .cty = fun->t_else,
+        .hook = basic_hook
+    };
+    Rule_define(fun, &else_rule_def);
+
+    PatNode if_else_rule_pat[] = {
+        { fun->t_if },
+        { fun->t_elif, PAT_REPEAT | PAT_OPTIONAL },
+        { fun->t_else, PAT_OPTIONAL },
+    };
+    RuleDef if_else_rule_def = {
+        .name = WORD("IfElseChain"),
+        .pattern = if_else_rule_pat,
+        .len = ARRAY_SIZE(if_else_rule_pat),
+        .prec = fun->p_highest,
+        .cty = fun->t_if_else,
+        .hook = basic_hook
+    };
+    Rule_define(fun, &if_else_rule_def);
 
     // math
     typedef struct BinaryMathOperator {

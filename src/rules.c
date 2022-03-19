@@ -1,3 +1,5 @@
+#include <assert.h>
+
 #include "rules.h"
 #include "fungus.h"
 
@@ -131,6 +133,8 @@ Rule Rule_define(Fungus *fun, RuleDef *def) {
 }
 
 RuleEntry *Rule_get(RuleTree *rt, Rule rule) {
+    assert(rule.id < rt->entries.len);
+
     return rt->entries.data[rule.id];
 }
 
