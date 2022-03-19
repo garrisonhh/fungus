@@ -17,12 +17,8 @@ typedef struct Fungus {
 
     // base types
     Type t_notype;
-
     Type t_runtype, t_string, t_bool, t_number, t_int, t_float;
-
     Type t_comptype, t_literal, t_lexeme;
-    Type t_parens, t_stmt;
-    Type t_if, t_elif, t_else, t_if_else;
 
     // base precedences
     Prec p_lowest, p_highest;

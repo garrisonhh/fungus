@@ -9,64 +9,77 @@
 #endif
 
 typedef struct Fungus Fungus;
-typedef struct Expr Expr;
 
-enum PatternNodeModifiers {
+enum PatModifiers {
     PAT_REPEAT = 0x1,
-    PAT_OPTIONAL = 0x2,
+    // PAT_OPTIONAL = 0x2,
 };
 
-typedef struct PatNode {
+typedef struct WherePat {
     Type ty;
-    unsigned modifiers; // bitfield using modifiers
-} PatNode;
+    unsigned modifiers; // bitfield using pattern modifiers
+} WherePat;
+
+/*
+ * patterns are defined something like this:
+ *
+ * (Pattern){
+ *     .pat = { 0, 1, 0 }, .len = 3,
+ *     .returns = 0,
+ *     .where = {
+ *         { number },
+ *         { plus_lexeme }
+ *     }
+ * }
+ *
+ * this is exactly like some rust-like syntax:
+ *
+ * fn add(lhs: T, symbol: S, rhs: T): T
+ *    where T: Number,
+ *          S: +;
+ */
+typedef struct Pattern {
+    size_t *pat;
+    size_t len;
+    size_t returns;
+    WherePat *where;
+} Pattern;
+
+typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
+
+// fill this out in order to define a rule. when defined, every rule will
+// also generate its own comptype
+typedef struct RuleDef {
+    Word name;
+    Pattern pat;
+    Prec prec;
+    Associativity assoc;
+} RuleDef;
 
 typedef struct RuleHandle { unsigned id; } Rule;
 
-typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
-typedef struct RuleEntry RuleEntry;
+// used to store rule data within ruletree entries
+typedef struct RuleEntry {
+    Type ty;
 
-// RuleHooks take an untyped expr filled with raw pattern match data as
-// children, and adds type info + whatever else it needs to do
-// TODO get rid of this pattern somehow
-typedef void (*RuleHook)(Fungus *fun, RuleEntry *entry, Expr *expr);
-
-// fill this out in order to define a rule
-typedef struct RuleDef {
-    Word name;
-    PatNode *pattern;
-    size_t len;
+    Pattern pat;
     Prec prec;
     Associativity assoc;
-    Type cty;
-    RuleHook hook;
-} RuleDef;
-
-// used to store rule data at the end of an atom
-struct RuleEntry {
-    Rule handle;
-    Word *name;
-    Prec prec;
-    Associativity assoc;
-    // available for hook usage, necessary for some rules TODO consider removal?
-    Type cty;
-    RuleHook hook;
 
     // flags
     unsigned prefixed: 1; // if rule has a lexeme at start
     unsigned postfixed: 1; // if rule has a lexeme at end
-};
+} RuleEntry;
 
 // nodes could use hashmaps instead of vecs to store nexts, but I'm not sure
-// this would actually result in a performance improvement
+// this would actually result in a performance improvement in most cases
 typedef struct RuleNode {
-    struct RuleNode *parent; // null if this node is a root node
-    Rule rule;
-
-    Type ty;
     Vec nexts;
+    Type ty;
 
-    bool terminates;
+    Rule rule;
+    unsigned terminates: 1; // whether `rule` is valid
+    unsigned repeats: 1; // whether `nexts` contains a self-reference
 } RuleNode;
 
 typedef struct RuleTree {

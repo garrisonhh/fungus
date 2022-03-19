@@ -42,7 +42,6 @@ reset_lex:
     return status;
 }
 
-
 #define REPL_BUF_SIZE 1024
 
 void repl(Fungus *fun) {

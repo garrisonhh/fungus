@@ -13,13 +13,40 @@ static RuleNode *RT_new_node(RuleTree *rt, RuleNode *parent, Type ty) {
     *node = (RuleNode){
         .ty = ty,
         .nexts = Vec_new(),
-        .parent = parent
     };
 
     if (parent)
         Vec_push(&parent->nexts, node);
 
     return node;
+}
+
+static Pattern Pattern_copy_of(RuleTree *rt, Pattern *pat) {
+    // find where len
+    size_t where_len = 0;
+
+    for (size_t i = 0; i < pat->len; ++i)
+        if (pat->pat[i] >= where_len)
+            where_len = pat->pat[i] + 1;
+
+    if (pat->returns >= where_len)
+        where_len = pat->returns + 1;
+
+    // allocate
+    Pattern copy = {
+        .pat = RT_alloc(rt, pat->len * sizeof(*copy.pat)),
+        .len = pat->len,
+        .returns = pat->returns,
+        .where = RT_alloc(rt, where_len * sizeof(*copy.where))
+    };
+
+    for (size_t i = 0; i < pat->len; ++i)
+        copy.pat[i] = pat->pat[i];
+
+    for (size_t i = 0; i < where_len; ++i)
+        copy.where[i] = pat->where[i];
+
+    return copy;
 }
 
 RuleTree RuleTree_new(void) {
@@ -46,52 +73,51 @@ void RuleTree_del(RuleTree *rt) {
     Bump_del(&rt->pool);
 }
 
-static void RuleNode_place(RuleTree *rt, RuleNode *node, PatNode *pat,
-                           size_t len, Rule rule) {
-    if (len == 0) {
-        // reached end of pattern
+// idx is into def->pat pattern
+static void RuleNode_place(Fungus *fun, Rule rule, Pattern *pat, size_t idx,
+                           RuleNode *node) {
+    if (idx == pat->len) {
+        // terminus
+        if (node->terminates) // TODO error
+            fungus_panic("redefined rule");
+
         node->terminates = true;
         node->rule = rule;
+    } else {
+        RuleNode *next = NULL;
+        WherePat where = pat->where[pat->pat[idx]];
 
-        return;
-    }
+        // try to match an old node
+        for (size_t i = 0; i < node->nexts.len; ++i) {
+            RuleNode *other = node->nexts.data[i];
 
-    // optional modifier
-    if (pat->modifiers & PAT_OPTIONAL)
-        RuleNode_place(rt, node, pat + 1, len - 1, rule);
-
-    // try to match a node
-    RuleNode *placed = NULL;
-
-    for (size_t i = 0; i < node->nexts.len; ++i) {
-        RuleNode *next = node->nexts.data[i];
-
-        if (next->ty.id == pat->ty.id) {
-            placed = next;
-            break;
-        }
-    }
-
-    if (!placed) // no match, create a new node
-        placed = RT_new_node(rt, node, pat->ty);
-
-    // repeat modifier
-    if (pat->modifiers & PAT_REPEAT) {
-        bool already_repeats = false;
-
-        for (size_t i = 0; i < placed->nexts.len; ++i) {
-            if (placed->nexts.data[i] == placed) {
-                already_repeats = true;
+            if (other->ty.id == where.ty.id) {
+                next = other;
                 break;
             }
         }
 
-        if (!already_repeats)
-            Vec_push(&placed->nexts, placed);
-    }
+        if (!next) // no node found, make a new one
+            next = RT_new_node(&fun->rules, node, where.ty);
 
-    // recur on next pattern
-    RuleNode_place(rt, placed, pat + 1, len - 1, rule);
+        // repetition
+        if (where.modifiers & PAT_REPEAT && !next->repeats) {
+            next->repeats = true;
+
+            Vec_push(&next->nexts, next);
+        }
+
+        // TODO optional
+
+        // recur on node
+        RuleNode_place(fun, rule, pat, idx + 1, next);
+    }
+}
+
+static bool validate_rule(Fungus *fun, RuleDef *def) {
+    // TODO
+
+    return true;
 }
 
 Rule Rule_define(Fungus *fun, RuleDef *def) {
@@ -99,35 +125,36 @@ Rule Rule_define(Fungus *fun, RuleDef *def) {
     TypeGraph *types = &fun->types;
 
     // validate RuleDef
-    // TODO need MUCH more intelligent errors + validation for this
-    bool valid = def->len && def->len < MAX_RULE_LEN && def->pattern;
-
-    if (!valid) {
+    if (!validate_rule(fun, def)) {
         fungus_panic("invalid rule definition: %.*s",
                      (int)def->name.len, def->name.str);
     }
 
     // create Rule
-    RuleEntry *entry = RT_alloc(rt, sizeof(*entry));
     Rule handle = { rt->entries.len };
+    RuleEntry *entry = RT_alloc(rt, sizeof(*entry));
 
     *entry = (RuleEntry){
-        .handle = handle,
-        .name = Word_copy_of(&def->name, &fun->rules.pool),
+        .ty = Type_define(types, &(TypeDef){
+            .name = def->name,
+            .is = &fun->t_comptype,
+            .is_len = 1
+        }),
+        .pat = Pattern_copy_of(rt, &def->pat),
         .prec = def->prec,
         .assoc = def->assoc,
-        .cty = def->cty,
-        .hook = def->hook,
 
-        .prefixed = Type_is(types, def->pattern[0].ty, fun->t_lexeme),
-        .postfixed = Type_is(types, def->pattern[def->len - 1].ty,
+        .prefixed = Type_is(types, def->pat.where[def->pat.pat[0]].ty,
+                            fun->t_lexeme),
+        .postfixed = Type_is(types,
+                             def->pat.where[def->pat.pat[def->pat.len - 1]].ty,
                              fun->t_lexeme),
     };
 
     Vec_push(&rt->entries, entry);
 
     // place node entry in tree
-    RuleNode_place(rt, rt->root, def->pattern, def->len, handle);
+    RuleNode_place(fun, handle, &entry->pat, 0, rt->root);
 
     return handle;
 }
@@ -155,7 +182,9 @@ static void RuleNode_dump(Fungus *fun, RuleNode *node, char *buf, char *tail) {
 
     // print rule if exists
     if (node->terminates) {
-        name = Rule_get(&fun->rules, node->rule)->name;
+        Type ty = Rule_get(&fun->rules, node->rule)->ty;
+
+        name = Type_name(&fun->types, ty);
 
         printf("%.*s: %s\n", (int)name->len, name->str, buf);
     }
