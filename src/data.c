@@ -4,16 +4,16 @@
 
 #include "data.h"
 
-// dyn array ===================================================================
-
-#ifndef VEC_INIT_CAP
-#define VEC_INIT_CAP 8
+#ifndef DATA_INIT_CAP
+#define DATA_INIT_CAP 8
 #endif
+
+// dyn array ===================================================================
 
 Vec Vec_new(void) {
     Vec v = {
-        .data = malloc(VEC_INIT_CAP * sizeof(*v.data)),
-        .cap = VEC_INIT_CAP
+        .data = malloc(DATA_INIT_CAP * sizeof(*v.data)),
+        .cap = DATA_INIT_CAP
     };
 
     return v;
@@ -48,7 +48,7 @@ void **Vec_alloc(Vec *v) {
 
 void Vec_clear(Vec *v) {
     v->len = 0;
-    v->cap = VEC_INIT_CAP;
+    v->cap = DATA_INIT_CAP;
     v->data = realloc(v->data, v->cap * sizeof(*v->data));
 }
 
@@ -170,8 +170,8 @@ Word *Word_copy_of(Word *src, Bump *pool) {
 }
 
 bool Word_eq(const Word *a, const Word *b) {
-    // NOTE if this is broken, fnv-1a may have to go
-    return a->len == b->len && a->hash == b->hash;
+    return a->len == b->len && a->hash == b->hash
+        && !strncmp(a->str, b->str, a->len);
 }
 
 bool Word_eq_view(const Word *a, const View *b) {
@@ -182,3 +182,80 @@ bool Word_eq_view(const Word *a, const View *b) {
 
 // idmap =======================================================================
 
+IdMap IdMap_new(void) {
+    return (IdMap){
+        .nodes = calloc(DATA_INIT_CAP, sizeof(IdMapNode *)),
+        .cap = DATA_INIT_CAP
+    };
+}
+
+void IdMap_del(IdMap *map) {
+    free(map->nodes);
+}
+
+static void IdMap_put_lower(IdMap *map, IdMapNode *node) {
+    IdMapNode **place = &map->nodes[node->name->hash % map->cap];
+
+    while (*place)
+        place = &(*place)->next;
+
+    *place = node;
+}
+
+static void IdMap_resize(IdMap *map, size_t new_cap) {
+    IdMapNode **old_nodes = map->nodes;
+    size_t old_cap = map->cap;
+
+    map->nodes = calloc(new_cap, sizeof(*map->nodes));
+    map->cap = new_cap;
+
+    for (size_t i = 0; i < old_cap; ++i)
+        for (IdMapNode *trav = old_nodes[i]; trav; trav = trav->next)
+            IdMap_put_lower(map, trav);
+}
+
+void IdMap_put(IdMap *map, const Word *name, size_t id) {
+    // check for expansion
+    if (map->size * 2 > map->cap)
+        IdMap_resize(map, map->cap * 2);
+
+    // place node
+    // TODO fml the memory fragmentation :(
+    IdMapNode *node = malloc(sizeof(*node));
+
+    *node = (IdMapNode){ .name = name, .id = id };
+
+    IdMap_put_lower(map, node);
+
+    ++map->size;
+}
+
+bool IdMap_get_checked(IdMap *map, const Word *name, size_t *out_id) {
+    IdMapNode *trav = map->nodes[name->hash % map->cap];
+
+    for (; trav; trav = trav->next) {
+        if (Word_eq(name, trav->name)) {
+            *out_id = trav->id;
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+size_t IdMap_get(IdMap *map, const Word *name) {
+    size_t id;
+
+    if (IdMap_get_checked(map, name, &id))
+        return id;
+
+    fungus_panic("IdMap failed to retrieve '%.*s'!\n",
+                 (int)name->len, name->str);
+}
+
+void IdMap_remove(IdMap *map, const Word *name) {
+    // TODO if this function remains unused that would be REALLY nice for
+    // a replacement implementation
+    fungus_panic("IDMap_remove not impl'd");
+}

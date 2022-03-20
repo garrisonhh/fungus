@@ -65,15 +65,30 @@ bool Word_eq_view(const Word *a, const View *b);
 
 // ordered Word -> id hashmap ==================================================
 
-// TODO replace with a faster flat (non-node-based) version at some point
+// TODO replace with a (much) faster flat version at some point
 
 typedef struct IdMapNode {
-    size_t data;
+    struct IdMapNode *next;
+
+    const Word *name;
+    size_t id;
 } IdMapNode;
 
 typedef struct IdMap {
-    IdMapNode *nodes;
+    IdMapNode **nodes;
     size_t size, cap;
 } IdMap;
+
+IdMap IdMap_new(void);
+void IdMap_del(IdMap *);
+
+// put does NOT copy words, assumes their lifetime is longer than IdMap
+void IdMap_put(IdMap *, const Word *name, size_t id);
+
+// get will panic if name isn't found, checked allows you to handle errors
+bool IdMap_get_checked(IdMap *, const Word *name, size_t *out_id);
+size_t IdMap_get(IdMap *, const Word *name);
+
+void IdMap_remove(IdMap *, const Word *name);
 
 #endif
