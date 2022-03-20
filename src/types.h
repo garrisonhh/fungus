@@ -24,7 +24,7 @@ typedef struct TypeGraph {
     Bump pool;
     Vec entries;
 
-    // TODO name => id hashmap
+    IdMap by_name;
 } TypeGraph;
 
 typedef struct TypeDef {
@@ -33,13 +33,13 @@ typedef struct TypeDef {
     size_t is_len;
 } TypeDef;
 
-extern const Type INVALID_TYPE;
+extern const Type INVALID_TYPE; // TODO this is hacky, get rid of it
 
 TypeGraph TypeGraph_new(void);
 void TypeGraph_del(TypeGraph *);
 
 Type Type_define(TypeGraph *, TypeDef *def);
-Type Type_get(TypeGraph *, Word *name); // may return INVALID_TYPE
+bool Type_get(TypeGraph *, Word *name, Type *o_type);
 const Word *Type_name(TypeGraph *, Type ty);
 bool Type_is(TypeGraph *, Type ty, Type super);
 

@@ -238,9 +238,9 @@ static bool match_symbol(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
             && !strncmp(zip->str + zip->idx, sym->str, sym->len)) {
             zip->idx += sym->len;
 
-            Type type = Type_get(&fun->types, sym);
+            Type type;
 
-            if (type.id == INVALID_TYPE.id)
+            if (!Type_get(&fun->types, sym, &type))
                 fungus_panic("matched invalid symbol type");
 
             RawExprBuf_next(rebuf, fun->t_notype, type);
@@ -264,9 +264,9 @@ static bool match_keyword(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
             && !is_wordable(zip->str[zip->idx + kw->len])) {
             zip->idx += kw->len;
 
-            Type type = Type_get(&fun->types, kw);
+            Type type;
 
-            if (type.id == INVALID_TYPE.id)
+            if (!Type_get(&fun->types, kw, &type))
                 fungus_panic("matched invalid keyword type");
 
             RawExprBuf_next(rebuf, fun->t_notype, type);

@@ -16,11 +16,13 @@ typedef struct TypeEntry {
 TypeGraph TypeGraph_new(void) {
     return (TypeGraph){
         .pool = Bump_new(),
-        .entries = Vec_new()
+        .entries = Vec_new(),
+        .by_name = IdMap_new()
     };
 }
 
 void TypeGraph_del(TypeGraph *tg) {
+    IdMap_del(&tg->by_name);
     Vec_del(&tg->entries);
     Bump_del(&tg->pool);
 }
@@ -47,26 +49,19 @@ Type Type_define(TypeGraph *tg, TypeDef *def) {
 
     for (size_t i = 0; i < def->is_len; ++i) {
         if (def->is[i].id == handle.id)
-            fungus_panic("type is itself???");
+            fungus_panic("type is itself???"); // TODO better error
 
         entry->is[i] = def->is[i];
     }
 
     Vec_push(&tg->entries, entry);
+    IdMap_put(&tg->by_name, entry->name, handle.id);
 
     return handle;
 }
 
-// TODO use hashmap
-Type Type_get(TypeGraph *tg, Word *name) {
-    for (size_t i = 0; i < tg->entries.len; ++i) {
-        TypeEntry *entry = tg->entries.data[i];
-
-        if (Word_eq(entry->name, name))
-            return (Type){ i };
-    }
-
-    return INVALID_TYPE;
+bool Type_get(TypeGraph *tg, Word *name, Type *o_type) {
+    return IdMap_get_checked(&tg->by_name, name, &o_type->id);
 }
 
 const Word *Type_name(TypeGraph *tg, Type ty) {

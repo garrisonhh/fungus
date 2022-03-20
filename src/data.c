@@ -196,9 +196,7 @@ void IdMap_del(IdMap *map) {
 static void IdMap_put_lower(IdMap *map, IdMapNode *node) {
     IdMapNode **place = &map->nodes[node->name->hash % map->cap];
 
-    while (*place)
-        place = &(*place)->next;
-
+    node->next = *place;
     *place = node;
 }
 
@@ -214,7 +212,7 @@ static void IdMap_resize(IdMap *map, size_t new_cap) {
             IdMap_put_lower(map, trav);
 }
 
-void IdMap_put(IdMap *map, const Word *name, size_t id) {
+void IdMap_put(IdMap *map, const Word *name, unsigned id) {
     // check for expansion
     if (map->size * 2 > map->cap)
         IdMap_resize(map, map->cap * 2);
@@ -230,7 +228,7 @@ void IdMap_put(IdMap *map, const Word *name, size_t id) {
     ++map->size;
 }
 
-bool IdMap_get_checked(IdMap *map, const Word *name, size_t *out_id) {
+bool IdMap_get_checked(IdMap *map, const Word *name, unsigned *out_id) {
     IdMapNode *trav = map->nodes[name->hash % map->cap];
 
     for (; trav; trav = trav->next) {
@@ -244,8 +242,8 @@ bool IdMap_get_checked(IdMap *map, const Word *name, size_t *out_id) {
     return false;
 }
 
-size_t IdMap_get(IdMap *map, const Word *name) {
-    size_t id;
+unsigned IdMap_get(IdMap *map, const Word *name) {
+    unsigned id;
 
     if (IdMap_get_checked(map, name, &id))
         return id;

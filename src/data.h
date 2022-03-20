@@ -71,7 +71,7 @@ typedef struct IdMapNode {
     struct IdMapNode *next;
 
     const Word *name;
-    size_t id;
+    unsigned id;
 } IdMapNode;
 
 typedef struct IdMap {
@@ -83,11 +83,11 @@ IdMap IdMap_new(void);
 void IdMap_del(IdMap *);
 
 // put does NOT copy words, assumes their lifetime is longer than IdMap
-void IdMap_put(IdMap *, const Word *name, size_t id);
+void IdMap_put(IdMap *, const Word *name, unsigned id);
 
 // get will panic if name isn't found, checked allows you to handle errors
-bool IdMap_get_checked(IdMap *, const Word *name, size_t *out_id);
-size_t IdMap_get(IdMap *, const Word *name);
+bool IdMap_get_checked(IdMap *, const Word *name, unsigned *out_id);
+unsigned IdMap_get(IdMap *, const Word *name);
 
 void IdMap_remove(IdMap *, const Word *name);
 
