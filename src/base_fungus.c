@@ -136,10 +136,11 @@ void Fungus_define_base(Fungus *fun) {
         Word name;
         Type sym;
     } bin_math_ops[] = {
-        { WORD("Add"),      lex_plus   },
-        { WORD("Subtract"), lex_minus  },
-        { WORD("Multiply"), lex_star   },
-        { WORD("Divide"),   lex_rslash },
+        { WORD("Add"),      lex_plus    },
+        { WORD("Subtract"), lex_minus   },
+        { WORD("Multiply"), lex_star    },
+        { WORD("Divide"),   lex_rslash  },
+        { WORD("Modulo"),   lex_percent },
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(bin_math_ops); ++i) {
