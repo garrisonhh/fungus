@@ -105,10 +105,11 @@ static void RuleNode_place(Fungus *fun, Rule rule, Pattern *pat, size_t idx,
     }
 }
 
-static bool validate_rule(Fungus *fun, RuleDef *def) {
-    // TODO
+static bool validate_def(Fungus *fun, RuleDef *def) {
+    bool long_enough = def->pat.len > 0;
+    bool has_hook = def->hook != NULL;
 
-    return true;
+    return long_enough && has_hook;
 }
 
 Rule Rule_define(Fungus *fun, RuleDef *def) {
@@ -116,7 +117,7 @@ Rule Rule_define(Fungus *fun, RuleDef *def) {
     TypeGraph *types = &fun->types;
 
     // validate RuleDef
-    if (!validate_rule(fun, def)) {
+    if (!validate_def(fun, def)) {
         fungus_panic("invalid rule definition: %.*s",
                      (int)def->name.len, def->name.str);
     }
@@ -132,6 +133,7 @@ Rule Rule_define(Fungus *fun, RuleDef *def) {
             .is_len = 1
         }),
         .pat = Pattern_copy_of(rt, &def->pat),
+        .hook = def->hook,
         .prec = def->prec,
         .assoc = def->assoc,
 

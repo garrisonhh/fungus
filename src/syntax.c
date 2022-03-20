@@ -114,7 +114,7 @@ static Expr *collapse(Fungus *fun, RuleEntry *entry, Expr **exprs, size_t len) {
         if (exprs[i]->ty.id != fun->t_notype.id)
             expr->exprs[child++] = exprs[i];
 
-    expr->ty = fun->t_runtype; // TODO figure out ty using pattern
+    expr->ty = entry->hook(fun, expr);
     expr->cty = entry->ty;
 
     return expr;

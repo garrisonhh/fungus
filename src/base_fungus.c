@@ -2,6 +2,10 @@
 
 #include "base_fungus.h"
 
+static Type bin_math_hook(Fungus *fun, Expr *expr) {
+    return expr->exprs[0]->ty;
+}
+
 void Fungus_define_base(Fungus *fun) {
     /*
      * base types
@@ -90,6 +94,7 @@ void Fungus_define_base(Fungus *fun) {
      * rules
      */
     // boolean literals
+#if 0
     Rule_define(fun, &(RuleDef){
         .name = WORD("TrueLiteral"),
         .pat = {
@@ -132,6 +137,7 @@ void Fungus_define_base(Fungus *fun) {
             }
         }
     });
+#endif
 
     // math
     struct {
@@ -157,7 +163,8 @@ void Fungus_define_base(Fungus *fun) {
                     { bin_math_ops[i].sym },
                 },
                 .where_len = 2
-            }
+            },
+            .hook = bin_math_hook
         });
     }
 }

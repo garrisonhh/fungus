@@ -9,6 +9,7 @@
 #endif
 
 typedef struct Fungus Fungus;
+typedef struct Expr Expr;
 
 enum PatModifiers {
     PAT_REPEAT = 0x1,
@@ -48,11 +49,23 @@ typedef struct Pattern {
 
 typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
 
-// fill this out in order to define a rule. when defined, every rule will
-// also generate its own comptype
+/*
+ * RuleHooks are used to determine the runtime return type based on the input
+ * Expr
+ *
+ * TODO fungus code will eventually need a way to provide this functionality
+ */
+typedef Type (*RuleHook)(Fungus *fun, Expr *expr);
+
+/*
+ * fill this out in order to define a rule
+ * when defined, every rule will also generate its own comptype using the name
+ * provided
+ */
 typedef struct RuleDef {
     Word name;
     Pattern pat;
+    RuleHook hook;
     Prec prec;
     Associativity assoc;
 } RuleDef;
@@ -64,6 +77,7 @@ typedef struct RuleEntry {
     Type ty;
 
     Pattern pat;
+    RuleHook hook;
     Prec prec;
     Associativity assoc;
 
