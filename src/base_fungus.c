@@ -158,10 +158,7 @@ void Fungus_define_base(Fungus *fun) {
                 .pat = (size_t []){ 0, 1, 0 },
                 .len = 3,
                 .returns = 0,
-                .where = (WherePat []){
-                    { fun->t_number },
-                    { bin_math_ops[i].sym },
-                },
+                .where = (Type []){ fun->t_number, bin_math_ops[i].sym },
                 .where_len = 2
             },
             .hook = bin_math_hook

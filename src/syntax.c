@@ -2,8 +2,6 @@
 
 #include "syntax.h"
 
-// TODO I already know that REPEAT and OPTIONAL will be problematic for this
-// func
 static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
     TypeGraph *types = &fun->types;
 
@@ -18,13 +16,13 @@ static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
 
     for (size_t i = 0; i < len; ++i) {
         Expr *expr = slice[i];
-        WherePat *where = &pat->where[pat->pat[i]];
+        Type where = pat->where[pat->pat[i]];
         Type *generic = &generics[pat->pat[i]];
 
         if (generic->id == INVALID_TYPE.id) {
-            if (Type_is(types, expr->cty, where->ty))
+            if (Type_is(types, expr->cty, where))
                 *generic = expr->cty;
-            else if (Type_is(types, expr->ty, where->ty))
+            else if (Type_is(types, expr->ty, where))
                 *generic = expr->ty;
             else
                 fungus_panic("??? match was incorrect");

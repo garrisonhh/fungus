@@ -11,16 +11,6 @@
 typedef struct Fungus Fungus;
 typedef struct Expr Expr;
 
-enum PatModifiers {
-    PAT_REPEAT = 0x1,
-    // PAT_OPTIONAL = 0x2,
-};
-
-typedef struct WherePat {
-    Type ty;
-    unsigned modifiers; // bitfield using pattern modifiers
-} WherePat;
-
 /*
  * patterns are defined something like this:
  *
@@ -43,7 +33,7 @@ typedef struct Pattern {
     size_t *pat;
     size_t len;
     size_t returns;
-    WherePat *where;
+    Type *where;
     size_t where_len;
 } Pattern;
 

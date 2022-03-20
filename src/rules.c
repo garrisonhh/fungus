@@ -76,29 +76,20 @@ static void RuleNode_place(Fungus *fun, Rule rule, Pattern *pat, size_t idx,
         node->rule = rule;
     } else {
         RuleNode *next = NULL;
-        WherePat where = pat->where[pat->pat[idx]];
+        Type where = pat->where[pat->pat[idx]];
 
         // try to match an old node
         for (size_t i = 0; i < node->nexts.len; ++i) {
             RuleNode *other = node->nexts.data[i];
 
-            if (other->ty.id == where.ty.id) {
+            if (other->ty.id == where.id) {
                 next = other;
                 break;
             }
         }
 
         if (!next) // no node found, make a new one
-            next = RT_new_node(&fun->rules, node, where.ty);
-
-        // repetition
-        if (where.modifiers & PAT_REPEAT && !next->repeats) {
-            next->repeats = true;
-
-            Vec_push(&next->nexts, next);
-        }
-
-        // TODO optional
+            next = RT_new_node(&fun->rules, node, where);
 
         // recur on node
         RuleNode_place(fun, rule, pat, idx + 1, next);
@@ -137,10 +128,10 @@ Rule Rule_define(Fungus *fun, RuleDef *def) {
         .prec = def->prec,
         .assoc = def->assoc,
 
-        .prefixed = Type_is(types, def->pat.where[def->pat.pat[0]].ty,
+        .prefixed = Type_is(types, def->pat.where[def->pat.pat[0]],
                             fun->t_lexeme),
         .postfixed = Type_is(types,
-                             def->pat.where[def->pat.pat[def->pat.len - 1]].ty,
+                             def->pat.where[def->pat.pat[def->pat.len - 1]],
                              fun->t_lexeme),
     };
 
