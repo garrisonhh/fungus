@@ -6,8 +6,7 @@
  * and symbolic runtime definition of precedences.
  */
 
-#include "utils.h"
-#include "words.h"
+#include "data.h"
 
 typedef struct PrecHandle { unsigned id; } Prec;
 

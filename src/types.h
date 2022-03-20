@@ -1,7 +1,7 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include "words.h"
+#include "data.h"
 
 /*
  * TypeGraph is a generic type system representation, usable for both runtime
