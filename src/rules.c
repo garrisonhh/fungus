@@ -22,28 +22,19 @@ static RuleNode *RT_new_node(RuleTree *rt, RuleNode *parent, Type ty) {
 }
 
 static Pattern Pattern_copy_of(RuleTree *rt, Pattern *pat) {
-    // find where len
-    size_t where_len = 0;
-
-    for (size_t i = 0; i < pat->len; ++i)
-        if (pat->pat[i] >= where_len)
-            where_len = pat->pat[i] + 1;
-
-    if (pat->returns >= where_len)
-        where_len = pat->returns + 1;
-
     // allocate
     Pattern copy = {
         .pat = RT_alloc(rt, pat->len * sizeof(*copy.pat)),
         .len = pat->len,
         .returns = pat->returns,
-        .where = RT_alloc(rt, where_len * sizeof(*copy.where))
+        .where = RT_alloc(rt, pat->where_len * sizeof(*copy.where)),
+        .where_len = pat->where_len
     };
 
     for (size_t i = 0; i < pat->len; ++i)
         copy.pat[i] = pat->pat[i];
 
-    for (size_t i = 0; i < where_len; ++i)
+    for (size_t i = 0; i < pat->where_len; ++i)
         copy.where[i] = pat->where[i];
 
     return copy;

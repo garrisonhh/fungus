@@ -2,21 +2,66 @@
 
 #include "syntax.h"
 
-// o_len tracks the best length match found so far. if a longer match is found,
-// it will be modified
+// TODO I already know that REPEAT and OPTIONAL will be problematic for this
+// func
+static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
+    TypeGraph *types = &fun->types;
+
+    // initialize generics with placeholders
+    Type *generics = malloc(pat->where_len * sizeof(*generics));
+
+    for (size_t i = 0; i < pat->where_len; ++i)
+        generics[i] = INVALID_TYPE;
+
+    // ensure all generics are consistent
+    bool valid = true;
+
+    for (size_t i = 0; i < len; ++i) {
+        Expr *expr = slice[i];
+        WherePat *where = &pat->where[pat->pat[i]];
+        Type *generic = &generics[pat->pat[i]];
+
+        if (generic->id == INVALID_TYPE.id) {
+            if (Type_is(types, expr->cty, where->ty))
+                *generic = expr->cty;
+            else if (Type_is(types, expr->ty, where->ty))
+                *generic = expr->ty;
+            else
+                fungus_panic("??? match was incorrect");
+        } else if (generic->id != expr->ty.id && generic->id != expr->cty.id) {
+             valid = false;
+             break;
+        }
+    }
+
+    free(generics);
+
+    return valid;
+}
+
+/*
+ * o_len tracks the best length match found so far. if a longer match is found,
+ * it will be modified
+ *
+ * TODO should I check patterns during this? should generic parameters be
+ * tracked through rule matching? might make things easier in the end, only one
+ * implementation of 'matching' to keep track of
+ */
 static RuleEntry *try_match_rule(Fungus *fun, RuleNode *node, Expr **slice,
                                  size_t len, size_t depth, size_t *o_len) {
-    if (len == 0) {
+    if (depth == len) {
         // full slice match up to this node
-        if (node->terminates) {
-            *o_len = depth; // will always be best depth
+        if (!node->terminates)
+            return NULL;
 
-            // TODO check pattern
+        RuleEntry *entry = Rule_get(&fun->rules, node->rule);
 
-            return Rule_get(&fun->rules, node->rule);
-        }
+        if (!pattern_check(fun, &entry->pat, slice, depth))
+            return NULL;
 
-        return NULL;
+        *o_len = depth; // will always be best depth
+
+        return entry;
     }
 
     RuleEntry *best_match = NULL;
@@ -24,15 +69,16 @@ static RuleEntry *try_match_rule(Fungus *fun, RuleNode *node, Expr **slice,
     if (node->terminates) {
         // partial slice match up to this node
         if (depth > *o_len) {
-            *o_len = depth;
+            RuleEntry *pot_match = Rule_get(&fun->rules, node->rule);
 
-            // TODO check pattern
-
-            best_match = Rule_get(&fun->rules, node->rule);
+            if (pattern_check(fun, &pot_match->pat, slice, depth)) {
+                *o_len = depth;
+                best_match = pot_match;
+            }
         }
     }
 
-    Expr *expr = slice[0];
+    Expr *expr = slice[depth];
 
     for (size_t i = 0; i < node->nexts.len; ++i) {
         RuleNode *next = node->nexts.data[i];
@@ -41,7 +87,7 @@ static RuleEntry *try_match_rule(Fungus *fun, RuleNode *node, Expr **slice,
         if (Type_is(&fun->types, expr->cty, next->ty)
          || Type_is(&fun->types, expr->ty, next->ty)) {
             RuleEntry *better_match =
-                try_match_rule(fun, next, slice + 1, len - 1, depth + 1, o_len);
+                try_match_rule(fun, next, slice, len, depth + 1, o_len);
 
             if (better_match)
                 best_match = better_match;

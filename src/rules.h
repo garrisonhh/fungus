@@ -43,6 +43,7 @@ typedef struct Pattern {
     size_t len;
     size_t returns;
     WherePat *where;
+    size_t where_len;
 } Pattern;
 
 typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;

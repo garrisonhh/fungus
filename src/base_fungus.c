@@ -99,7 +99,8 @@ void Fungus_define_base(Fungus *fun) {
             .where = (WherePat []){
                 { lex_true },
                 { fun->t_bool }
-            }
+            },
+            .where_len = 2
         }
     });
 
@@ -112,7 +113,8 @@ void Fungus_define_base(Fungus *fun) {
             .where = (WherePat []){
                 { lex_false },
                 { fun->t_bool }
-            }
+            },
+            .where_len = 2
         }
     });
 
@@ -153,7 +155,8 @@ void Fungus_define_base(Fungus *fun) {
                 .where = (WherePat []){
                     { fun->t_number },
                     { bin_math_ops[i].sym },
-                }
+                },
+                .where_len = 2
             }
         });
     }
