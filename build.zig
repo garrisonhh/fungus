@@ -29,12 +29,12 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             "-std=c11"
         });
 
-        const dbg_def = if (mode == std.builtin.Mode.Debug)
-            "-DDEBUG"
-        else
-            "-DNDEBUG";
-
-        try c_flags.append(dbg_def);
+        if (mode == std.builtin.Mode.Debug) {
+            try c_flags.append("-DDEBUG");
+            try c_flags.append("-ggdb");
+        } else {
+            try c_flags.append("-DNDEBUG");
+        }
 
         const abs_src_dir = b.pathFromRoot("src");
         var src_dir = try std.fs.openDirAbsolute(abs_src_dir,
