@@ -121,6 +121,10 @@ static Expr *collapse(Fungus *fun, RuleEntry *entry, Expr **exprs, size_t len) {
 }
 
 static Expr *try_match(Fungus *fun, Expr **slice, size_t len, size_t *o_len) {
+    static size_t calls = 0;
+
+    printf("try_match %zu\n", ++calls);
+
     *o_len = 0;
 
     RuleEntry *matched =
@@ -128,8 +132,9 @@ static Expr *try_match(Fungus *fun, Expr **slice, size_t len, size_t *o_len) {
 
     if (matched) {
         const Word *name = Type_name(&fun->types, matched->ty);
-
-        printf("matched rule %.*s (%zu)!\n", (int)name->len, name->str, *o_len);
+        printf("matched rule %.*s on:\n", (int)name->len, name->str);
+        Expr_dump_array(fun, slice, *o_len);
+        puts("");
 
         return collapse(fun, matched, slice, *o_len);
     }
@@ -151,14 +156,23 @@ static Expr *parse_slice(Fungus *fun, Expr **exprs, size_t len) {
             Expr **sub = &exprs[i];
             size_t sub_len = len - i;
 
-            Expr *match;
+            Expr *collapsed;
             size_t match_len;
 
-            while ((match = try_match(fun, sub, sub_len, &match_len))) {
-                Expr_dump(fun, match);
-                exit(0);
-
+            while ((collapsed = try_match(fun, sub, sub_len, &match_len))) {
                 // stitch sub-slice
+                size_t stitch_len = match_len - 1;
+
+                for (size_t j = 0; j < i; ++j)
+                    exprs[i + (stitch_len - 1) - j] = exprs[i - j];
+
+                exprs[i + stitch_len] = collapsed;
+
+                // correct array pointers
+                exprs += stitch_len;
+                len -= stitch_len;
+                sub += stitch_len;
+                sub_len -= stitch_len;
             }
         }
     }
