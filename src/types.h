@@ -116,6 +116,7 @@ TypeExpr *TypeExpr_product(Bump *pool, size_t n, ...);
 
 void TypeExpr_print(TypeGraph *, TypeExpr *expr);
 void Type_print(TypeGraph *, Type ty);
+void Type_print_verbose(TypeGraph *, Type ty);
 void TypeGraph_dump(TypeGraph *);
 
 #endif

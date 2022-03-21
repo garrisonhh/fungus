@@ -1,3 +1,5 @@
+#include <ctype.h>
+
 #include "types.h"
 
 TypeGraph TypeGraph_new(void) {
@@ -309,7 +311,17 @@ void TypeExpr_print(TypeGraph *tg, TypeExpr *expr) {
 void Type_print(TypeGraph *tg, Type ty) {
     TypeEntry *entry = Type_get(tg, ty);
 
+    bool symbolic = ispunct(entry->name->str[0]);
+
+    if (symbolic) printf("`");
     printf("%.*s", (int)entry->name->len, entry->name->str);
+    if (symbolic) printf("`");
+}
+
+void Type_print_verbose(TypeGraph *tg, Type ty) {
+    Type_print(tg, ty);
+
+    TypeEntry *entry = Type_get(tg, ty);
 
     switch (entry->type) {
     case TY_CONCRETE: break;
@@ -349,7 +361,7 @@ void TypeGraph_dump(TypeGraph *tg) {
     term_format(TERM_RESET);
 
     for (size_t i = 0; i < tg->entries.len; ++i) {
-        Type_print(tg, (Type){ i });
+        Type_print_verbose(tg, (Type){ i });
         puts("");
     }
 

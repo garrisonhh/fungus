@@ -20,6 +20,7 @@ void Vec_del(Vec *);
 void **Vec_alloc(Vec *);
 void Vec_clear(Vec *);
 void Vec_push(Vec *, const void *item);
+void *Vec_pop(Vec *);
 void Vec_ordered_insert(Vec *, size_t idx, const void *item);
 void Vec_qsort(Vec *, int (*cmp)(const void *, const void *));
 

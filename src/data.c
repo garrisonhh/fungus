@@ -56,6 +56,14 @@ void Vec_push(Vec *v, const void *item) {
     *(const void **)Vec_alloc(v) = item;
 }
 
+void *Vec_pop(Vec *v) {
+    void *item = v->data[v->len - 1];
+
+    Vec_smolify(v);
+
+    return item;
+}
+
 // inserts idx into a slot in O(n) time to maintain sorted order
 void Vec_ordered_insert(Vec *v, size_t idx, const void *item) {
     if (idx > v->len) {

@@ -161,44 +161,43 @@ RuleEntry *Rule_get(RuleTree *rt, Rule rule) {
     return rt->entries.data[rule.id];
 }
 
-static void RuleNode_dump(Fungus *fun, RuleNode *node, char *buf, char *tail) {
-    // TODO print the rule ?????????
-    tail += sprintf(tail, "fuck");
-
-    // repeating patterns
-    for (size_t i = 0; i < node->nexts.len; ++i) {
-        if (node->nexts.data[i] == node) {
-            tail += sprintf(tail, "[*]");
-            break;
-        }
-    }
-
-    tail += sprintf(tail, " ");
+static void RuleNode_dump(Fungus *fun, RuleNode *node, Vec *stack) {
+    Vec_push(stack, node);
 
     // print rule if exists
     if (node->terminates) {
-        Type ty = Rule_get(&fun->rules, node->rule)->ty;
+        // print nodes
+        for (size_t i = 0; i < stack->len; ++i) {
+            TypeExpr_print(&fun->types, ((RuleNode *)stack->data[i])->te);
+            printf(" -> ");
+        }
 
+        // print rule name
+        Type ty = Rule_get(&fun->rules, node->rule)->ty;
         const Word *name = Type_name(&fun->types, ty);
 
-        printf("%.*s: %s\n", (int)name->len, name->str, buf);
+        printf("%.*s\n", (int)name->len, name->str);
     }
 
     // recur on children
     for (size_t i = 0; i < node->nexts.len; ++i)
         if (node->nexts.data[i] != node)
-            RuleNode_dump(fun, node->nexts.data[i], buf, tail);
+            RuleNode_dump(fun, node->nexts.data[i], stack);
+
+    Vec_pop(stack);
 }
 
 void RuleTree_dump(Fungus *fun, RuleTree *rt) {
-    char buf[1024];
-
     term_format(TERM_CYAN);
     puts("RuleTree:");
     term_format(TERM_RESET);
 
+    Vec buf = Vec_new();
+
     for (size_t i = 0; i < rt->root->nexts.len; ++i)
-        RuleNode_dump(fun, rt->root->nexts.data[i], buf, buf);
+        RuleNode_dump(fun, rt->root->nexts.data[i], &buf);
+
+    Vec_del(&buf);
 
     puts("");
 }
