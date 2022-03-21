@@ -148,7 +148,7 @@ bool Type_matches(TypeGraph *tg, Type ty, TypeExpr *pat) {
             // whether atom is the other atom
             return Type_is(tg, ty, pat->atom);
         case TET_PRODUCT:
-            // atoms cannot match products
+            // atoms can't match products
             return false;
         case TET_SUM:
             // whether atom is included in product
@@ -175,15 +175,28 @@ bool TypeExpr_matches(TypeGraph *tg, TypeExpr *expr, TypeExpr *pat) {
 
         return true;
     case TET_PRODUCT:
-        // whether all of expr members match pat's members
-        if (pat->type != TET_PRODUCT || pat->len != expr->len)
+        switch (pat->type) {
+        case TET_ATOM:
+            // products can't match atoms
             return false;
+        case TET_SUM:
+            // products could match something in a sum
+            for (size_t i = 0; i < pat->len; ++i)
+                if (TypeExpr_matches(tg, expr, pat->exprs[i]))
+                    return true;
 
-        for (size_t i = 0; i < expr->len; ++i)
-            if (!TypeExpr_matches(tg, expr->exprs[i], pat->exprs[i]))
+            return false;
+        case TET_PRODUCT:
+            // whether all of expr members match pat's members
+            if (pat->len != expr->len)
                 return false;
 
-        return true;
+            for (size_t i = 0; i < expr->len; ++i)
+                if (!TypeExpr_matches(tg, expr->exprs[i], pat->exprs[i]))
+                    return false;
+
+            return true;
+        }
     }
 }
 
