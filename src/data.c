@@ -257,3 +257,63 @@ void IdMap_remove(IdMap *map, const Word *name) {
     // a replacement implementation
     fungus_panic("IDMap_remove not impl'd");
 }
+
+// put-only id set =============================================================
+
+IdSet IdSet_new(void) {
+    return (IdSet){
+        .ids = malloc(DATA_INIT_CAP * sizeof(unsigned)),
+        .filled = calloc(DATA_INIT_CAP, sizeof(bool)),
+        .cap = DATA_INIT_CAP
+    };
+}
+
+void IdSet_del(IdSet *set) {
+    free(set->ids);
+    free(set->filled);
+}
+
+static void IdSet_put_lower(IdSet *set, unsigned id) {
+    size_t idx = fnv_hash((const char *)&id, sizeof(id)) % set->cap;
+
+    while (set->filled[idx])
+        idx = (idx + 1) % set->cap;
+
+    set->ids[idx] = id;
+}
+
+static void IdSet_resize(IdSet *set, size_t new_cap) {
+    unsigned *old_ids = set->ids;
+    bool *old_filled = set->filled;
+    size_t old_cap = set->cap;
+
+    set->cap = new_cap;
+    set->ids = malloc(set->cap * sizeof(*set->ids));
+    set->filled = calloc(set->cap, sizeof(*set->filled));
+
+    for (size_t i = 0; i < old_cap; ++i)
+        if (old_filled[i])
+            IdSet_put_lower(set, old_ids[i]);
+}
+
+void IdSet_put(IdSet *set, unsigned id) {
+    if (set->size * 2 > set->cap)
+        IdSet_resize(set, set->cap * 2);
+
+    IdSet_put_lower(set, id);
+
+    ++set->size;
+}
+
+bool IdSet_has(IdSet *set, unsigned id) {
+    size_t idx = fnv_hash((const char *)&id, sizeof(id)) % set->cap;
+
+    while (set->filled[idx]) {
+        if (set->ids[idx] == id)
+            return true;
+
+        idx = (idx + 1) % set->cap;
+    }
+
+    return false;
+}
