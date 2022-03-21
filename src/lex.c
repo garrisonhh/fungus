@@ -65,11 +65,11 @@ static Expr *RawExprBuf_alloc(RawExprBuf *rebuf) {
     return &rebuf->exprs[rebuf->len++];
 }
 
-static Expr *RawExprBuf_next(RawExprBuf *rebuf, Type ty, Type cty) {
+static Expr *RawExprBuf_next(RawExprBuf *rebuf, Type ty) {
     Expr *expr = RawExprBuf_alloc(rebuf);
 
     expr->ty = ty;
-    expr->cty = cty;
+    expr->atomic = true;
 
     return expr;
 }
@@ -162,7 +162,7 @@ static bool match_string(Fungus *fun, RawExprBuf *rebuf, LZip *z) {
         } while (!(c == '"' && prev != '\\'));
 
         // emit token
-        Expr *expr = RawExprBuf_next(rebuf, fun->t_string, fun->t_literal);
+        Expr *expr = RawExprBuf_next(rebuf, fun->t_string);
 
         expr->string_ = parse_string(&v);
 
@@ -194,7 +194,7 @@ static bool match_int(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
     }
 
     // token
-    Expr *expr = RawExprBuf_next(rebuf, fun->t_int, fun->t_literal);
+    Expr *expr = RawExprBuf_next(rebuf, fun->t_int);
 
     expr->int_ = num;
 
@@ -220,7 +220,7 @@ static bool match_float(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
     }
 
     // token
-    Expr *expr = RawExprBuf_next(rebuf, fun->t_float, fun->t_literal);
+    Expr *expr = RawExprBuf_next(rebuf, fun->t_float);
 
     expr->float_ = num;
 
@@ -240,10 +240,10 @@ static bool match_symbol(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
 
             Type type;
 
-            if (!Type_get(&fun->types, sym, &type))
+            if (!Type_by_name(&fun->types, sym, &type))
                 fungus_panic("matched invalid symbol type");
 
-            RawExprBuf_next(rebuf, fun->t_notype, type);
+            RawExprBuf_next(rebuf, type);
 
             return true;
         }
@@ -266,10 +266,10 @@ static bool match_keyword(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
 
             Type type;
 
-            if (!Type_get(&fun->types, kw, &type))
+            if (!Type_by_name(&fun->types, kw, &type))
                 fungus_panic("matched invalid keyword type");
 
-            RawExprBuf_next(rebuf, fun->t_notype, type);
+            RawExprBuf_next(rebuf, type);
 
             return true;
         }

@@ -20,7 +20,7 @@ static void *TG_alloc(TypeGraph *tg, size_t n_bytes) {
     return Bump_alloc(&tg->pool, n_bytes);
 }
 
-static TypeEntry *TG_get(TypeGraph *tg, Type handle) {
+TypeEntry *Type_get(TypeGraph *tg, Type handle) {
     if (handle.id > tg->entries.len)
         fungus_panic("attempted to get an invalid type.");
 
@@ -35,7 +35,7 @@ static bool validate_def(TypeGraph *tg, TypeDef *def) {
     bool abstracts_are_abstract = true;
 
     for (size_t i = 0; i < def->is_len; ++i) {
-        if (TG_get(tg, def->is[i])->type != TY_ABSTRACT) {
+        if (Type_get(tg, def->is[i])->type != TY_ABSTRACT) {
             abstracts_are_abstract = false;
             break;
         }
@@ -44,8 +44,8 @@ static bool validate_def(TypeGraph *tg, TypeDef *def) {
     return well_formed_expr && abstracts_are_abstract;
 }
 
-static TypeExpr *deepcopy_expr(TypeGraph *tg, TypeExpr *expr) {
-    TypeExpr *copy = TG_alloc(tg, sizeof(*copy));
+TypeExpr *TypeExpr_deepcopy(Bump *pool, TypeExpr *expr) {
+    TypeExpr *copy = Bump_alloc(pool, sizeof(*copy));
 
     copy->type = expr->type;
 
@@ -55,7 +55,7 @@ static TypeExpr *deepcopy_expr(TypeGraph *tg, TypeExpr *expr) {
         break;
 #if 0
     case TET_TAGGED:
-        copy->child = deepcopy_expr(tg, expr->child);
+        copy->child = TG_deepcopy_expr(tg, expr->child);
         /* fallthru */
     case TET_TAG:
         copy->tag = Word_copy_of(expr->tag, &tg->pool);
@@ -64,15 +64,19 @@ static TypeExpr *deepcopy_expr(TypeGraph *tg, TypeExpr *expr) {
     case TET_SUM:
     case TET_PRODUCT:
         copy->len = expr->len;
-        copy->exprs = TG_alloc(tg, copy->len * sizeof(*copy->exprs));
+        copy->exprs = Bump_alloc(pool, copy->len * sizeof(*copy->exprs));
 
         for (size_t i = 0; i < expr->len; ++i)
-            copy->exprs[i] = deepcopy_expr(tg, expr->exprs[i]);
+            copy->exprs[i] = TypeExpr_deepcopy(pool, expr->exprs[i]);
 
         break;
     }
 
     return copy;
+}
+
+static TypeExpr *TG_deepcopy_expr(TypeGraph *tg, TypeExpr *expr) {
+    return TypeExpr_deepcopy(&tg->pool, expr);
 }
 
 Type Type_define(TypeGraph *tg, TypeDef *def) {
@@ -98,13 +102,13 @@ Type Type_define(TypeGraph *tg, TypeDef *def) {
         *entry->type_set = IdSet_new();
         break;
     case TY_ALIAS:
-        entry->expr = deepcopy_expr(tg, def->expr);
+        entry->expr = TG_deepcopy_expr(tg, def->expr);
         break;
     }
 
     // place id in abstract type sets
     for (size_t i = 0; i < def->is_len; ++i) {
-        TypeEntry *set_entry = TG_get(tg, def->is[i]);
+        TypeEntry *set_entry = Type_get(tg, def->is[i]);
 
         IdSet_put(set_entry->type_set, handle.id);
 
@@ -118,12 +122,38 @@ Type Type_define(TypeGraph *tg, TypeDef *def) {
     return handle;
 }
 
-bool Type_get(TypeGraph *tg, Word *name, Type *o_type) {
+bool Type_by_name(TypeGraph *tg, Word *name, Type *o_type) {
     return IdMap_get_checked(&tg->by_name, name, &o_type->id);
 }
 
 const Word *Type_name(TypeGraph *tg, Type ty) {
-    return TG_get(tg, ty)->name;
+    return Type_get(tg, ty)->name;
+}
+
+bool TypeExpr_deepequals(TypeExpr *expr, TypeExpr *other) {
+    if (expr->type != other->type)
+        return false;
+
+    switch (expr->type) {
+    case TET_ATOM:
+        return expr->atom.id == other->atom.id;
+    case TET_SUM:
+        if (expr->len != other->len)
+            return false;
+
+        fungus_panic("TODO sum deepequals");
+
+        return true;
+    case TET_PRODUCT:
+        if (expr->len != other->len)
+            return false;
+
+        for (size_t i = 0; i < expr->len; ++i)
+            if (!TypeExpr_deepequals(expr->exprs[i], other->exprs[i]))
+                return false;
+
+        return true;
+    }
 }
 
 bool Type_is(TypeGraph *tg, Type ty, Type of) {
@@ -131,7 +161,7 @@ bool Type_is(TypeGraph *tg, Type ty, Type of) {
     if (ty.id == of.id)
         return true;
 
-    TypeEntry *of_entry = TG_get(tg, of);
+    TypeEntry *of_entry = Type_get(tg, of);
 
     return of_entry->type == TY_ABSTRACT
         && IdSet_has(of_entry->type_set, ty.id);
@@ -145,7 +175,7 @@ bool TypeExpr_is(TypeGraph *tg, TypeExpr *expr, Type of) {
 }
 
 bool Type_matches(TypeGraph *tg, Type ty, TypeExpr *pat) {
-    TypeEntry *entry = TG_get(tg, ty);
+    TypeEntry *entry = Type_get(tg, ty);
 
     switch (entry->type) {
     case TY_CONCRETE:
@@ -232,7 +262,7 @@ void TypeExpr_print(TypeGraph *tg, TypeExpr *expr) {
 }
 
 void Type_print(TypeGraph *tg, Type ty) {
-    TypeEntry *entry = TG_get(tg, ty);
+    TypeEntry *entry = Type_get(tg, ty);
 
     printf("%.*s", (int)entry->name->len, entry->name->str);
 
@@ -255,7 +285,8 @@ void Type_print(TypeGraph *tg, Type ty) {
                 else
                     printf(", ");
 
-                const Word *name = TG_get(tg, (Type){ type_set->ids[i] })->name;
+                const Word *name =
+                    Type_get(tg, (Type){ type_set->ids[i] })->name;
 
                 printf("%.*s", (int)name->len, name->str);
             }

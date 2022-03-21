@@ -3,10 +3,6 @@
 #include "base_fungus.h"
 #include "expr.h"
 
-static Type bin_math_hook(Fungus *fun, Expr *expr) {
-    return expr->exprs[0]->ty;
-}
-
 void Fungus_define_base(Fungus *fun) {
     /*
      * base types
@@ -23,7 +19,9 @@ void Fungus_define_base(Fungus *fun) {
     });
     fun->t_primitive = Type_define(&fun->types, &(TypeDef){
         .name = WORD("Primitive"),
-        .type = TY_ABSTRACT
+        .type = TY_ABSTRACT,
+        .is = &fun->t_runtype,
+        .is_len = 1
     });
     fun->t_number = Type_define(&fun->types, &(TypeDef){
         .name = WORD("Number"),
@@ -70,29 +68,6 @@ void Fungus_define_base(Fungus *fun) {
         .is = &fun->t_comptype,
         .is_len = 1
     });
-    fun->t_literal = Type_define(&fun->types, &(TypeDef){
-        .name = WORD("literal"),
-        .is = &fun->t_comptype,
-        .is_len = 1
-    });
-
-    // patterns
-    fun->te_prim_literal = &(TypeExpr){
-        .type = TET_PRODUCT,
-        .exprs = (TypeExpr *[]){
-            &(TypeExpr){ .type = TET_ATOM, .atom = fun->t_primitive },
-            &(TypeExpr){ .type = TET_ATOM, .atom = fun->t_literal },
-        },
-        .len = 2
-    };
-    fun->te_rule = &(TypeExpr){
-        .type = TET_PRODUCT,
-        .exprs = (TypeExpr *[]){
-            &(TypeExpr){ .type = TET_ATOM, .atom = fun->t_runtype },
-            &(TypeExpr){ .type = TET_ATOM, .atom = fun->t_syntax },
-        },
-        .len = 2
-    };
 
     /*
      * lexemes (Fungus_define_x funcs rely on t_lexeme)
@@ -207,11 +182,19 @@ void Fungus_define_base(Fungus *fun) {
                 .pat = (size_t []){ 0, 1, 0 },
                 .len = 3,
                 .returns = 0,
-                .where = (Type []){ fun->t_number, bin_math_ops[i].sym },
+                .where = (TypeExpr *[]){
+                    &(TypeExpr){
+                        .type = TET_ATOM,
+                        .atom = fun->t_number
+                    },
+                    &(TypeExpr){
+                        .type = TET_ATOM,
+                        .atom = bin_math_ops[i].sym
+                    },
+                },
                 .where_len = 2
             },
             .prec = bin_math_ops[i].prec,
-            .hook = bin_math_hook
         });
     }
 }

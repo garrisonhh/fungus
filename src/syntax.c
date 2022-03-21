@@ -4,8 +4,6 @@
 
 // TODO this but with type exprs
 static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
-    TypeGraph *types = &fun->types;
-
     // initialize generics with placeholders
     Type *generics = malloc(pat->where_len * sizeof(*generics));
 
@@ -17,25 +15,48 @@ static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
 
     for (size_t i = 0; i < len; ++i) {
         Expr *expr = slice[i];
-        Type where = pat->where[pat->pat[i]];
         Type *generic = &generics[pat->pat[i]];
 
         if (generic->id == fun->t_notype.id) {
-            if (Type_is(types, expr->cty, where))
-                *generic = expr->cty;
-            else if (Type_is(types, expr->ty, where))
-                *generic = expr->ty;
-            else
-                fungus_panic("??? match was incorrect");
-        } else if (generic->id != expr->ty.id && generic->id != expr->cty.id) {
-             valid = false;
-             break;
+            *generic = expr->ty;
+        } else if (generic->id != expr->ty.id) {
+            // inconsistent types
+            valid = false;
+            break;
         }
     }
 
     free(generics);
 
     return valid;
+}
+
+static Type find_return_type(Fungus *fun, Pattern *pat, Expr **slice,
+                             size_t len) {
+    printf("ARRAY:");
+
+    for (size_t i = 0; i < len; ++i) {
+        printf(" ");
+        Type_print(&fun->types, slice[i]->ty);
+    }
+
+    puts("");
+
+    // check if this return type is inferrable via a parameter
+    // TODO this could be stored in RuleEntry
+    for (size_t i = 0; i < pat->len; ++i)
+        if (pat->pat[i] == pat->returns)
+            return slice[i]->ty;
+
+    printf("INFERRING!\n");
+
+    // otherwise it is a concrete unique type from the where clause
+    // TODO check this in Rule_define
+    TypeExpr *ret_te = pat->where[pat->returns];
+
+    assert(ret_te->type == TET_ATOM);
+
+    return ret_te->atom;
 }
 
 /*
@@ -82,9 +103,7 @@ static RuleEntry *try_match_rule(Fungus *fun, RuleNode *node, Expr **slice,
     for (size_t i = 0; i < node->nexts.len; ++i) {
         RuleNode *next = node->nexts.data[i];
 
-        // TODO figure out rule matching conditions!!!
-        if (Type_is(&fun->types, expr->cty, next->ty)
-         || Type_is(&fun->types, expr->ty, next->ty)) {
+        if (Type_matches(&fun->types, expr->ty, next->te)) {
             RuleEntry *better_match =
                 try_match_rule(fun, next, slice, len, depth + 1, o_len);
 
@@ -101,7 +120,7 @@ static Expr *collapse(Fungus *fun, RuleEntry *entry, Expr **exprs, size_t len) {
     size_t num_children = 0;
 
     for (size_t i = 0; i < len; ++i)
-        if (exprs[i]->ty.id != fun->t_notype.id)
+        if (Type_is(&fun->types, exprs[i]->ty, fun->t_runtype))
             ++num_children;
 
     // create expr
@@ -110,11 +129,12 @@ static Expr *collapse(Fungus *fun, RuleEntry *entry, Expr **exprs, size_t len) {
     size_t child = 0;
 
     for (size_t i = 0; i < len; ++i)
-        if (exprs[i]->ty.id != fun->t_notype.id)
+        if (Type_is(&fun->types, exprs[i]->ty, fun->t_runtype))
             expr->exprs[child++] = exprs[i];
 
-    expr->ty = entry->hook(fun, expr);
-    expr->cty = entry->ty;
+    expr->atomic = false;
+    expr->rule = entry->rule;
+    expr->ty = find_return_type(fun, &entry->pat, exprs, len);
 
     return expr;
 }

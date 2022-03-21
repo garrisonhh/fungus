@@ -2,12 +2,14 @@
 #define EXPR_H
 
 #include "types.h"
+#include "rules.h"
 #include "literal_types.h"
 
 typedef struct Fungus Fungus;
 
 typedef struct Expr {
-    TypeExpr *te;
+    Type ty;
+    bool atomic; // rule types are non-atomic
 
     union {
         // literals
@@ -20,6 +22,7 @@ typedef struct Expr {
         struct {
             struct Expr **exprs;
             size_t len;
+            Rule rule;
         };
     };
 } Expr;

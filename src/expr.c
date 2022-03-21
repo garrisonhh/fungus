@@ -17,32 +17,33 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
     }
 
     // print data
-    TypeExpr_print(types, expr->te);
+    printf("[ ");
+    Type_print(types, expr->ty);
+    printf(" ]");
 
-    if (TypeExpr_matches(&fun->types, expr->te, fun->te_prim_literal)) {
-        Type prim = expr->te->exprs[0]->atom;
+    if (expr->atomic) {
+        if (!Type_is(&fun->types, expr->ty, fun->t_lexeme)) {
+            printf(" ");
 
-        printf(" ");
-
-        // literals
-        if (prim.id == fun->t_string.id)
-            printf(">>%.*s<<", (int)expr->string_.len, expr->string_.str);
-        else if (prim.id == fun->t_int.id)
-            printf("%Ld", expr->int_);
-        else if (prim.id == fun->t_float.id)
-            printf("%Lf", expr->float_);
-        else if (prim.id == fun->t_bool.id)
-            printf("%s", expr->bool_ ? "true" : "false");
-        else
-            fungus_panic("unknown literal type!");
+            // literals
+            if (expr->ty.id == fun->t_string.id)
+                printf(">>%.*s<<", (int)expr->string_.len, expr->string_.str);
+            else if (expr->ty.id == fun->t_int.id)
+                printf("%Ld", expr->int_);
+            else if (expr->ty.id == fun->t_float.id)
+                printf("%Lf", expr->float_);
+            else if (expr->ty.id == fun->t_bool.id)
+                printf("%s", expr->bool_ ? "true" : "false");
+            else
+                fungus_panic("unknown literal type!");
+        }
 
         puts("");
-    } else if (TypeExpr_is(types, expr->te, fun->t_lexeme)) {
-        // lexemes
-        ;
-    } else if (TypeExpr_matches(types, expr->te, fun->te_rule)) {
+    } else {
         // print child values
-        puts("");
+        const Word *name = Type_name(types, Rule_get(&fun->rules, expr->rule)->ty);
+
+        printf(" %.*s\n", (int)name->len, name->str);
 
         for (size_t i = 0; i < expr->len; ++i)
             Expr_dump_r(fun, expr->exprs[i], level + 1);

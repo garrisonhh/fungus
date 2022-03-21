@@ -9,7 +9,6 @@
 #endif
 
 typedef struct Fungus Fungus;
-typedef struct Expr Expr;
 
 /*
  * patterns are defined something like this:
@@ -28,24 +27,18 @@ typedef struct Expr Expr;
  * fn add(lhs: T, symbol: S, rhs: T): T
  *    where T: Number,
  *          S: +;
+ *
+ * where typeexprs are deepcopied!
  */
 typedef struct Pattern {
     size_t *pat;
     size_t len;
     size_t returns;
-    Type *where;
+    TypeExpr **where;
     size_t where_len;
 } Pattern;
 
 typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
-
-/*
- * RuleHooks are used to determine the runtime return type based on the input
- * Expr
- *
- * TODO fungus code will eventually need a way to provide this functionality
- */
-typedef Type (*RuleHook)(Fungus *fun, Expr *expr);
 
 /*
  * fill this out in order to define a rule
@@ -55,7 +48,6 @@ typedef Type (*RuleHook)(Fungus *fun, Expr *expr);
 typedef struct RuleDef {
     Word name;
     Pattern pat;
-    RuleHook hook;
     Prec prec;
     Associativity assoc;
 } RuleDef;
@@ -64,10 +56,10 @@ typedef struct RuleHandle { unsigned id; } Rule;
 
 // used to store rule data within ruletree entries
 typedef struct RuleEntry {
+    Rule rule;
     Type ty;
 
     Pattern pat;
-    RuleHook hook;
     Prec prec;
     Associativity assoc;
 
@@ -80,7 +72,7 @@ typedef struct RuleEntry {
 // this would actually result in a performance improvement in most cases
 typedef struct RuleNode {
     Vec nexts;
-    Type ty;
+    TypeExpr *te;
 
     Rule rule;
     unsigned terminates: 1; // whether `rule` is valid

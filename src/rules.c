@@ -7,12 +7,12 @@ static void *RT_alloc(RuleTree *rt, size_t n_bytes) {
     return Bump_alloc(&rt->pool, n_bytes);
 }
 
-static RuleNode *RT_new_node(RuleTree *rt, RuleNode *parent, Type ty) {
+static RuleNode *RT_new_node(RuleTree *rt, RuleNode *parent, TypeExpr *te) {
     RuleNode *node = RT_alloc(rt, sizeof(*node));
 
     *node = (RuleNode){
-        .ty = ty,
         .nexts = Vec_new(),
+        .te = te, // te should be bump allocated in Rule_defin
     };
 
     if (parent)
@@ -35,7 +35,7 @@ static Pattern Pattern_copy_of(RuleTree *rt, Pattern *pat) {
         copy.pat[i] = pat->pat[i];
 
     for (size_t i = 0; i < pat->where_len; ++i)
-        copy.where[i] = pat->where[i];
+        copy.where[i] = TypeExpr_deepcopy(&rt->pool, pat->where[i]);
 
     return copy;
 }
@@ -46,7 +46,7 @@ RuleTree RuleTree_new(void) {
         .entries = Vec_new(),
     };
 
-    rt.root = RT_new_node(&rt, NULL, (Type){ 0 });
+    rt.root = RT_new_node(&rt, NULL, NULL);
 
     return rt;
 }
@@ -76,15 +76,25 @@ static void RuleNode_place(Fungus *fun, Rule rule, Pattern *pat, size_t idx,
         node->rule = rule;
     } else {
         RuleNode *next = NULL;
-        Type where = pat->where[pat->pat[idx]];
+        TypeExpr *where = pat->where[pat->pat[idx]];
 
         // try to match an old node
         for (size_t i = 0; i < node->nexts.len; ++i) {
             RuleNode *other = node->nexts.data[i];
 
-            if (other->ty.id == where.id) {
+            if (TypeExpr_deepequals(where, other->te)) {
+                TypeExpr_print(&fun->types, where);
+                printf(" == ");
+                TypeExpr_print(&fun->types, other->te);
+                puts("");
+
                 next = other;
                 break;
+            } else {
+                TypeExpr_print(&fun->types, where);
+                printf(" != ");
+                TypeExpr_print(&fun->types, other->te);
+                puts("");
             }
         }
 
@@ -98,9 +108,10 @@ static void RuleNode_place(Fungus *fun, Rule rule, Pattern *pat, size_t idx,
 
 static bool validate_def(Fungus *fun, RuleDef *def) {
     bool long_enough = def->pat.len > 0;
-    bool has_hook = def->hook != NULL;
 
-    return long_enough && has_hook;
+    // TODO check for concrete return type
+
+    return long_enough;
 }
 
 Rule Rule_define(Fungus *fun, RuleDef *def) {
@@ -118,21 +129,22 @@ Rule Rule_define(Fungus *fun, RuleDef *def) {
     RuleEntry *entry = RT_alloc(rt, sizeof(*entry));
 
     *entry = (RuleEntry){
+        .rule = handle,
         .ty = Type_define(types, &(TypeDef){
             .name = def->name,
             .is = &fun->t_syntax,
             .is_len = 1
         }),
+
         .pat = Pattern_copy_of(rt, &def->pat),
-        .hook = def->hook,
         .prec = def->prec,
         .assoc = def->assoc,
 
-        .prefixed = Type_is(types, def->pat.where[def->pat.pat[0]],
-                            fun->t_lexeme),
-        .postfixed = Type_is(types,
-                             def->pat.where[def->pat.pat[def->pat.len - 1]],
-                             fun->t_lexeme),
+        .prefixed = TypeExpr_is(types, def->pat.where[def->pat.pat[0]],
+                                fun->t_lexeme),
+        .postfixed = TypeExpr_is(types,
+                                 def->pat.where[def->pat.pat[def->pat.len - 1]],
+                                 fun->t_lexeme),
     };
 
     Vec_push(&rt->entries, entry);
@@ -150,9 +162,8 @@ RuleEntry *Rule_get(RuleTree *rt, Rule rule) {
 }
 
 static void RuleNode_dump(Fungus *fun, RuleNode *node, char *buf, char *tail) {
-    const Word *name = Type_name(&fun->types, node->ty);
-
-    tail += sprintf(tail, "%.*s", (int)name->len, name->str);
+    // TODO print the rule ?????????
+    tail += sprintf(tail, "fuck");
 
     // repeating patterns
     for (size_t i = 0; i < node->nexts.len; ++i) {
@@ -168,7 +179,7 @@ static void RuleNode_dump(Fungus *fun, RuleNode *node, char *buf, char *tail) {
     if (node->terminates) {
         Type ty = Rule_get(&fun->rules, node->rule)->ty;
 
-        name = Type_name(&fun->types, ty);
+        const Word *name = Type_name(&fun->types, ty);
 
         printf("%.*s: %s\n", (int)name->len, name->str, buf);
     }

@@ -97,12 +97,15 @@ TypeGraph TypeGraph_new(void);
 void TypeGraph_del(TypeGraph *);
 
 Type Type_define(TypeGraph *, TypeDef *def);
-bool Type_get(TypeGraph *, Word *name, Type *o_type);
+bool Type_by_name(TypeGraph *, Word *name, Type *o_type);
+TypeEntry *Type_get(TypeGraph *, Type ty);
 const Word *Type_name(TypeGraph *, Type ty);
+
+TypeExpr *TypeExpr_deepcopy(Bump *pool, TypeExpr *expr);
+bool TypeExpr_deepequals(TypeExpr *expr, TypeExpr *other);
 
 bool Type_is(TypeGraph *, Type ty, Type of);
 bool TypeExpr_is(TypeGraph *, TypeExpr *expr, Type of);
-
 bool Type_matches(TypeGraph *, Type ty, TypeExpr *pat);
 bool TypeExpr_matches(TypeGraph *, TypeExpr *expr, TypeExpr *pat);
 
