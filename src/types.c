@@ -137,6 +137,13 @@ bool Type_is(TypeGraph *tg, Type ty, Type of) {
         && IdSet_has(of_entry->type_set, ty.id);
 }
 
+bool TypeExpr_is(TypeGraph *tg, TypeExpr *expr, Type of) {
+    return TypeExpr_matches(tg, expr, &(TypeExpr){
+        .type = TET_ATOM,
+        .atom = of
+    });
+}
+
 bool Type_matches(TypeGraph *tg, Type ty, TypeExpr *pat) {
     TypeEntry *entry = TG_get(tg, ty);
 
@@ -200,12 +207,10 @@ bool TypeExpr_matches(TypeGraph *tg, TypeExpr *expr, TypeExpr *pat) {
     }
 }
 
-static void Type_dump_r(TypeGraph *, Type);
-
-static void TypeExpr_dump_r(TypeGraph *tg, TypeExpr *expr) {
+void TypeExpr_print(TypeGraph *tg, TypeExpr *expr) {
     switch (expr->type) {
     case TET_ATOM:
-        Type_dump_r(tg, expr->atom);
+        Type_print(tg, expr->atom);
         break;
     case TET_SUM:
         for (size_t i = 0; i < expr->len; ++i) {
@@ -213,25 +218,20 @@ static void TypeExpr_dump_r(TypeGraph *tg, TypeExpr *expr) {
 
             if (i) printf(" | ");
             if (add_parens) printf("(");
-            TypeExpr_dump_r(tg, expr->exprs[i]);
+            TypeExpr_print(tg, expr->exprs[i]);
             if (add_parens) printf(")");
         }
         break;
     case TET_PRODUCT:
         for (size_t i = 0; i < expr->len; ++i) {
             if (i) printf(" * ");
-            TypeExpr_dump_r(tg, expr->exprs[i]);
+            TypeExpr_print(tg, expr->exprs[i]);
         }
         break;
     }
 }
 
-void TypeExpr_dump(TypeGraph *tg, TypeExpr *expr) {
-    TypeExpr_dump_r(tg, expr);
-    puts("");
-}
-
-static void Type_dump_r(TypeGraph *tg, Type ty) {
+void Type_print(TypeGraph *tg, Type ty) {
     TypeEntry *entry = TG_get(tg, ty);
 
     printf("%.*s", (int)entry->name->len, entry->name->str);
@@ -240,7 +240,7 @@ static void Type_dump_r(TypeGraph *tg, Type ty) {
     case TY_CONCRETE: break;
     case TY_ALIAS:
         printf(": ");
-        TypeExpr_dump_r(tg, entry->expr);
+        TypeExpr_print(tg, entry->expr);
         break;
     case TY_ABSTRACT:
         printf(": { ");
@@ -267,18 +267,15 @@ static void Type_dump_r(TypeGraph *tg, Type ty) {
     }
 }
 
-void Type_dump(TypeGraph *tg, Type ty) {
-    Type_dump_r(tg, ty);
-    puts("");
-}
-
 void TypeGraph_dump(TypeGraph *tg) {
     term_format(TERM_CYAN);
     puts("TypeGraph:");
     term_format(TERM_RESET);
 
-    for (size_t i = 0; i < tg->entries.len; ++i)
-        Type_dump(tg, (Type){ i });
+    for (size_t i = 0; i < tg->entries.len; ++i) {
+        Type_print(tg, (Type){ i });
+        puts("");
+    }
 
     puts("");
 }

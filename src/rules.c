@@ -120,7 +120,7 @@ Rule Rule_define(Fungus *fun, RuleDef *def) {
     *entry = (RuleEntry){
         .ty = Type_define(types, &(TypeDef){
             .name = def->name,
-            .is = &fun->t_comptype,
+            .is = &fun->t_syntax,
             .is_len = 1
         }),
         .pat = Pattern_copy_of(rt, &def->pat),

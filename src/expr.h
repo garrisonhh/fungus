@@ -1,15 +1,13 @@
 #ifndef EXPR_H
 #define EXPR_H
 
-#include "literal_types.h"
 #include "types.h"
-#include "precedence.h"
-#include "rules.h"
+#include "literal_types.h"
 
 typedef struct Fungus Fungus;
 
 typedef struct Expr {
-    Type ty, cty;
+    TypeExpr *te;
 
     union {
         // literals
@@ -22,8 +20,6 @@ typedef struct Expr {
         struct {
             struct Expr **exprs;
             size_t len;
-
-            Rule rule;
         };
     };
 } Expr;

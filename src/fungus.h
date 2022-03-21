@@ -1,7 +1,6 @@
 #ifndef FUNGUS_H
 #define FUNGUS_H
 
-#include "expr.h"
 #include "lex.h"
 #include "types.h"
 #include "precedence.h"
@@ -17,8 +16,11 @@ typedef struct Fungus {
 
     // base types
     Type t_notype;
-    Type t_runtype, t_number, t_string, t_bool, t_int, t_float;
-    Type t_comptype, t_lexeme, t_literal;
+    Type t_runtype, t_primitive, t_number, t_string, t_bool, t_int, t_float;
+    Type t_comptype, t_lexeme, t_literal, t_syntax;
+
+    // common patterns
+    TypeExpr *te_prim_literal, *te_rule;
 
     // base precedences
     Prec p_lowest, p_highest;
@@ -34,9 +36,6 @@ Expr *Fungus_tmp_expr(Fungus *, size_t children);
 
 bool Fungus_define_symbol(Fungus *, Word symbol, Type *o_type);
 bool Fungus_define_keyword(Fungus *, Word keyword, Type *o_type);
-
-void Fungus_print_types(Fungus *, Type ty, Type cty);
-size_t Fungus_sprint_types(Fungus *, char *str, Type ty, Type cty);
 
 void Fungus_dump(Fungus *);
 

@@ -6,6 +6,8 @@
 #define EXPR_INDENT 2
 
 static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
+    TypeGraph *types = &fun->types;
+
     printf("%*s", level * EXPR_INDENT, "");
 
     // check validity
@@ -15,27 +17,30 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
     }
 
     // print data
-    Fungus_print_types(fun, expr->ty, expr->cty);
-    printf(" ");
+    TypeExpr_print(types, expr->te);
 
-    if (expr->cty.id == fun->t_literal.id) {
+    if (TypeExpr_matches(&fun->types, expr->te, fun->te_prim_literal)) {
+        Type prim = expr->te->exprs[0]->atom;
+
+        printf(" ");
+
         // literals
-        if (expr->ty.id == fun->t_string.id)
+        if (prim.id == fun->t_string.id)
             printf(">>%.*s<<", (int)expr->string_.len, expr->string_.str);
-        else if (expr->ty.id == fun->t_int.id)
+        else if (prim.id == fun->t_int.id)
             printf("%Ld", expr->int_);
-        else if (expr->ty.id == fun->t_float.id)
+        else if (prim.id == fun->t_float.id)
             printf("%Lf", expr->float_);
-        else if (expr->ty.id == fun->t_bool.id)
+        else if (prim.id == fun->t_bool.id)
             printf("%s", expr->bool_ ? "true" : "false");
         else
             fungus_panic("unknown literal type!");
 
         puts("");
-    } else if (Type_is(&fun->types, expr->cty, fun->t_lexeme)) {
+    } else if (TypeExpr_is(types, expr->te, fun->t_lexeme)) {
         // lexemes
-        puts("raw lexeme");
-    } else {
+        ;
+    } else if (TypeExpr_matches(types, expr->te, fun->te_rule)) {
         // print child values
         puts("");
 

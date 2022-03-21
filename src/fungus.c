@@ -133,36 +133,3 @@ void Fungus_dump(Fungus *fun) {
     PrecGraph_dump(&fun->precedences);
     RuleTree_dump(fun, &fun->rules);
 }
-
-// ensure ty is not a comptype and cty is
-static void ensure_valid_types(Fungus *fun, Type ty, Type cty) {
-    bool actual_ty = !Type_is(&fun->types, ty, fun->t_comptype);
-    bool actual_mty = Type_is(&fun->types, cty, fun->t_comptype);
-
-    if (actual_ty && actual_mty)
-        return;
-
-    printf("l%s%sks fishy ><> ", actual_ty ? "o" : "O", actual_mty ? "o" : "O");
-}
-
-void Fungus_print_types(Fungus *fun, Type ty, Type cty) {
-    ensure_valid_types(fun, ty, cty);
-
-    const Word *ty_name = Type_name(&fun->types, ty);
-    const Word *mty_name = Type_name(&fun->types, cty);
-
-    printf("[ %.*s | %.*s ]",
-           (int)ty_name->len, ty_name->str,
-           (int)mty_name->len, mty_name->str);
-}
-
-size_t Fungus_sprint_types(Fungus *fun, char *str, Type ty, Type cty) {
-    ensure_valid_types(fun, ty, cty);
-
-    const Word *ty_name = Type_name(&fun->types, ty);
-    const Word *mty_name = Type_name(&fun->types, cty);
-
-    return sprintf(str, "[ %.*s | %.*s ]",
-                   (int)ty_name->len, ty_name->str,
-                   (int)mty_name->len, mty_name->str);
-}

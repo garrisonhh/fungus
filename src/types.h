@@ -55,16 +55,6 @@ typedef struct TypeExpr {
     };
 } TypeExpr;
 
-// convenience macros
-#define TYEX_ATOM(ATOM) (TypeExpr){ .type = TET_ATOM, .atom = ATOM }
-#define TYEX_TAG(TAG) (TypeExpr){ .type = TET_TAG, .tag = TAG }
-#define TYEX_TAGGED(TAG, CHILD)\
-    (TypeExpr){ .type = TET_TAGGED, .tag = TAG, .child = CHILD }
-#define TYEX_SUM(EXPRS, LEN)\
-    (TypeExpr){ .type = TET_SUM, .exprs = EXPRS, .len = LEN }
-#define TYEX_PRODUCT(EXPRS, LEN)\
-    (TypeExpr){ .type = TET_PRODUCT, .exprs = EXPRS, .len = LEN }
-
 typedef enum TypeType {
     TY_CONCRETE, // a new type
     TY_ABSTRACT, // a type grouping (like an interface)
@@ -91,9 +81,7 @@ typedef struct TypeEntry {
     TypeType type;
     union {
         // concrete types store no data
-        struct {
-            IdSet *type_set; // abstract
-        };
+        IdSet *type_set; // abstract
         TypeExpr *expr; // aliased
     };
 } TypeEntry;
@@ -111,13 +99,15 @@ void TypeGraph_del(TypeGraph *);
 Type Type_define(TypeGraph *, TypeDef *def);
 bool Type_get(TypeGraph *, Word *name, Type *o_type);
 const Word *Type_name(TypeGraph *, Type ty);
+
 bool Type_is(TypeGraph *, Type ty, Type of);
+bool TypeExpr_is(TypeGraph *, TypeExpr *expr, Type of);
 
 bool Type_matches(TypeGraph *, Type ty, TypeExpr *pat);
 bool TypeExpr_matches(TypeGraph *, TypeExpr *expr, TypeExpr *pat);
 
-void TypeExpr_dump(TypeGraph *, TypeExpr *expr);
-void Type_dump(TypeGraph *, Type ty);
+void TypeExpr_print(TypeGraph *, TypeExpr *expr);
+void Type_print(TypeGraph *, Type ty);
 void TypeGraph_dump(TypeGraph *);
 
 #endif
