@@ -200,8 +200,30 @@ bool TypeExpr_matches(TypeGraph *tg, TypeExpr *expr, TypeExpr *pat) {
     }
 }
 
+static void Type_dump_r(TypeGraph *, Type);
+
 static void TypeExpr_dump_r(TypeGraph *tg, TypeExpr *expr) {
-    fungus_panic("TODO this");
+    switch (expr->type) {
+    case TET_ATOM:
+        Type_dump_r(tg, expr->atom);
+        break;
+    case TET_SUM:
+        for (size_t i = 0; i < expr->len; ++i) {
+            bool add_parens = expr->exprs[i]->type == TET_PRODUCT;
+
+            if (i) printf(" | ");
+            if (add_parens) printf("(");
+            TypeExpr_dump_r(tg, expr->exprs[i]);
+            if (add_parens) printf(")");
+        }
+        break;
+    case TET_PRODUCT:
+        for (size_t i = 0; i < expr->len; ++i) {
+            if (i) printf(" * ");
+            TypeExpr_dump_r(tg, expr->exprs[i]);
+        }
+        break;
+    }
 }
 
 void TypeExpr_dump(TypeGraph *tg, TypeExpr *expr) {
