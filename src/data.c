@@ -159,7 +159,7 @@ Word Word_new(const char *str, size_t len) {
     };
 }
 
-Word *Word_copy_of(Word *src, Bump *pool) {
+Word *Word_copy_of(const Word *src, Bump *pool) {
     char *str = Bump_alloc(pool, src->len * sizeof(*str));
     Word *copy = Bump_alloc(pool, sizeof(*copy));
 
@@ -262,6 +262,7 @@ void IdMap_remove(IdMap *map, const Word *name) {
 
 IdSet IdSet_new(void) {
     return (IdSet){
+        .supersets = Vec_new(),
         .ids = malloc(DATA_INIT_CAP * sizeof(unsigned)),
         .filled = calloc(DATA_INIT_CAP, sizeof(bool)),
         .cap = DATA_INIT_CAP
@@ -269,6 +270,7 @@ IdSet IdSet_new(void) {
 }
 
 void IdSet_del(IdSet *set) {
+    Vec_del(&set->supersets);
     free(set->ids);
     free(set->filled);
 }
@@ -280,6 +282,7 @@ static void IdSet_put_lower(IdSet *set, unsigned id) {
         idx = (idx + 1) % set->cap;
 
     set->ids[idx] = id;
+    set->filled[idx] = true;
 }
 
 static void IdSet_resize(IdSet *set, size_t new_cap) {
@@ -296,13 +299,27 @@ static void IdSet_resize(IdSet *set, size_t new_cap) {
             IdSet_put_lower(set, old_ids[i]);
 }
 
+void IdSet_add_superset(IdSet *set, IdSet *super) {
+    Vec_push(&set->supersets, super);
+
+    for (size_t i = 0; i < set->cap; ++i)
+        if (set->filled[i])
+            IdSet_put(super, set->ids[i]);
+}
+
 void IdSet_put(IdSet *set, unsigned id) {
+    // check resize
     if (set->size * 2 > set->cap)
         IdSet_resize(set, set->cap * 2);
 
+    // add to this set
     IdSet_put_lower(set, id);
 
     ++set->size;
+
+    // add to supersets
+    for (size_t i = 0; i < set->supersets.len; ++i)
+        IdSet_put(set->supersets.data[i], id);
 }
 
 bool IdSet_has(IdSet *set, unsigned id) {

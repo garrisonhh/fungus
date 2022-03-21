@@ -56,7 +56,7 @@ typedef union Word {
 } Word;
 
 Word Word_new(const char *str, size_t len);
-Word *Word_copy_of(Word *src, Bump *pool);
+Word *Word_copy_of(const Word *src, Bump *pool);
 
 #define WORD(STR) Word_new(STR, strlen(STR))
 
@@ -94,6 +94,7 @@ void IdMap_remove(IdMap *, const Word *name);
 // put-only id set =============================================================
 
 typedef struct IdSet {
+    Vec supersets; // Vec<IdSet *>
     unsigned *ids;
     bool *filled;
     size_t size, cap;
@@ -102,6 +103,7 @@ typedef struct IdSet {
 IdSet IdSet_new(void);
 void IdSet_del(IdSet *);
 
+void IdSet_add_superset(IdSet *, IdSet *super);
 void IdSet_put(IdSet *, unsigned id);
 bool IdSet_has(IdSet *, unsigned id);
 

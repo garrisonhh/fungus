@@ -17,8 +17,8 @@ typedef struct Fungus {
 
     // base types
     Type t_notype;
-    Type t_runtype, t_string, t_bool, t_number, t_int, t_float;
-    Type t_comptype, t_literal, t_lexeme;
+    Type t_runtype, t_number, t_string, t_bool, t_int, t_float;
+    Type t_comptype, t_lexeme, t_literal;
 
     // base precedences
     Prec p_lowest, p_highest;
@@ -32,8 +32,8 @@ void Fungus_tmp_clear(Fungus *);
 // if children > 0, allocates for them on Expr->exprs
 Expr *Fungus_tmp_expr(Fungus *, size_t children);
 
-Type Fungus_define_symbol(Fungus *, Word symbol);
-Type Fungus_define_keyword(Fungus *, Word keyword);
+bool Fungus_define_symbol(Fungus *, Word symbol, Type *o_type);
+bool Fungus_define_keyword(Fungus *, Word keyword, Type *o_type);
 
 void Fungus_print_types(Fungus *, Type ty, Type cty);
 size_t Fungus_sprint_types(Fungus *, char *str, Type ty, Type cty);

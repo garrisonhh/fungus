@@ -46,7 +46,7 @@ RuleTree RuleTree_new(void) {
         .entries = Vec_new(),
     };
 
-    rt.root = RT_new_node(&rt, NULL, INVALID_TYPE);
+    rt.root = RT_new_node(&rt, NULL, (Type){ 0 });
 
     return rt;
 }

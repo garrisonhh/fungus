@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <assert.h>
 
 #include "fungus.h"
 #include "base_fungus.h"
@@ -10,12 +11,16 @@ static int lexeme_cmp(const void *a, const void *b) {
 }
 
 static Type define_lexeme(Fungus *fun, Word name) {
-    TypeDef lexeme_def = { name, &fun->t_lexeme, 1 };
-
-    return Type_define(&fun->types, &lexeme_def);
+    return Type_define(&fun->types, &(TypeDef){
+        .name = name,
+        .is = &fun->t_lexeme,
+        .is_len = 1
+    });
 }
 
-Type Fungus_define_symbol(Fungus *fun, Word symbol) {
+bool Fungus_define_symbol(Fungus *fun, Word symbol, Type *o_type) {
+    assert(o_type);
+
     // validate symbol
     if (symbol.len == 0)
         goto invalid_symbol;
@@ -30,17 +35,21 @@ Type Fungus_define_symbol(Fungus *fun, Word symbol) {
     Vec_push(&fun->lexer.symbols, copy);
     Vec_qsort(&fun->lexer.symbols, lexeme_cmp); // TODO this is inefficient af
 
-    return define_lexeme(fun, symbol);
+    *o_type = define_lexeme(fun, symbol);
+
+    return true;
 
 invalid_symbol:
     fungus_error(">>%.*s<< is not a valid symbol.",
                  (int)symbol.len, symbol.str);
     global_error = true;
 
-    return INVALID_TYPE;
+    return false;
 }
 
-Type Fungus_define_keyword(Fungus *fun, Word keyword) {
+bool Fungus_define_keyword(Fungus *fun, Word keyword, Type *o_type) {
+    assert(o_type);
+
     // validate keyword
     if (keyword.len == 0 || !isalpha(keyword.str[0]))
         goto invalid_keyword;
@@ -55,14 +64,16 @@ Type Fungus_define_keyword(Fungus *fun, Word keyword) {
     Vec_push(&fun->lexer.keywords, copy);
     Vec_qsort(&fun->lexer.keywords, lexeme_cmp); // TODO this is inefficient af
 
-    return define_lexeme(fun, keyword);
+    *o_type = define_lexeme(fun, keyword);
+
+    return true;
 
 invalid_keyword:
     fungus_panic(">>%.*s<< is not a valid keyword.",
                  (int)keyword.len, keyword.str);
     global_error = true;
 
-    return INVALID_TYPE;
+    return false;
 }
 
 Fungus Fungus_new(void) {

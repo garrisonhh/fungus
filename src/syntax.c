@@ -2,6 +2,7 @@
 
 #include "syntax.h"
 
+// TODO this but with type exprs
 static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
     TypeGraph *types = &fun->types;
 
@@ -9,7 +10,7 @@ static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
     Type *generics = malloc(pat->where_len * sizeof(*generics));
 
     for (size_t i = 0; i < pat->where_len; ++i)
-        generics[i] = INVALID_TYPE;
+        generics[i] = fun->t_notype;
 
     // ensure all generics are consistent
     bool valid = true;
@@ -19,7 +20,7 @@ static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
         Type where = pat->where[pat->pat[i]];
         Type *generic = &generics[pat->pat[i]];
 
-        if (generic->id == INVALID_TYPE.id) {
+        if (generic->id == fun->t_notype.id) {
             if (Type_is(types, expr->cty, where))
                 *generic = expr->cty;
             else if (Type_is(types, expr->ty, where))

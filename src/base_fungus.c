@@ -10,85 +10,106 @@ void Fungus_define_base(Fungus *fun) {
     /*
      * base types
      */
-    TypeDef notype_typedef = { WORD("NoType") };
-
-    fun->t_notype = Type_define(&fun->types, &notype_typedef);
+    fun->t_notype = Type_define(&fun->types, &(TypeDef){
+        .name = WORD("NoType"),
+        .type = TY_ABSTRACT
+    });
 
     // runtime
-    TypeDef runtype_typedef = { WORD("RunType") };
+    fun->t_runtype = Type_define(&fun->types, &(TypeDef){
+        .name = WORD("RunType"),
+        .type = TY_ABSTRACT
+    });
+    fun->t_number = Type_define(&fun->types, &(TypeDef){
+        .name = WORD("Number"),
+        .type = TY_ABSTRACT,
+        .is = &fun->t_runtype,
+        .is_len = 1
+    });
 
-    fun->t_runtype = Type_define(&fun->types, &runtype_typedef);
+    fun->t_string = Type_define(&fun->types, &(TypeDef){
+        .name = WORD("string"),
+        .is = &fun->t_runtype,
+        .is_len = 1
+    });
+    fun->t_bool = Type_define(&fun->types, &(TypeDef){
+        .name = WORD("bool"),
+        .is = &fun->t_runtype,
+        .is_len = 1
+    });
+    fun->t_int = Type_define(&fun->types, &(TypeDef){
+        .name = WORD("int"),
+        .is = &fun->t_number,
+        .is_len = 1
+    });
+    fun->t_float = Type_define(&fun->types, &(TypeDef){
+        .name = WORD("float"),
+        .is = &fun->t_number,
+        .is_len = 1
+    });
 
-    TypeDef string_typedef = { WORD("String"), &fun->t_runtype, 1 };
-    TypeDef bool_typedef = { WORD("Bool"), &fun->t_runtype, 1 };
-    TypeDef number_typedef = { WORD("Number"), &fun->t_runtype, 1 };
-
-    fun->t_string = Type_define(&fun->types, &string_typedef);
-    fun->t_bool = Type_define(&fun->types, &bool_typedef);
-    fun->t_number = Type_define(&fun->types, &number_typedef);
-
-    TypeDef int_typedef = { WORD("Int"), &fun->t_number, 1 };
-    TypeDef float_typedef = { WORD("Float"), &fun->t_number, 1 };
-
-    fun->t_int = Type_define(&fun->types, &int_typedef);
-    fun->t_float = Type_define(&fun->types, &float_typedef);
-
-    // meta
-    TypeDef comptype_typedef = { WORD("CompType") };
-
-    fun->t_comptype = Type_define(&fun->types, &comptype_typedef);
-
-    TypeDef literal_typedef = { WORD("Literal"), &fun->t_comptype, 1 };
-    TypeDef lexeme_typedef = { WORD("Lexeme"), &fun->t_comptype, 1 };
-
-    fun->t_literal = Type_define(&fun->types, &literal_typedef);
-    fun->t_lexeme = Type_define(&fun->types, &lexeme_typedef);
+    // comptime-only types
+    fun->t_comptype = Type_define(&fun->types, &(TypeDef){
+        .name = WORD("CompType"),
+        .type = TY_ABSTRACT
+    });
+    // TODO REMOVE
+    fun->t_literal = Type_define(&fun->types, &(TypeDef){
+        .name = WORD("Literal"),
+        .type = TY_ABSTRACT,
+        .is = &fun->t_comptype,
+        .is_len = 1
+    });
+    fun->t_lexeme = Type_define(&fun->types, &(TypeDef){
+        .name = WORD("Lexeme"),
+        .type = TY_ABSTRACT,
+        .is = &fun->t_comptype,
+        .is_len = 1
+    });
 
     /*
      * lexemes (Fungus_define_x funcs rely on t_lexeme)
      */
-    Type lex_true = Fungus_define_keyword(fun, WORD("true"));
-    Type lex_false = Fungus_define_keyword(fun, WORD("false"));
+    Type lex_true;
+    Type lex_false;
+    Type lex_lparen;
+    Type lex_rparen;
+    Type lex_star;
+    Type lex_rslash;
+    Type lex_percent;
+    Type lex_plus;
+    Type lex_minus;
 
-    Type lex_lparen = Fungus_define_symbol(fun, WORD("("));
-    Type lex_rparen = Fungus_define_symbol(fun, WORD(")"));
-    Type lex_star = Fungus_define_symbol(fun, WORD("*"));
-    Type lex_rslash = Fungus_define_symbol(fun, WORD("/"));
-    Type lex_percent = Fungus_define_symbol(fun, WORD("%"));
-    Type lex_plus = Fungus_define_symbol(fun, WORD("+"));
-    Type lex_minus = Fungus_define_symbol(fun, WORD("-"));
+    Fungus_define_keyword(fun, WORD("true"), &lex_true);
+    Fungus_define_keyword(fun, WORD("false"), &lex_false);
+    Fungus_define_symbol(fun, WORD("("), &lex_lparen);
+    Fungus_define_symbol(fun, WORD(")"), &lex_rparen);
+    Fungus_define_symbol(fun, WORD("*"), &lex_star);
+    Fungus_define_symbol(fun, WORD("/"), &lex_rslash);
+    Fungus_define_symbol(fun, WORD("%"), &lex_percent);
+    Fungus_define_symbol(fun, WORD("+"), &lex_plus);
+    Fungus_define_symbol(fun, WORD("-"), &lex_minus);
 
     /*
      * precedences
      */
-    PrecDef lowest_def = {
+    fun->p_lowest = Prec_define(&fun->precedences, &(PrecDef){
         .name = WORD("LowestPrecedence")
-    };
-    fun->p_lowest = Prec_define(&fun->precedences, &lowest_def);
+    });
+    fun->p_highest = Prec_define(&fun->precedences, &(PrecDef){
+        .name = WORD("HighestPrecedence")
+    });
 
-    Prec addsub_above[] = { fun->p_lowest };
-    PrecDef addsub_def = {
+    Prec addsub = Prec_define(&fun->precedences, &(PrecDef){
         .name = WORD("AddSubPrecedence"),
-        .above = addsub_above,
-        .above_len = ARRAY_SIZE(addsub_above),
-    };
-    Prec addsub = Prec_define(&fun->precedences, &addsub_def);
-
-    Prec muldiv_above[] = { addsub };
-    PrecDef muldiv_def = {
+        .above = (Prec []){ fun->p_lowest }, .above_len = 1,
+        .below = (Prec []){ fun->p_highest }, .below_len = 1
+    });
+    Prec muldiv = Prec_define(&fun->precedences, &(PrecDef){
         .name = WORD("MulDivPrecedence"),
-        .above = muldiv_above,
-        .above_len = ARRAY_SIZE(muldiv_above),
-    };
-    Prec muldiv = Prec_define(&fun->precedences, &muldiv_def);
-
-    Prec highest_above[] = { addsub, muldiv };
-    PrecDef highest_def = {
-        .name = WORD("HighestPrecedence"),
-        .above = highest_above,
-        .above_len = ARRAY_SIZE(highest_above),
-    };
-    fun->p_highest = Prec_define(&fun->precedences, &highest_def);
+        .above = (Prec []){ addsub }, .above_len = 1,
+        .below = (Prec []){ fun->p_highest }, .below_len = 1
+    });
 
     /*
      * rules
@@ -143,12 +164,13 @@ void Fungus_define_base(Fungus *fun) {
     struct {
         Word name;
         Type sym;
+        Prec prec;
     } bin_math_ops[] = {
-        { WORD("Add"),      lex_plus    },
-        { WORD("Subtract"), lex_minus   },
-        { WORD("Multiply"), lex_star    },
-        { WORD("Divide"),   lex_rslash  },
-        { WORD("Modulo"),   lex_percent },
+        { WORD("Add"),      lex_plus,    addsub },
+        { WORD("Subtract"), lex_minus,   addsub },
+        { WORD("Multiply"), lex_star,    muldiv },
+        { WORD("Divide"),   lex_rslash,  muldiv },
+        { WORD("Modulo"),   lex_percent, muldiv },
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(bin_math_ops); ++i) {
@@ -161,6 +183,7 @@ void Fungus_define_base(Fungus *fun) {
                 .where = (Type []){ fun->t_number, bin_math_ops[i].sym },
                 .where_len = 2
             },
+            .prec = bin_math_ops[i].prec,
             .hook = bin_math_hook
         });
     }
