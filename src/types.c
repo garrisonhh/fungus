@@ -53,16 +53,22 @@ static TypeExpr *deepcopy_expr(TypeGraph *tg, TypeExpr *expr) {
     case TET_ATOM:
         copy->atom = expr->atom;
         break;
+#if 0
     case TET_TAGGED:
         copy->child = deepcopy_expr(tg, expr->child);
         /* fallthru */
     case TET_TAG:
         copy->tag = Word_copy_of(expr->tag, &tg->pool);
         break;
+#endif
     case TET_SUM:
     case TET_PRODUCT:
-        copy->lhs = deepcopy_expr(tg, expr->lhs);
-        copy->rhs = deepcopy_expr(tg, expr->rhs);
+        copy->len = expr->len;
+        copy->exprs = TG_alloc(tg, copy->len * sizeof(*copy->exprs));
+
+        for (size_t i = 0; i < expr->len; ++i)
+            copy->exprs[i] = deepcopy_expr(tg, expr->exprs[i]);
+
         break;
     }
 
@@ -129,6 +135,56 @@ bool Type_is(TypeGraph *tg, Type ty, Type of) {
 
     return of_entry->type == TY_ABSTRACT
         && IdSet_has(of_entry->type_set, ty.id);
+}
+
+bool Type_matches(TypeGraph *tg, Type ty, TypeExpr *pat) {
+    TypeEntry *entry = TG_get(tg, ty);
+
+    switch (entry->type) {
+    case TY_CONCRETE:
+    case TY_ABSTRACT:
+        switch (pat->type) {
+        case TET_ATOM:
+            // whether atom is the other atom
+            return Type_is(tg, ty, pat->atom);
+        case TET_PRODUCT:
+            // atoms cannot match products
+            return false;
+        case TET_SUM:
+            // whether atom is included in product
+            for (size_t i = 0; i < pat->len; ++i)
+                if (Type_matches(tg, ty, pat->exprs[i]))
+                    return true;
+
+            return false;
+        }
+    case TY_ALIAS:
+        return TypeExpr_matches(tg, entry->expr, pat);
+    }
+}
+
+bool TypeExpr_matches(TypeGraph *tg, TypeExpr *expr, TypeExpr *pat) {
+    switch (expr->type) {
+    case TET_ATOM:
+        return Type_matches(tg, expr->atom, pat);
+    case TET_SUM:
+        // whether expr is a subset of pat
+        for (size_t i = 0; i < expr->len; ++i)
+            if (!TypeExpr_matches(tg, expr->exprs[i], pat))
+                return false;
+
+        return true;
+    case TET_PRODUCT:
+        // whether all of expr members match pat's members
+        if (pat->type != TET_PRODUCT || pat->len != expr->len)
+            return false;
+
+        for (size_t i = 0; i < expr->len; ++i)
+            if (!TypeExpr_matches(tg, expr->exprs[i], pat->exprs[i]))
+                return false;
+
+        return true;
+    }
 }
 
 static void TypeExpr_dump_r(TypeGraph *tg, TypeExpr *expr) {

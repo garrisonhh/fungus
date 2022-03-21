@@ -24,9 +24,9 @@ typedef enum TypeExprType {
     // basic unit like `u64`
     TET_ATOM,
 
-    // for enum tags + tagged enums
-    TET_TAG,
-    TET_TAGGED,
+    // for enum tags + tagged enums TODO
+    // TET_TAG,
+    // TET_TAGGED,
 
     // algebraic typing
     TET_SUM,
@@ -39,15 +39,18 @@ typedef struct TypeExpr {
         // atomic
         Type atom;
 
+        /*
         // tag/tagged
         struct {
             const Word *tag;
             struct TypeExpr *child;
         };
+        */
 
         // algebraic
         struct {
-            struct TypeExpr *lhs, *rhs;
+            struct TypeExpr **exprs;
+            size_t len;
         };
     };
 } TypeExpr;
@@ -57,10 +60,10 @@ typedef struct TypeExpr {
 #define TYEX_TAG(TAG) (TypeExpr){ .type = TET_TAG, .tag = TAG }
 #define TYEX_TAGGED(TAG, CHILD)\
     (TypeExpr){ .type = TET_TAGGED, .tag = TAG, .child = CHILD }
-#define TYEX_SUM(LHS, RHS)\
-    (TypeExpr){ .type = TET_SUM, .lhs = LHS, .rhs = RHS }
-#define TYEX_PRODUCT(LHS, RHS)\
-    (TypeExpr){ .type = TET_PRODUCT, .lhs = LHS, .rhs = RHS }
+#define TYEX_SUM(EXPRS, LEN)\
+    (TypeExpr){ .type = TET_SUM, .exprs = EXPRS, .len = LEN }
+#define TYEX_PRODUCT(EXPRS, LEN)\
+    (TypeExpr){ .type = TET_PRODUCT, .exprs = EXPRS, .len = LEN }
 
 typedef enum TypeType {
     TY_CONCRETE, // a new type
@@ -108,7 +111,10 @@ void TypeGraph_del(TypeGraph *);
 Type Type_define(TypeGraph *, TypeDef *def);
 bool Type_get(TypeGraph *, Word *name, Type *o_type);
 const Word *Type_name(TypeGraph *, Type ty);
-bool Type_is(TypeGraph *, Type ty, Type super);
+bool Type_is(TypeGraph *, Type ty, Type of);
+
+bool Type_matches(TypeGraph *, Type ty, TypeExpr *pat);
+bool TypeExpr_matches(TypeGraph *, TypeExpr *expr, TypeExpr *pat);
 
 void TypeExpr_dump(TypeGraph *, TypeExpr *expr);
 void Type_dump(TypeGraph *, Type ty);
