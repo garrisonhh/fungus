@@ -1,5 +1,5 @@
-#ifndef SYNTAX_H
-#define SYNTAX_H
+#ifndef PARSE_H
+#define PARSE_H
 
 #include "fungus.h"
 

@@ -3,7 +3,7 @@
 
 #include "fungus.h"
 #include "lex.h"
-#include "syntax.h"
+#include "parse.h"
 #include "ir.h"
 #include "cgen.h"
 

@@ -1,6 +1,6 @@
 #include <assert.h>
 
-#include "syntax.h"
+#include "parse.h"
 
 // TODO this but with type exprs
 static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
@@ -33,22 +33,11 @@ static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
 
 static Type find_return_type(Fungus *fun, Pattern *pat, Expr **slice,
                              size_t len) {
-    printf("ARRAY:");
-
-    for (size_t i = 0; i < len; ++i) {
-        printf(" ");
-        Type_print(&fun->types, slice[i]->ty);
-    }
-
-    puts("");
-
     // check if this return type is inferrable via a parameter
     // TODO this could be stored in RuleEntry
     for (size_t i = 0; i < pat->len; ++i)
         if (pat->pat[i] == pat->returns)
             return slice[i]->ty;
-
-    printf("INFERRING!\n");
 
     // otherwise it is a concrete unique type from the where clause
     // TODO check this in Rule_define
@@ -140,25 +129,13 @@ static Expr *collapse(Fungus *fun, RuleEntry *entry, Expr **exprs, size_t len) {
 }
 
 static Expr *try_match(Fungus *fun, Expr **slice, size_t len, size_t *o_len) {
-    static size_t calls = 0;
-
-    printf("try_match %zu\n", ++calls);
-
     *o_len = 0;
 
     RuleEntry *matched =
         try_match_rule(fun, fun->rules.root, slice, len, 0, o_len);
 
-    if (matched) {
-        const Word *name = Type_name(&fun->types, matched->ty);
-        printf("matched rule %.*s on:\n", (int)name->len, name->str);
-        Expr_dump_array(fun, slice, *o_len);
-        puts("");
-
+    if (matched)
         return collapse(fun, matched, slice, *o_len);
-    }
-
-    puts("matched no rules");
 
     return NULL;
 }
@@ -192,6 +169,12 @@ static Expr *parse_slice(Fungus *fun, Expr **exprs, size_t len) {
                 len -= stitch_len;
                 sub += stitch_len;
                 sub_len -= stitch_len;
+
+#if 1
+                puts("post rule collapse:");
+                Expr_dump_array(fun, exprs, len);
+                puts("");
+#endif
             }
         }
     }

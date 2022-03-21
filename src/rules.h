@@ -11,24 +11,24 @@
 typedef struct Fungus Fungus;
 
 /*
- * patterns are defined something like this:
+ * patterns are defined something like this (intentially pseudocode-y):
  *
  * (Pattern){
- *     .pat = { 0, 1, 0 }, .len = 3,
+ *     .pat = { 0, 1, 0 },
  *     .returns = 0,
  *     .where = {
- *         { number },
- *         { plus_lexeme }
+ *         number,
+ *         plus_lexeme
  *     }
  * }
  *
  * this is exactly like some rust-like syntax:
  *
  * fn add(lhs: T, symbol: S, rhs: T): T
- *    where T: Number,
- *          S: +;
+ *         where T: Number,
+ *               S: +
  *
- * where typeexprs are deepcopied!
+ * typeexprs are deepcopied on Rule_define call
  */
 typedef struct Pattern {
     size_t *pat;
