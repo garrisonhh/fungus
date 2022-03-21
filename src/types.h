@@ -109,6 +109,11 @@ bool TypeExpr_is(TypeGraph *, TypeExpr *expr, Type of);
 bool Type_matches(TypeGraph *, Type ty, TypeExpr *pat);
 bool TypeExpr_matches(TypeGraph *, TypeExpr *expr, TypeExpr *pat);
 
+// TypeExpr convenience funcs
+TypeExpr *TypeExpr_atom(Bump *pool, Type ty);
+TypeExpr *TypeExpr_sum(Bump *pool, size_t n, ...);
+TypeExpr *TypeExpr_product(Bump *pool, size_t n, ...);
+
 void TypeExpr_print(TypeGraph *, TypeExpr *expr);
 void Type_print(TypeGraph *, Type ty);
 void TypeGraph_dump(TypeGraph *);

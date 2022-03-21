@@ -237,6 +237,51 @@ bool TypeExpr_matches(TypeGraph *tg, TypeExpr *expr, TypeExpr *pat) {
     }
 }
 
+TypeExpr *TypeExpr_atom(Bump *pool, Type ty) {
+    TypeExpr *te = Bump_alloc(pool, sizeof(*te));
+
+    te->type = TET_ATOM;
+    te->atom = ty;
+
+    return te;
+}
+
+static TypeExpr *TE_copy_va_list(Bump *pool, size_t n, va_list argp) {
+    TypeExpr *te = Bump_alloc(pool, sizeof(*te));
+
+    te->len = n;
+    te->exprs = Bump_alloc(pool, te->len * sizeof(*te->exprs));
+
+    for (size_t i = 0; i < te->len; ++i)
+        te->exprs[i] = va_arg(argp, TypeExpr *);
+
+    return te;
+}
+
+TypeExpr *TypeExpr_sum(Bump *pool, size_t n, ...) {
+    va_list argp;
+
+    va_start(argp, n);
+    TypeExpr *te = TE_copy_va_list(pool, n, argp);
+    va_end(argp);
+
+    te->type = TET_SUM;
+
+    return te;
+}
+
+TypeExpr *TypeExpr_product(Bump *pool, size_t n, ...) {
+    va_list argp;
+
+    va_start(argp, n);
+    TypeExpr *te = TE_copy_va_list(pool, n, argp);
+    va_end(argp);
+
+    te->type = TET_SUM;
+
+    return te;
+}
+
 void TypeExpr_print(TypeGraph *tg, TypeExpr *expr) {
     switch (expr->type) {
     case TET_ATOM:

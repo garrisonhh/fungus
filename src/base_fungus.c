@@ -116,51 +116,26 @@ void Fungus_define_base(Fungus *fun) {
     /*
      * rules
      */
+    Bump _tmp = Bump_new(), *tmp = &_tmp;
+
     // boolean literals
-#if 0
     Rule_define(fun, &(RuleDef){
-        .name = WORD("TrueLiteral"),
+        .name = WORD("BoolLiteral"),
         .pat = {
             .pat = (size_t []){ 0 },
             .len = 1,
             .returns = 1,
-            .where = (WherePat []){
-                { lex_true },
-                { fun->t_bool }
+            .where = (TypeExpr *[]){
+                TypeExpr_sum(tmp, 2,
+                    TypeExpr_atom(tmp, lex_true),
+                    TypeExpr_atom(tmp, lex_false)
+                ),
+                TypeExpr_atom(tmp, fun->t_bool)
             },
             .where_len = 2
-        }
+        },
+        .prec = fun->p_highest,
     });
-
-    Rule_define(fun, &(RuleDef){
-        .name = WORD("FalseLiteral"),
-        .pat = {
-            .pat = (size_t []){ 0 },
-            .len = 1,
-            .returns = 1,
-            .where = (WherePat []){
-                { lex_false },
-                { fun->t_bool }
-            },
-            .where_len = 2
-        }
-    });
-
-    // parens
-    Rule_define(fun, &(RuleDef){
-        .name = WORD("Parens"),
-        .pat = {
-            .pat = (size_t []){ 0, 1, 2 },
-            .len = 3,
-            .returns = 1,
-            .where = (WherePat []){
-                { lex_lparen },
-                { fun->t_comptype },
-                { lex_rparen },
-            }
-        }
-    });
-#endif
 
     // math
     struct {
@@ -183,19 +158,15 @@ void Fungus_define_base(Fungus *fun) {
                 .len = 3,
                 .returns = 0,
                 .where = (TypeExpr *[]){
-                    &(TypeExpr){
-                        .type = TET_ATOM,
-                        .atom = fun->t_number
-                    },
-                    &(TypeExpr){
-                        .type = TET_ATOM,
-                        .atom = bin_math_ops[i].sym
-                    },
+                    TypeExpr_atom(tmp, fun->t_number),
+                    TypeExpr_atom(tmp, bin_math_ops[i].sym),
                 },
                 .where_len = 2
             },
             .prec = bin_math_ops[i].prec,
         });
     }
+
+    Bump_del(tmp);
 }
 
