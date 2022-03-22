@@ -118,7 +118,6 @@ void Fungus_define_base(Fungus *fun) {
      */
     Bump _tmp = Bump_new(), *tmp = &_tmp;
 
-    // boolean literals
     Rule_define(fun, &(RuleDef){
         .name = WORD("BoolLiteral"),
         .pat = {
@@ -133,6 +132,22 @@ void Fungus_define_base(Fungus *fun) {
                 TypeExpr_atom(tmp, fun->t_bool)
             },
             .where_len = 2
+        },
+        .prec = fun->p_highest,
+    });
+
+    Rule_define(fun, &(RuleDef){
+        .name = WORD("Parens"),
+        .pat = {
+            .pat = (size_t []){ 0, 1, 2 },
+            .len = 3,
+            .returns = 1,
+            .where = (TypeExpr *[]){
+                TypeExpr_atom(tmp, lex_lparen),
+                TypeExpr_atom(tmp, fun->t_runtype),
+                TypeExpr_atom(tmp, lex_rparen)
+            },
+            .where_len = 3
         },
         .prec = fun->p_highest,
     });

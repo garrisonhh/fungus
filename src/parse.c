@@ -238,6 +238,8 @@ static Expr *parse_slice(Fungus *fun, Expr **exprs, size_t len) {
             size_t match_len;
 
             while ((collapsed = try_match(fun, sub, sub_len, &match_len))) {
+                found_match = true;
+
                 // stitch sub-slice
                 size_t stitch_len = match_len - 1;
 

@@ -33,7 +33,7 @@ static void Vec_biggify(Vec *v) {
 
 // subtract one slot
 static void Vec_smolify(Vec *v) {
-    if (--v->len <= v->cap / 2) {
+    if (--v->len < v->cap / 2) {
         v->cap /= 2;
         v->data = realloc(v->data, v->cap * sizeof(*v->data));
     }
