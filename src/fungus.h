@@ -33,6 +33,9 @@ Expr *Fungus_tmp_expr(Fungus *, size_t children);
 
 bool Fungus_define_symbol(Fungus *, Word symbol, Type *o_type);
 bool Fungus_define_keyword(Fungus *, Word keyword, Type *o_type);
+// panic on failure
+Type Fungus_base_symbol(Fungus *, Word keyword);
+Type Fungus_base_keyword(Fungus *, Word keyword);
 
 void Fungus_dump(Fungus *);
 

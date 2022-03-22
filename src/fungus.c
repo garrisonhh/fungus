@@ -76,6 +76,26 @@ invalid_keyword:
     return false;
 }
 
+Type Fungus_base_symbol(Fungus *fun, Word symbol) {
+    Type ty;
+
+    if (Fungus_define_symbol(fun, symbol, &ty))
+        return ty;
+
+    fungus_panic("failed to define base symbol: `%.*s`",
+                 (int)symbol.len, symbol.str);
+}
+
+Type Fungus_base_keyword(Fungus *fun, Word keyword) {
+    Type ty;
+
+    if (Fungus_define_keyword(fun, keyword, &ty))
+        return ty;
+
+    fungus_panic("failed to define base keyword: %.*s",
+                 (int)keyword.len, keyword.str);
+}
+
 Fungus Fungus_new(void) {
     Fungus fun = {
         .lexer = Lexer_new(),

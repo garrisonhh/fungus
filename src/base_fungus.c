@@ -72,31 +72,18 @@ void Fungus_define_base(Fungus *fun) {
     /*
      * lexemes (Fungus_define_x funcs rely on t_lexeme)
      */
-    Type lex_true;
-    Type lex_false;
-    Type lex_lparen;
-    Type lex_rparen;
-    Type lex_star;
-    Type lex_rslash;
-    Type lex_percent;
-    Type lex_plus;
-    Type lex_minus;
-    Type lex_colon;
-    Type lex_question;
-    Type lex_dstar;
-
-    Fungus_define_keyword(fun, WORD("true"), &lex_true);
-    Fungus_define_keyword(fun, WORD("false"), &lex_false);
-    Fungus_define_symbol(fun, WORD("("), &lex_lparen);
-    Fungus_define_symbol(fun, WORD(")"), &lex_rparen);
-    Fungus_define_symbol(fun, WORD("*"), &lex_star);
-    Fungus_define_symbol(fun, WORD("/"), &lex_rslash);
-    Fungus_define_symbol(fun, WORD("%"), &lex_percent);
-    Fungus_define_symbol(fun, WORD("+"), &lex_plus);
-    Fungus_define_symbol(fun, WORD("-"), &lex_minus);
-    Fungus_define_symbol(fun, WORD(":"), &lex_colon);
-    Fungus_define_symbol(fun, WORD("?"), &lex_question);
-    Fungus_define_symbol(fun, WORD("**"), &lex_dstar);
+    Type lex_true     = Fungus_base_keyword(fun, WORD("true"));
+    Type lex_false    = Fungus_base_keyword(fun, WORD("false"));
+    Type lex_lparen   = Fungus_base_symbol(fun,  WORD("("));
+    Type lex_rparen   = Fungus_base_symbol(fun,  WORD(")"));
+    Type lex_star     = Fungus_base_symbol(fun,  WORD("*"));
+    Type lex_rslash   = Fungus_base_symbol(fun,  WORD("/"));
+    Type lex_percent  = Fungus_base_symbol(fun,  WORD("%"));
+    Type lex_plus     = Fungus_base_symbol(fun,  WORD("+"));
+    Type lex_minus    = Fungus_base_symbol(fun,  WORD("-"));
+    Type lex_colon    = Fungus_base_symbol(fun,  WORD(":"));
+    Type lex_question = Fungus_base_symbol(fun,  WORD("?"));
+    Type lex_dstar    = Fungus_base_symbol(fun,  WORD("**"));
 
     /*
      * precedences
