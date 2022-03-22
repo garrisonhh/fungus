@@ -215,9 +215,18 @@ static void IdMap_resize(IdMap *map, size_t new_cap) {
     map->nodes = calloc(new_cap, sizeof(*map->nodes));
     map->cap = new_cap;
 
-    for (size_t i = 0; i < old_cap; ++i)
-        for (IdMapNode *trav = old_nodes[i]; trav; trav = trav->next)
+    for (size_t i = 0; i < old_cap; ++i) {
+        IdMapNode *trav = old_nodes[i];
+
+        while (trav) {
+            IdMapNode *next = trav->next;
+
             IdMap_put_lower(map, trav);
+            trav = next;
+        }
+    }
+
+    free(old_nodes);
 }
 
 void IdMap_put(IdMap *map, const Word *name, unsigned id) {
@@ -264,6 +273,23 @@ void IdMap_remove(IdMap *map, const Word *name) {
     // TODO if this function remains unused that would be REALLY nice for
     // a replacement implementation
     fungus_panic("IDMap_remove not impl'd");
+}
+
+void IdMap_dump(IdMap *map) {
+    puts("IdMap:");
+
+    for (size_t i = 0; i < map->cap; ++i) {
+        if (map->nodes[i]) {
+            printf("%4zu | ", i);
+
+            for (IdMapNode *trav = map->nodes[i]; trav; trav = trav->next) {
+                printf("'%.*s'", (int)trav->name->len, trav->name->str);
+                if (trav->next) printf(" -> ");
+            }
+
+            puts("");
+        }
+    }
 }
 
 // put-only id set =============================================================

@@ -92,6 +92,8 @@ unsigned IdMap_get(IdMap *, const Word *name);
 
 void IdMap_remove(IdMap *, const Word *name);
 
+void IdMap_dump(IdMap *);
+
 // put-only id set =============================================================
 
 typedef struct IdSet {

@@ -154,8 +154,6 @@ static Expr *try_rot_right(Fungus *fun, Expr *expr) {
      */
     if ((*swap)->ty.id != (*left)->ty.id)
         return expr;
-    else
-        fungus_panic("uh oh, found an infix type checking edge case!");
 
     // rotate right!
     Expr *mid = *swap;

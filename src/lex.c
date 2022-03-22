@@ -240,8 +240,10 @@ static bool match_symbol(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
 
             Type type;
 
-            if (!Type_by_name(&fun->types, sym, &type))
-                fungus_panic("matched invalid symbol type");
+            if (!Type_by_name(&fun->types, sym, &type)) {
+                fungus_panic("matched invalid symbol type: %.*s",
+                             (int)sym->len, sym->str);
+            }
 
             RawExprBuf_next(rebuf, type);
 

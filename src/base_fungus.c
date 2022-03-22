@@ -70,12 +70,18 @@ void Fungus_define_base(Fungus *fun) {
     });
 
     /*
-     * lexemes (Fungus_define_x funcs rely on t_lexeme)
+     * lexemes (rely on t_lexeme)
      */
     Type lex_true     = Fungus_base_keyword(fun, WORD("true"));
     Type lex_false    = Fungus_base_keyword(fun, WORD("false"));
+    Type lex_if       = Fungus_base_keyword(fun, WORD("if"));
+    Type lex_elif     = Fungus_base_keyword(fun, WORD("elif"));
+    Type lex_else     = Fungus_base_keyword(fun, WORD("else"));
+
     Type lex_lparen   = Fungus_base_symbol(fun,  WORD("("));
     Type lex_rparen   = Fungus_base_symbol(fun,  WORD(")"));
+    Type lex_lcurly   = Fungus_base_symbol(fun,  WORD("{"));
+    Type lex_rcurly   = Fungus_base_symbol(fun,  WORD("}"));
     Type lex_star     = Fungus_base_symbol(fun,  WORD("*"));
     Type lex_rslash   = Fungus_base_symbol(fun,  WORD("/"));
     Type lex_percent  = Fungus_base_symbol(fun,  WORD("%"));
