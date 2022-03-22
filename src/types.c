@@ -360,10 +360,31 @@ void TypeGraph_dump(TypeGraph *tg) {
     puts("TypeGraph:");
     term_format(TERM_RESET);
 
+    puts("abstract:");
+
     for (size_t i = 0; i < tg->entries.len; ++i) {
-        Type_print_verbose(tg, (Type){ i });
+        Type ty = { i };
+
+        if (Type_get(tg, ty)->type != TY_ABSTRACT)
+            continue;
+
+        printf("  ");
+        Type_print_verbose(tg, ty);
         puts("");
     }
 
-    puts("");
+    puts("concrete and aliased:");
+    printf("  ");
+
+    for (size_t i = 0; i < tg->entries.len; ++i) {
+        Type ty = { i };
+
+        if (Type_get(tg, ty)->type == TY_ABSTRACT)
+            continue;
+
+        Type_print_verbose(tg, ty);
+        printf(" ");
+    }
+
+    puts("\n");
 }

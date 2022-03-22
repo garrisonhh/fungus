@@ -2,6 +2,8 @@
 
 #include "parse.h"
 
+static int try_match_calls;
+
 static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
     // initialize generics with placeholders
     Type *generics = malloc(pat->where_len * sizeof(*generics));
@@ -57,6 +59,8 @@ static Type find_return_type(Fungus *fun, Pattern *pat, Expr **slice,
  */
 static RuleEntry *try_match_rule(Fungus *fun, RuleNode *node, Expr **slice,
                                  size_t len, size_t depth, size_t *o_len) {
+    ++try_match_calls;
+
     if (depth == len) {
         // full slice match up to this node
         if (!node->terminates)
@@ -116,10 +120,6 @@ static bool is_left_atomic(Fungus *fun, Expr *expr) {
 }
 
 static Expr *try_rot_right(Fungus *fun, Expr *expr) {
-    puts("trying to rotate right:");
-    Expr_dump(fun, expr);
-    puts("");
-
     RuleTree *rules = &fun->rules;
     PrecGraph *precedences = &fun->precedences;
 
@@ -129,13 +129,9 @@ static Expr *try_rot_right(Fungus *fun, Expr *expr) {
 
     Expr **left = Expr_lhs(expr);
 
-    puts("root can swap...");
-
     // check if left could swap
     if (is_right_atomic(fun, *left))
         return expr;
-
-    puts("pivot can swap...");
 
     // check if precedence says that swap should happen
     RuleEntry *entry = Rule_get(rules, expr->rule);
@@ -145,14 +141,10 @@ static Expr *try_rot_right(Fungus *fun, Expr *expr) {
     if (!(cmp == LT || (cmp == EQ && entry->assoc == ASSOC_RIGHT)))
         return expr;
 
-    puts("precedence wants to swap...");
-
     // find expr that could swap between lhs and rhs
     Expr **swap = left;
 
-    do {
-        swap = Expr_rhs(*swap);
-    } while (!is_right_atomic(fun, *swap));
+    do { swap = Expr_rhs(*swap); } while (!is_right_atomic(fun, *swap));
 
     // check types to see if swap is possible
     /*
@@ -162,18 +154,14 @@ static Expr *try_rot_right(Fungus *fun, Expr *expr) {
      */
     if ((*swap)->ty.id != (*left)->ty.id)
         return expr;
-
-    puts("type checking would allow swap...");
+    else
+        fungus_panic("uh oh, found an infix type checking edge case!");
 
     // rotate right!
     Expr *mid = *swap;
     *swap = expr;
     expr = *left;
     *left = mid;
-
-    puts("after rotate:");
-    Expr_dump(fun, expr);
-    puts("");
 
     return expr;
 }
@@ -218,23 +206,16 @@ static Expr *try_match(Fungus *fun, Expr **slice, size_t len, size_t *o_len) {
     RuleEntry *matched =
         try_match_rule(fun, fun->rules.root, slice, len, 0, o_len);
 
-    if (matched) {
-#if 1
-        const Word *name = Type_name(&fun->types, matched->ty);
-
-        printf("matched rule %.*s on:\n", (int)name->len, name->str);
-        Expr_dump_array(fun, slice, *o_len);
-        puts("");
-#endif
-
+    if (matched)
         return collapse(fun, matched, slice, *o_len);
-    }
 
     return NULL;
 }
 
 // greatly modifies `exprs` array memory
 static Expr *parse_slice(Fungus *fun, Expr **exprs, size_t len) {
+    try_match_calls = 0;
+
     bool found_match = true;
 
     while (found_match) {
@@ -281,6 +262,8 @@ static Expr *parse_slice(Fungus *fun, Expr **exprs, size_t len) {
 
         return NULL;
     }
+
+    printf("try match calls from parsing: %d\n", try_match_calls);
 
     return exprs[0];
 }

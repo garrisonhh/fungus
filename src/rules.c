@@ -83,18 +83,8 @@ static void RuleNode_place(Fungus *fun, Rule rule, Pattern *pat, size_t idx,
             RuleNode *other = node->nexts.data[i];
 
             if (TypeExpr_deepequals(where, other->te)) {
-                TypeExpr_print(&fun->types, where);
-                printf(" == ");
-                TypeExpr_print(&fun->types, other->te);
-                puts("");
-
                 next = other;
                 break;
-            } else {
-                TypeExpr_print(&fun->types, where);
-                printf(" != ");
-                TypeExpr_print(&fun->types, other->te);
-                puts("");
             }
         }
 

@@ -83,6 +83,7 @@ void Fungus_define_base(Fungus *fun) {
     Type lex_minus;
     Type lex_colon;
     Type lex_question;
+    Type lex_dstar;
 
     Fungus_define_keyword(fun, WORD("true"), &lex_true);
     Fungus_define_keyword(fun, WORD("false"), &lex_false);
@@ -95,6 +96,7 @@ void Fungus_define_base(Fungus *fun) {
     Fungus_define_symbol(fun, WORD("-"), &lex_minus);
     Fungus_define_symbol(fun, WORD(":"), &lex_colon);
     Fungus_define_symbol(fun, WORD("?"), &lex_question);
+    Fungus_define_symbol(fun, WORD("**"), &lex_dstar);
 
     /*
      * precedences
@@ -114,6 +116,11 @@ void Fungus_define_base(Fungus *fun) {
     Prec muldiv = Prec_define(&fun->precedences, &(PrecDef){
         .name = WORD("MulDivPrecedence"),
         .above = (Prec []){ addsub }, .above_len = 1,
+        .below = (Prec []){ fun->p_highest }, .below_len = 1
+    });
+    Prec exp = Prec_define(&fun->precedences, &(PrecDef){
+        .name = WORD("ExpPrecedence"),
+        .above = (Prec []){ muldiv }, .above_len = 1,
         .below = (Prec []){ fun->p_highest }, .below_len = 1
     });
 
@@ -190,12 +197,14 @@ void Fungus_define_base(Fungus *fun) {
         Word name;
         Type sym;
         Prec prec;
+        Associativity assoc;
     } bin_math_ops[] = {
         { WORD("Add"),      lex_plus,    addsub },
         { WORD("Subtract"), lex_minus,   addsub },
         { WORD("Multiply"), lex_star,    muldiv },
         { WORD("Divide"),   lex_rslash,  muldiv },
         { WORD("Modulo"),   lex_percent, muldiv },
+        { WORD("Power"),    lex_dstar,   exp,   ASSOC_RIGHT },
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(bin_math_ops); ++i) {
@@ -212,6 +221,7 @@ void Fungus_define_base(Fungus *fun) {
                 .where_len = 2
             },
             .prec = bin_math_ops[i].prec,
+            .assoc = bin_math_ops[i].assoc,
         });
     }
 
