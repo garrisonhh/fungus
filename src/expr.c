@@ -28,6 +28,8 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
             // literals
             if (expr->ty.id == fun->t_string.id)
                 printf(">>%.*s<<", (int)expr->string_.len, expr->string_.str);
+            else if (expr->ty.id == fun->t_ident.id)
+                printf("%.*s", (int)expr->ident.len, expr->ident.str);
             else if (expr->ty.id == fun->t_int.id)
                 printf("%Ld", expr->int_);
             else if (expr->ty.id == fun->t_float.id)

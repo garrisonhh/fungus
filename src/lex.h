@@ -8,6 +8,8 @@
 /*
  * TODO the lexer should just return a token stream, where tokens are just a
  * comptype and an index into the file string. all other work can be done later.
+ *
+ * TODO the lexer REALLY needs a rework, this is a hacky piece of crap tbh
  */
 
 typedef struct Fungus Fungus; // forward decl to fix header hell

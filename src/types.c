@@ -125,9 +125,6 @@ Type Type_define(TypeGraph *tg, TypeDef *def) {
 }
 
 bool Type_by_name(TypeGraph *tg, Word *name, Type *o_type) {
-    printf("retrieving type: %.*s\n", (int)name->len, name->str);
-    IdMap_dump(&tg->by_name);
-
     return IdMap_get_checked(&tg->by_name, name, &o_type->id);
 }
 

@@ -119,8 +119,8 @@ static void skip_whitespace(LZip *z) {
         ++z->idx;
 }
 
-static Word parse_string(View *lit) {
-    char *str = malloc((lit->len - 2) * sizeof(*str)); // TODO this is leaked
+static Word parse_string(Fungus *fun, View *lit) {
+    char *str = Fungus_tmp_alloc(fun, (lit->len - 2) * sizeof(*str));
     size_t len = 0;
 
     for (size_t i = 1; i < lit->len - 1; ++i) {
@@ -164,7 +164,7 @@ static bool match_string(Fungus *fun, RawExprBuf *rebuf, LZip *z) {
         // emit token
         Expr *expr = RawExprBuf_next(rebuf, fun->t_string);
 
-        expr->string_ = parse_string(&v);
+        expr->string_ = parse_string(fun, &v);
 
         return true;
     }
@@ -254,18 +254,46 @@ static bool match_symbol(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
     return false;
 }
 
-static bool match_keyword(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
+static bool match_word(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
     Lexer *lex = &fun->lexer;
-    size_t remaining = zip->len - zip->idx;
 
+    // get next word
+    size_t remaining = zip->len - zip->idx;
+    size_t len = 0;
+
+    if (isdigit(zip->str[zip->idx + len]))
+        return false;
+
+    for (; len < remaining && is_wordable(zip->str[zip->idx + len]); ++len)
+        ;
+
+    if (!len) // no word found
+        return false;
+
+    Word word = Word_new(&zip->str[zip->idx], len);
+
+    zip->idx += len;
+
+    // true/false
+    if (Word_eq_view(&word, &(View){ "true", 4 })) {
+        Expr *expr = RawExprBuf_next(rebuf, fun->t_bool);
+
+        expr->bool_ = true;
+
+        return true;
+    } else if (Word_eq_view(&word, &(View){ "false", 5 })) {
+        Expr *expr = RawExprBuf_next(rebuf, fun->t_bool);
+
+        expr->bool_ = false;
+
+        return true;
+    }
+
+    // match keywords
     for (size_t i = 0; i < lex->keywords.len; ++i) {
         Word *kw = lex->keywords.data[i];
 
-        if (remaining >= kw->len
-            && !strncmp(zip->str + zip->idx, kw->str, kw->len)
-            && !is_wordable(zip->str[zip->idx + kw->len])) {
-            zip->idx += kw->len;
-
+        if (Word_eq(kw, &word)) {
             Type type;
 
             if (!Type_by_name(&fun->types, kw, &type))
@@ -277,7 +305,16 @@ static bool match_keyword(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
         }
     }
 
-    return false;
+    // must be an ident
+    Expr *expr = RawExprBuf_next(rebuf, fun->t_ident);
+
+    expr->ident = word;
+    expr->ident.str =
+        Fungus_tmp_alloc(fun, (word.len + 1) * sizeof(*expr->ident.str));
+
+    strncpy((char *)expr->ident.str, word.str, expr->ident.len);
+
+    return true;
 }
 
 static bool err_no_match(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
@@ -298,7 +335,7 @@ RawExprBuf tokenize(Fungus *fun, const char *str, size_t len) {
 
     bool (*match_funcs[])(Fungus *, RawExprBuf *, LZip *) = {
         match_symbol,
-        match_keyword,
+        match_word,
         match_string,
         match_int,
         match_float,

@@ -144,7 +144,9 @@ static Expr *try_rot_right(Fungus *fun, Expr *expr) {
     // find expr that could swap between lhs and rhs
     Expr **swap = left;
 
-    do { swap = Expr_rhs(*swap); } while (!is_right_atomic(fun, *swap));
+    do
+        swap = Expr_rhs(*swap);
+    while (!is_right_atomic(fun, *swap));
 
     // check types to see if swap is possible
     /*
@@ -268,8 +270,6 @@ static Expr *parse_slice(Fungus *fun, Expr **exprs, size_t len) {
 
 // exprs are raw TODO intake tokens instead
 Expr *parse(Fungus *fun, Expr *exprs, size_t len) {
-    Fungus_tmp_clear(fun);
-
     if (len == 0)
         return NULL;
 

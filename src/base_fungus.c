@@ -30,6 +30,12 @@ void Fungus_define_base(Fungus *fun) {
         .is_len = 1
     });
 
+    fun->t_ident = Type_define(&fun->types, &(TypeDef){
+        .name = WORD("Ident"),
+        .is = &fun->t_runtype,
+        .is_len = 1
+    });
+
     fun->t_string = Type_define(&fun->types, &(TypeDef){
         .name = WORD("string"),
         .is = &fun->t_primitive,
@@ -72,24 +78,28 @@ void Fungus_define_base(Fungus *fun) {
     /*
      * lexemes (rely on t_lexeme)
      */
-    Type lex_true     = Fungus_base_keyword(fun, WORD("true"));
-    Type lex_false    = Fungus_base_keyword(fun, WORD("false"));
-    Type lex_if       = Fungus_base_keyword(fun, WORD("if"));
-    Type lex_elif     = Fungus_base_keyword(fun, WORD("elif"));
-    Type lex_else     = Fungus_base_keyword(fun, WORD("else"));
+#define DECL_KW(NAME, KW) Type lex_##NAME = Fungus_base_keyword(fun, WORD(KW))
+#define DECL_SYM(NAME, SYM) Type lex_##NAME = Fungus_base_symbol(fun, WORD(SYM))
+    DECL_KW(let,  "let");
+    DECL_KW(type, "type");
 
-    Type lex_lparen   = Fungus_base_symbol(fun,  WORD("("));
-    Type lex_rparen   = Fungus_base_symbol(fun,  WORD(")"));
-    Type lex_lcurly   = Fungus_base_symbol(fun,  WORD("{"));
-    Type lex_rcurly   = Fungus_base_symbol(fun,  WORD("}"));
-    Type lex_star     = Fungus_base_symbol(fun,  WORD("*"));
-    Type lex_rslash   = Fungus_base_symbol(fun,  WORD("/"));
-    Type lex_percent  = Fungus_base_symbol(fun,  WORD("%"));
-    Type lex_plus     = Fungus_base_symbol(fun,  WORD("+"));
-    Type lex_minus    = Fungus_base_symbol(fun,  WORD("-"));
-    Type lex_colon    = Fungus_base_symbol(fun,  WORD(":"));
-    Type lex_question = Fungus_base_symbol(fun,  WORD("?"));
-    Type lex_dstar    = Fungus_base_symbol(fun,  WORD("**"));
+    DECL_SYM(lparen,   "(");
+    DECL_SYM(rparen,   ")");
+    DECL_SYM(lcurly,   "{");
+    DECL_SYM(rcurly,   "}");
+    DECL_SYM(equals,   "=");
+    DECL_SYM(star,     "*");
+    DECL_SYM(rslash,   "/");
+    DECL_SYM(percent,  "%");
+    DECL_SYM(plus,     "+");
+    DECL_SYM(minus,    "-");
+    DECL_SYM(colon,    ":");
+    DECL_SYM(question, "?");
+    DECL_SYM(dstar,    "**");
+    DECL_SYM(bar,      "|");
+
+#undef DECL_SYM
+#undef DECL_KW
 
     /*
      * precedences
@@ -121,35 +131,6 @@ void Fungus_define_base(Fungus *fun) {
      * rules
      */
     Bump _tmp = Bump_new(), *tmp = &_tmp;
-
-    Rule_define(fun, &(RuleDef){
-        .name = WORD("TrueLiteral"),
-        .pat = {
-            .pat = (size_t []){ 0 },
-            .len = 1,
-            .returns = 1,
-            .where = (TypeExpr *[]){
-                TypeExpr_atom(tmp, lex_true),
-                TypeExpr_atom(tmp, fun->t_bool)
-            },
-            .where_len = 2
-        },
-        .prec = fun->p_highest,
-    });
-    Rule_define(fun, &(RuleDef){
-        .name = WORD("FalseLiteral"),
-        .pat = {
-            .pat = (size_t []){ 0 },
-            .len = 1,
-            .returns = 1,
-            .where = (TypeExpr *[]){
-                TypeExpr_atom(tmp, lex_false),
-                TypeExpr_atom(tmp, fun->t_bool)
-            },
-            .where_len = 2
-        },
-        .prec = fun->p_highest,
-    });
 
     Rule_define(fun, &(RuleDef){
         .name = WORD("Parens"),
@@ -217,6 +198,18 @@ void Fungus_define_base(Fungus *fun) {
             .assoc = bin_math_ops[i].assoc,
         });
     }
+
+    // algebraic types
+    /*
+    struct {
+        Word name;
+        Type sym;
+        Prec prec;
+    } algebraic[] = {
+        { WORD("TypeSum"),     }
+        { WORD("TypeProduct"), }
+    };
+    */
 
     Bump_del(tmp);
 }

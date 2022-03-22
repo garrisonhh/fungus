@@ -8,6 +8,8 @@
 #include "cgen.h"
 
 static bool eval(Fungus *fun, const char *text, size_t len) {
+    Fungus_tmp_clear(fun);
+
     // tokenize
     RawExprBuf rebuf = tokenize(fun, text, len);
 

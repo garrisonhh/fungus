@@ -12,6 +12,8 @@ typedef struct Expr {
     bool atomic; // rule types are non-atomic
 
     union {
+        Word ident;
+
         // literals
         Word string_;
         fun_int int_;
