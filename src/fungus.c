@@ -115,10 +115,10 @@ void Fungus_tmp_clear(Fungus *fun) {
 Expr *Fungus_tmp_expr(Fungus *fun, size_t children) {
     Expr *expr = Fungus_tmp_alloc(fun, sizeof(*expr));
 
-    if (children) {
-        expr->len = children;
+    expr->len = children;
+
+    if (expr->len)
         expr->exprs = Fungus_tmp_alloc(fun, expr->len * sizeof(*expr->exprs));
-    }
 
     return expr;
 }

@@ -81,6 +81,8 @@ void Fungus_define_base(Fungus *fun) {
     Type lex_percent;
     Type lex_plus;
     Type lex_minus;
+    Type lex_colon;
+    Type lex_question;
 
     Fungus_define_keyword(fun, WORD("true"), &lex_true);
     Fungus_define_keyword(fun, WORD("false"), &lex_false);
@@ -91,6 +93,8 @@ void Fungus_define_base(Fungus *fun) {
     Fungus_define_symbol(fun, WORD("%"), &lex_percent);
     Fungus_define_symbol(fun, WORD("+"), &lex_plus);
     Fungus_define_symbol(fun, WORD("-"), &lex_minus);
+    Fungus_define_symbol(fun, WORD(":"), &lex_colon);
+    Fungus_define_symbol(fun, WORD("?"), &lex_question);
 
     /*
      * precedences
@@ -119,16 +123,27 @@ void Fungus_define_base(Fungus *fun) {
     Bump _tmp = Bump_new(), *tmp = &_tmp;
 
     Rule_define(fun, &(RuleDef){
-        .name = WORD("BoolLiteral"),
+        .name = WORD("TrueLiteral"),
         .pat = {
             .pat = (size_t []){ 0 },
             .len = 1,
             .returns = 1,
             .where = (TypeExpr *[]){
-                TypeExpr_sum(tmp, 2,
-                    TypeExpr_atom(tmp, lex_true),
-                    TypeExpr_atom(tmp, lex_false)
-                ),
+                TypeExpr_atom(tmp, lex_true),
+                TypeExpr_atom(tmp, fun->t_bool)
+            },
+            .where_len = 2
+        },
+        .prec = fun->p_highest,
+    });
+    Rule_define(fun, &(RuleDef){
+        .name = WORD("FalseLiteral"),
+        .pat = {
+            .pat = (size_t []){ 0 },
+            .len = 1,
+            .returns = 1,
+            .where = (TypeExpr *[]){
+                TypeExpr_atom(tmp, lex_false),
                 TypeExpr_atom(tmp, fun->t_bool)
             },
             .where_len = 2
@@ -150,6 +165,24 @@ void Fungus_define_base(Fungus *fun) {
             .where_len = 3
         },
         .prec = fun->p_highest,
+    });
+
+    Rule_define(fun, &(RuleDef){
+        .name = WORD("Ternary"),
+        .pat = {
+            .pat = (size_t []){ 0, 2, 1, 3, 1 },
+            .len = 5,
+            .returns = 1,
+            .where = (TypeExpr *[]){
+                TypeExpr_atom(tmp, fun->t_bool),
+                TypeExpr_atom(tmp, fun->t_runtype),
+                TypeExpr_atom(tmp, lex_question),
+                TypeExpr_atom(tmp, lex_colon)
+            },
+            .where_len = 4
+        },
+        .prec = fun->p_highest,
+        .assoc = ASSOC_RIGHT
     });
 
     // math

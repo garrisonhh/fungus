@@ -105,12 +105,14 @@ static RuleEntry *try_match_rule(Fungus *fun, RuleNode *node, Expr **slice,
 
 // whether this expr is atomic to the right
 static bool is_right_atomic(Fungus *fun, Expr *expr) {
-    return expr->atomic || Rule_get(&fun->rules, expr->rule)->postfixed;
+    return expr->atomic || expr->len <= 1
+        || Rule_get(&fun->rules, expr->rule)->prefixed;
 }
 
 // whether this expr is atomic to the left
 static bool is_left_atomic(Fungus *fun, Expr *expr) {
-    return expr->atomic || Rule_get(&fun->rules, expr->rule)->prefixed;
+    return expr->atomic || expr->len <= 1
+        || Rule_get(&fun->rules, expr->rule)->postfixed;
 }
 
 static Expr *try_rot_right(Fungus *fun, Expr *expr) {
@@ -121,19 +123,19 @@ static Expr *try_rot_right(Fungus *fun, Expr *expr) {
     RuleTree *rules = &fun->rules;
     PrecGraph *precedences = &fun->precedences;
 
-    // check if lhs could swap
+    // check if expr could swap
     if (is_left_atomic(fun, expr))
         return expr;
 
     Expr **left = Expr_lhs(expr);
 
-    puts("lhs can swap...");
+    puts("root can swap...");
 
-    // check if rhs could swap
+    // check if left could swap
     if (is_right_atomic(fun, *left))
         return expr;
 
-    puts("rhs can swap...");
+    puts("pivot can swap...");
 
     // check if precedence says that swap should happen
     RuleEntry *entry = Rule_get(rules, expr->rule);
@@ -216,8 +218,17 @@ static Expr *try_match(Fungus *fun, Expr **slice, size_t len, size_t *o_len) {
     RuleEntry *matched =
         try_match_rule(fun, fun->rules.root, slice, len, 0, o_len);
 
-    if (matched)
+    if (matched) {
+#if 1
+        const Word *name = Type_name(&fun->types, matched->ty);
+
+        printf("matched rule %.*s on:\n", (int)name->len, name->str);
+        Expr_dump_array(fun, slice, *o_len);
+        puts("");
+#endif
+
         return collapse(fun, matched, slice, *o_len);
+    }
 
     return NULL;
 }
