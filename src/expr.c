@@ -50,6 +50,18 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
     }
 }
 
+Expr **Expr_lhs(Expr *expr) {
+    assert(!expr->atomic && expr->len > 0);
+
+    return &expr->exprs[0];
+}
+
+Expr **Expr_rhs(Expr *expr) {
+    assert(!expr->atomic && expr->len > 0);
+
+    return &expr->exprs[expr->len - 1];
+}
+
 void Expr_dump(Fungus *fun, Expr *expr) {
     Expr_dump_r(fun, expr, 0);
 }

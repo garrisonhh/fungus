@@ -2,7 +2,6 @@
 
 #include "parse.h"
 
-// TODO this but with type exprs
 static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
     // initialize generics with placeholders
     Type *generics = malloc(pat->where_len * sizeof(*generics));
@@ -34,7 +33,7 @@ static bool pattern_check(Fungus *fun, Pattern *pat, Expr **slice, size_t len) {
 static Type find_return_type(Fungus *fun, Pattern *pat, Expr **slice,
                              size_t len) {
     // check if this return type is inferrable via a parameter
-    // TODO this could be stored in RuleEntry
+    // TODO this could be precomputed in Rule_define and stored in RuleEntry
     for (size_t i = 0; i < pat->len; ++i)
         if (pat->pat[i] == pat->returns)
             return slice[i]->ty;
@@ -104,6 +103,88 @@ static RuleEntry *try_match_rule(Fungus *fun, RuleNode *node, Expr **slice,
     return best_match;
 }
 
+// whether this expr is atomic to the right
+static bool is_right_atomic(Fungus *fun, Expr *expr) {
+    return expr->atomic || Rule_get(&fun->rules, expr->rule)->postfixed;
+}
+
+// whether this expr is atomic to the left
+static bool is_left_atomic(Fungus *fun, Expr *expr) {
+    return expr->atomic || Rule_get(&fun->rules, expr->rule)->prefixed;
+}
+
+static Expr *try_rot_right(Fungus *fun, Expr *expr) {
+    puts("trying to rotate right:");
+    Expr_dump(fun, expr);
+    puts("");
+
+    RuleTree *rules = &fun->rules;
+    PrecGraph *precedences = &fun->precedences;
+
+    // check if lhs could swap
+    if (is_left_atomic(fun, expr))
+        return expr;
+
+    Expr **left = Expr_lhs(expr);
+
+    puts("lhs can swap...");
+
+    // check if rhs could swap
+    if (is_right_atomic(fun, *left))
+        return expr;
+
+    puts("rhs can swap...");
+
+    // check if precedence says that swap should happen
+    RuleEntry *entry = Rule_get(rules, expr->rule);
+    RuleEntry *left_entry = Rule_get(rules, (*left)->rule);
+    Comparison cmp = Prec_cmp(precedences, left_entry->prec, entry->prec);
+
+    if (!(cmp == LT || (cmp == EQ && entry->assoc == ASSOC_RIGHT)))
+        return expr;
+
+    puts("precedence wants to swap...");
+
+    // find expr that could swap between lhs and rhs
+    Expr **swap = left;
+
+    do {
+        swap = Expr_rhs(*swap);
+    } while (!is_right_atomic(fun, *swap));
+
+    // check types to see if swap is possible
+    /*
+     * TODO this is a bandaid until I figure out a cleaner impl:
+     * type pattern re-checking will have to be propagated down the parent to
+     * child chain and the output expr will need its type to be recalculated
+     */
+    if ((*swap)->ty.id != (*left)->ty.id)
+        return expr;
+
+    puts("type checking would allow swap...");
+
+    // rotate right!
+    Expr *mid = *swap;
+    *swap = expr;
+    expr = *left;
+    *left = mid;
+
+    puts("after rotate:");
+    Expr_dump(fun, expr);
+    puts("");
+
+    return expr;
+}
+
+static Expr *correct_precedence(Fungus *fun, Expr *expr) {
+    assert(!expr->atomic);
+
+    expr = try_rot_right(fun, expr);
+    // TODO expr = try_rot_left(fun, expr);
+
+    return expr;
+}
+
 static Expr *collapse(Fungus *fun, RuleEntry *entry, Expr **exprs, size_t len) {
     // count children
     size_t num_children = 0;
@@ -114,7 +195,6 @@ static Expr *collapse(Fungus *fun, RuleEntry *entry, Expr **exprs, size_t len) {
 
     // create expr
     Expr *expr = Fungus_tmp_expr(fun, num_children);
-
     size_t child = 0;
 
     for (size_t i = 0; i < len; ++i)
@@ -124,6 +204,8 @@ static Expr *collapse(Fungus *fun, RuleEntry *entry, Expr **exprs, size_t len) {
     expr->atomic = false;
     expr->rule = entry->rule;
     expr->ty = find_return_type(fun, &entry->pat, exprs, len);
+
+    expr = correct_precedence(fun, expr);
 
     return expr;
 }
@@ -159,8 +241,8 @@ static Expr *parse_slice(Fungus *fun, Expr **exprs, size_t len) {
                 // stitch sub-slice
                 size_t stitch_len = match_len - 1;
 
-                for (size_t j = 0; j < i; ++j)
-                    exprs[i + (stitch_len - 1) - j] = exprs[i - j];
+                for (size_t j = 1; j <= i; ++j)
+                    exprs[i + stitch_len - j] = exprs[i - j];
 
                 exprs[i + stitch_len] = collapsed;
 

@@ -27,6 +27,9 @@ typedef struct Expr {
     };
 } Expr;
 
+Expr **Expr_lhs(Expr *);
+Expr **Expr_rhs(Expr *);
+
 void Expr_dump(Fungus *, Expr *);
 void Expr_dump_array(Fungus *, Expr **exprs, size_t len);
 
