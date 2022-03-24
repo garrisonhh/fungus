@@ -97,7 +97,6 @@ void Fungus_define_base(Fungus *fun) {
     DECL_SYM(question, "?");
     DECL_SYM(dstar,    "**");
     DECL_SYM(bar,      "|");
-
 #undef DECL_SYM
 #undef DECL_KW
 

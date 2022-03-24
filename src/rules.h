@@ -38,6 +38,7 @@ typedef struct Pattern {
     size_t where_len;
 } Pattern;
 
+// TODO should Associativity not be a part of Precedence?
 typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
 
 /*

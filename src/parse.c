@@ -175,25 +175,31 @@ static Expr *correct_precedence(Fungus *fun, Expr *expr) {
     return expr;
 }
 
-static Expr *collapse(Fungus *fun, RuleEntry *entry, Expr **exprs, size_t len) {
+static Expr *collapse(Fungus *fun, RuleEntry *entry, Expr **children,
+                      size_t len) {
     // count children
     size_t num_children = 0;
 
     for (size_t i = 0; i < len; ++i)
-        if (Type_is(&fun->types, exprs[i]->ty, fun->t_runtype))
+        if (Type_is(&fun->types, children[i]->ty, fun->t_runtype))
             ++num_children;
 
     // create expr
-    Expr *expr = Fungus_tmp_expr(fun, num_children);
+    Expr *expr = Fungus_tmp_expr(fun, NULL, num_children);
     size_t child = 0;
 
-    for (size_t i = 0; i < len; ++i)
-        if (Type_is(&fun->types, exprs[i]->ty, fun->t_runtype))
-            expr->exprs[child++] = exprs[i];
+    for (size_t i = 0; i < len; ++i) {
+        if (Type_is(&fun->types, children[i]->ty, fun->t_runtype)) {
+            Expr **place = &expr->exprs[child++];
+
+            *place = children[i];
+            (*place)->parent = expr;
+        }
+    }
 
     expr->atomic = false;
     expr->rule = entry->rule;
-    expr->ty = find_return_type(fun, &entry->pat, exprs, len);
+    expr->ty = find_return_type(fun, &entry->pat, children, len);
 
     expr = correct_precedence(fun, expr);
 
@@ -268,6 +274,49 @@ static Expr *parse_slice(Fungus *fun, Expr **exprs, size_t len) {
     return exprs[0];
 }
 
+#ifdef DEBUG
+static bool verify_parenthood(Fungus *fun, Expr *expr) {
+    if (expr->atomic)
+        return true;
+
+    bool invalid = false;
+
+    for (size_t i = 0; i < expr->len; ++i) {
+        Expr *child = expr->exprs[i];
+
+        if (child->parent != expr) {
+            fungus_error("found mismatched parenthood:");
+
+            puts("parent:");
+            Expr_dump_depth(fun, expr, 1);
+            puts("child:");
+            Expr_dump_depth(fun, expr, 0);
+
+            invalid = true;
+        }
+    }
+
+    return !invalid;
+}
+
+static bool verify_precedence(Fungus *fun, Expr *expr) {
+    // TODO
+    return true;
+}
+
+static void run_ast_diagnostics(Fungus *fun, Expr *ast) {
+    bool valid = true;
+
+    valid &= verify_parenthood(fun, ast);
+    valid &= verify_precedence(fun, ast);
+
+    if (!valid)
+        fungus_panic("ast diagnostics failed.");
+    else
+        puts("ast diagnostics found no issues.");
+}
+#endif
+
 // exprs are raw TODO intake tokens instead
 Expr *parse(Fungus *fun, Expr *exprs, size_t len) {
     if (len == 0)
@@ -279,5 +328,11 @@ Expr *parse(Fungus *fun, Expr *exprs, size_t len) {
     for (size_t i = 0; i < len; ++i)
         expr_slice[i] = &exprs[i];
 
-    return parse_slice(fun, expr_slice, len);
+    Expr *ast = parse_slice(fun, expr_slice, len);
+
+#ifdef DEBUG
+    run_ast_diagnostics(fun, ast);
+#endif
+
+    return ast;
 }

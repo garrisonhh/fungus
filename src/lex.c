@@ -257,12 +257,13 @@ static bool match_symbol(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
 static bool match_word(Fungus *fun, RawExprBuf *rebuf, LZip *zip) {
     Lexer *lex = &fun->lexer;
 
+    // reject numbers
+    if (isdigit(zip->str[zip->idx]))
+        return false;
+
     // get next word
     size_t remaining = zip->len - zip->idx;
     size_t len = 0;
-
-    if (isdigit(zip->str[zip->idx + len]))
-        return false;
 
     for (; len < remaining && is_wordable(zip->str[zip->idx + len]); ++len)
         ;

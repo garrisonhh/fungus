@@ -30,7 +30,7 @@ void Fungus_del(Fungus *);
 void *Fungus_tmp_alloc(Fungus *, size_t n_bytes);
 void Fungus_tmp_clear(Fungus *);
 // if children > 0, allocates for them on Expr->exprs
-Expr *Fungus_tmp_expr(Fungus *, size_t children);
+Expr *Fungus_tmp_expr(Fungus *, Expr *parent, size_t children);
 
 bool Fungus_define_symbol(Fungus *, Word symbol, Type *o_type);
 bool Fungus_define_keyword(Fungus *, Word keyword, Type *o_type);

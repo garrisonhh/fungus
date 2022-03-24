@@ -132,9 +132,10 @@ void Fungus_tmp_clear(Fungus *fun) {
     Bump_clear(&fun->temp);
 }
 
-Expr *Fungus_tmp_expr(Fungus *fun, size_t children) {
+Expr *Fungus_tmp_expr(Fungus *fun, Expr *parent, size_t children) {
     Expr *expr = Fungus_tmp_alloc(fun, sizeof(*expr));
 
+    expr->parent = parent;
     expr->len = children;
 
     if (expr->len)

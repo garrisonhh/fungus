@@ -3,9 +3,24 @@
 #include "expr.h"
 #include "fungus.h"
 
+Expr **Expr_lhs(Expr *expr) {
+    assert(!expr->atomic && expr->len > 0);
+
+    return &expr->exprs[0];
+}
+
+Expr **Expr_rhs(Expr *expr) {
+    assert(!expr->atomic && expr->len > 0);
+
+    return &expr->exprs[expr->len - 1];
+}
+
 #define EXPR_INDENT 2
 
-static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
+static void Expr_dump_r(Fungus *fun, Expr *expr, int level, int limit) {
+    if (level > limit)
+        return;
+
     TypeGraph *types = &fun->types;
 
     printf("%*s", level * EXPR_INDENT, "");
@@ -43,29 +58,27 @@ static void Expr_dump_r(Fungus *fun, Expr *expr, int level) {
         puts("");
     } else {
         // print child values
-        const Word *name = Type_name(types, Rule_get(&fun->rules, expr->rule)->ty);
+        const Word *name =
+            Type_name(types, Rule_get(&fun->rules, expr->rule)->ty);
 
         printf(" %.*s\n", (int)name->len, name->str);
 
         for (size_t i = 0; i < expr->len; ++i)
-            Expr_dump_r(fun, expr->exprs[i], level + 1);
+            Expr_dump_r(fun, expr->exprs[i], level + 1, limit);
     }
 }
 
-Expr **Expr_lhs(Expr *expr) {
-    assert(!expr->atomic && expr->len > 0);
-
-    return &expr->exprs[0];
+void Expr_dump_depth(Fungus *fun, Expr *expr, int limit) {
+    Expr_dump_r(fun, expr, 0, limit);
 }
 
-Expr **Expr_rhs(Expr *expr) {
-    assert(!expr->atomic && expr->len > 0);
-
-    return &expr->exprs[expr->len - 1];
+void Expr_dump_array_depth(Fungus *fun, Expr **exprs, size_t len, int limit) {
+    for (size_t i = 0; i < len; ++i)
+        Expr_dump_depth(fun, exprs[i], limit);
 }
 
 void Expr_dump(Fungus *fun, Expr *expr) {
-    Expr_dump_r(fun, expr, 0);
+    Expr_dump_depth(fun, expr, 0);
 }
 
 void Expr_dump_array(Fungus *fun, Expr **exprs, size_t len) {

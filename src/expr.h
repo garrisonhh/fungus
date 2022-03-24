@@ -8,8 +8,10 @@
 typedef struct Fungus Fungus;
 
 typedef struct Expr {
+    struct Expr *parent;
+
     Type ty;
-    bool atomic; // rule types are non-atomic
+    bool atomic; // rule types are non-atomic; literals + lexemes + idents are
 
     union {
         Word ident;
@@ -34,5 +36,7 @@ Expr **Expr_rhs(Expr *);
 
 void Expr_dump(Fungus *, Expr *);
 void Expr_dump_array(Fungus *, Expr **exprs, size_t len);
+void Expr_dump_depth(Fungus *, Expr *, int limit);
+void Expr_dump_array_depth(Fungus *, Expr **exprs, size_t len, int limit);
 
 #endif
