@@ -80,9 +80,7 @@ Comparison Prec_cmp(PrecGraph *pg, Prec a, Prec b) {
 }
 
 void PrecGraph_dump(PrecGraph *pg) {
-    term_format(TERM_CYAN);
-    puts("PrecGraph:");
-    term_format(TERM_RESET);
+    puts(TC_CYAN "PrecGraph:" TC_RESET);
 
     for (size_t i = 0; i < pg->entries.len; ++i) {
         PrecEntry *entry = pg->entries.data[i];

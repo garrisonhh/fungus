@@ -35,27 +35,17 @@ void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len);
 
 // term codes ==================================================================
 
-#define TERM_TABLE\
-    X(RESET,    0)\
-    \
-    X(BLINK,    5)\
-    X(INVERSE,  7)\
-    \
-    X(BLACK,    30)\
-    X(RED,      31)\
-    X(GREEN,    32)\
-    X(YELLOW,   33)\
-    X(BLUE,     34)\
-    X(MAGENTA,  35)\
-    X(CYAN,     36)\
-    X(WHITE,    37)\
-
-#define X(NAME, CODE) TERM_##NAME,
-typedef enum TermFormat { TERM_TABLE } TermFmt;
-#undef X
-
-void term_format(TermFmt fmt);
-void term_fformat(FILE *, TermFmt fmt);
+#define TC_RESET   "\x1b[0m"
+#define TC_BLINK   "\x1b[5m"
+#define TC_INVERSE "\x1b[7m"
+#define TC_BLACK   "\x1b[30m"
+#define TC_RED     "\x1b[31m"
+#define TC_GREEN   "\x1b[32m"
+#define TC_YELLOW  "\x1b[33m"
+#define TC_BLUE    "\x1b[34m"
+#define TC_MAGENTA "\x1b[35m"
+#define TC_CYAN    "\x1b[36m"
+#define TC_WHITE   "\x1b[37m"
 
 // errors ======================================================================
 

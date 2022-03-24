@@ -356,10 +356,7 @@ void Type_print_verbose(TypeGraph *tg, Type ty) {
 }
 
 void TypeGraph_dump(TypeGraph *tg) {
-    term_format(TERM_CYAN);
-    puts("TypeGraph:");
-    term_format(TERM_RESET);
-
+    puts(TC_CYAN "TypeGraph:" TC_RESET);
     puts("abstract:");
 
     for (size_t i = 0; i < tg->entries.len; ++i) {

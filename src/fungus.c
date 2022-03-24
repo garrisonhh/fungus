@@ -145,9 +145,7 @@ Expr *Fungus_tmp_expr(Fungus *fun, Expr *parent, size_t children) {
 }
 
 void Fungus_dump(Fungus *fun) {
-    term_format(TERM_YELLOW);
-    puts("Fungus Definitions");
-    term_format(TERM_RESET);
+    puts(TC_YELLOW "Fungus Definitions" TC_RESET);
 
     Lexer_dump(&fun->lexer);
     TypeGraph_dump(&fun->types);

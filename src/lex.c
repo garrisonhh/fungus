@@ -99,9 +99,7 @@ static void dump_word_vec(Vec *vec) {
 }
 
 void Lexer_dump(Lexer *lex) {
-    term_format(TERM_CYAN);
-    puts("Lexer:");
-    term_format(TERM_RESET);
+    puts(TC_CYAN "Lexer:" TC_RESET);
 
     printf("symbols: ");
     dump_word_vec(&lex->symbols);
@@ -366,9 +364,7 @@ err_exit:
 }
 
 void RawExprBuf_dump(Fungus *fun, RawExprBuf *rebuf) {
-    term_format(TERM_CYAN);
-    puts("RawExprBuf:");
-    term_format(TERM_RESET);
+    puts(TC_CYAN "RawExprBuf:" TC_RESET);
 
     for (size_t i = 0; i < rebuf->len; ++i)
         Expr_dump(fun, &rebuf->exprs[i]);

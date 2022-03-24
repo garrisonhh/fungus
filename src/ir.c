@@ -235,9 +235,7 @@ static void IFuncEntry_dump(IRContext *ctx, IFuncEntry *entry) {
 }
 
 void ir_dump(IRContext *ctx) {
-    term_format(TERM_CYAN);
-    puts("IR:");
-    term_format(TERM_RESET);
+    puts(TC_CYAN "IR:" TC_RESET);
 
     for (size_t i = 0; i < ctx->funcs.len; ++i) {
         if (i) puts("");

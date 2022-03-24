@@ -178,9 +178,7 @@ static void RuleNode_dump(Fungus *fun, RuleNode *node, Vec *stack) {
 }
 
 void RuleTree_dump(Fungus *fun, RuleTree *rt) {
-    term_format(TERM_CYAN);
-    puts("RuleTree:");
-    term_format(TERM_RESET);
+    puts(TC_CYAN "RuleTree:" TC_RESET);
 
     Vec buf = Vec_new();
 

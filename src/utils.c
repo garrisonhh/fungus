@@ -2,10 +2,6 @@
 
 #include "utils.h"
 
-#define X(NAME, CODE) CODE,
-static const int TERM_CODES[] = { TERM_TABLE };
-#undef X
-
 bool global_error = false;
 
 void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len) {
@@ -28,23 +24,10 @@ void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len) {
     }
 }
 
-void term_fformat(FILE *fp, TermFmt fmt) {
-    fflush(fp);
-    fprintf(fp, "\x1b[%dm", TERM_CODES[fmt]);
-}
-
-void term_format(TermFmt fmt) {
-    term_fformat(stdout, fmt);
-}
-
 void fungus_error(const char *msg, ...) {
     va_list args;
 
-    fprintf(stderr, "[");
-    term_fformat(stderr, TERM_RED);
-    fprintf(stderr, "ERROR");
-    term_fformat(stderr, TERM_RESET);
-    fprintf(stderr, "]: ");
+    fprintf(stderr, "[" TC_RED "ERROR" TC_RESET "]: ");
 
     va_start(args, msg);
     vfprintf(stderr, msg, args);
@@ -56,14 +39,8 @@ void fungus_error(const char *msg, ...) {
 void fungus_panic(const char *msg, ...) {
     va_list args;
 
-    fprintf(stderr, "[");
-    term_fformat(stderr, TERM_BLINK);
-    term_fformat(stderr, TERM_YELLOW);
-    fprintf(stderr, "FUNGUS");
-    term_fformat(stderr, TERM_RED);
-    fprintf(stderr, "PANIC");
-    term_fformat(stderr, TERM_RESET);
-    fprintf(stderr, "]: ");
+    fprintf(stderr,
+            "[" TC_BLINK TC_YELLOW "FUNGUS" TC_RED "PANIC" TC_RESET "]: ");
 
     va_start(args, msg);
     vfprintf(stderr, msg, args);

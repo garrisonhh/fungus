@@ -27,9 +27,7 @@ static bool eval(Fungus *fun, const char *text, size_t len) {
         goto reset_parse;
 
 #if 1
-    term_format(TERM_CYAN);
-    puts("AST:");
-    term_format(TERM_RESET);
+    puts(TC_CYAN "AST:" TC_RESET);
     Expr_dump(fun, ast);
 #endif
 
@@ -47,9 +45,7 @@ reset_lex:
 #define REPL_BUF_SIZE 1024
 
 void repl(Fungus *fun) {
-    term_format(TERM_YELLOW);
-    printf("fungus v0 - by garrisonhh\n");
-    term_format(TERM_RESET);
+    puts(TC_YELLOW "fungus v0 - by garrisonhh" TC_RESET);
 
     while (true) {
         char buf[REPL_BUF_SIZE];
