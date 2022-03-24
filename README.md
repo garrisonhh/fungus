@@ -8,7 +8,7 @@ Feature goals for the first version:
 
 - [X] compile-time lexemes (symbols and keywords)
 - [X] unified compile-time and runtime type system
-  - [ ] algebraic types
+  - [X] algebraic types
 - [X] compile-time operator precedence
 - [X] compile-time syntax rule definitions for parsing tokens into an AST
   - [ ] syntax rule ambiguity checking
