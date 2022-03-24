@@ -50,6 +50,7 @@ void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len);
 // errors ======================================================================
 
 // set to true if error has happened
+// TODO get rid of this? what is a better error system?
 extern bool global_error;
 
 void fungus_error(const char *msg, ...);

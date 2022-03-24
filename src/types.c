@@ -30,8 +30,6 @@ TypeEntry *Type_get(TypeGraph *tg, Type handle) {
 }
 
 static bool validate_def(TypeGraph *tg, TypeDef *def) {
-    bool well_formed_expr = def->type != TY_ALIAS || def->expr != NULL;
-
     // TODO verify def->expr
 
     bool abstracts_are_abstract = true;
@@ -43,7 +41,7 @@ static bool validate_def(TypeGraph *tg, TypeDef *def) {
         }
     }
 
-    return well_formed_expr && abstracts_are_abstract;
+    return abstracts_are_abstract;
 }
 
 TypeExpr *TypeExpr_deepcopy(Bump *pool, TypeExpr *expr) {
@@ -102,9 +100,6 @@ Type Type_define(TypeGraph *tg, TypeDef *def) {
     case TY_ABSTRACT:
         entry->type_set = TG_alloc(tg, sizeof(*entry->type_set));
         *entry->type_set = IdSet_new();
-        break;
-    case TY_ALIAS:
-        entry->expr = TG_deepcopy_expr(tg, def->expr);
         break;
     }
 
@@ -197,8 +192,6 @@ bool Type_matches(TypeGraph *tg, Type ty, TypeExpr *pat) {
 
             return false;
         }
-    case TY_ALIAS:
-        return TypeExpr_matches(tg, entry->expr, pat);
     }
 }
 
@@ -325,27 +318,15 @@ void Type_print_verbose(TypeGraph *tg, Type ty) {
 
     switch (entry->type) {
     case TY_CONCRETE: break;
-    case TY_ALIAS:
-        printf(": ");
-        TypeExpr_print(tg, entry->expr);
-        break;
     case TY_ABSTRACT:
-        printf(": { ");
+        printf(": {");
 
         IdSet *type_set = entry->type_set;
-        bool first = true;
 
         for (size_t i = 0; i < type_set->cap; ++i) {
             if (type_set->filled[i]) {
-                if (first)
-                    first = false;
-                else
-                    printf(", ");
-
-                const Word *name =
-                    Type_get(tg, (Type){ type_set->ids[i] })->name;
-
-                printf("%.*s", (int)name->len, name->str);
+                printf(" ");
+                Type_print(tg, (Type){ type_set->ids[i] });
             }
         }
 
@@ -370,7 +351,7 @@ void TypeGraph_dump(TypeGraph *tg) {
         puts("");
     }
 
-    puts("concrete and aliased:");
+    puts("concrete:");
     printf("  ");
 
     for (size_t i = 0; i < tg->entries.len; ++i) {

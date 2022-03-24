@@ -58,15 +58,12 @@ typedef struct TypeExpr {
 typedef enum TypeType {
     TY_CONCRETE, // a new type
     TY_ABSTRACT, // a type grouping (like an interface)
-    TY_ALIAS // an alias for a type expression
 } TypeType;
 
 // used to define a new type. all data is copied
 typedef struct TypeDef {
     Word name;
-
     TypeType type;
-    TypeExpr *expr; // aliased types alias
 
     struct { // all types can subtype abstract types
         Type *is;
