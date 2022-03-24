@@ -53,14 +53,6 @@ TypeExpr *TypeExpr_deepcopy(Bump *pool, TypeExpr *expr) {
     case TET_ATOM:
         copy->atom = expr->atom;
         break;
-#if 0
-    case TET_TAGGED:
-        copy->child = TG_deepcopy_expr(tg, expr->child);
-        /* fallthru */
-    case TET_TAG:
-        copy->tag = Word_copy_of(expr->tag, &tg->pool);
-        break;
-#endif
     case TET_SUM:
     case TET_PRODUCT:
         copy->len = expr->len;
@@ -73,10 +65,6 @@ TypeExpr *TypeExpr_deepcopy(Bump *pool, TypeExpr *expr) {
     }
 
     return copy;
-}
-
-static TypeExpr *TG_deepcopy_expr(TypeGraph *tg, TypeExpr *expr) {
-    return TypeExpr_deepcopy(&tg->pool, expr);
 }
 
 Type Type_define(TypeGraph *tg, TypeDef *def) {
@@ -95,12 +83,9 @@ Type Type_define(TypeGraph *tg, TypeDef *def) {
         .type = def->type
     };
 
-    switch (def->type) {
-    case TY_CONCRETE: break;
-    case TY_ABSTRACT:
+    if (def->type == TY_ABSTRACT) {
         entry->type_set = TG_alloc(tg, sizeof(*entry->type_set));
         *entry->type_set = IdSet_new();
-        break;
     }
 
     // place id in abstract type sets
@@ -316,12 +301,10 @@ void Type_print_verbose(TypeGraph *tg, Type ty) {
 
     TypeEntry *entry = Type_get(tg, ty);
 
-    switch (entry->type) {
-    case TY_CONCRETE: break;
-    case TY_ABSTRACT:
-        printf(": {");
-
+    if (entry->type == TY_ABSTRACT) {
         IdSet *type_set = entry->type_set;
+
+        printf(": {");
 
         for (size_t i = 0; i < type_set->cap; ++i) {
             if (type_set->filled[i]) {
@@ -332,7 +315,6 @@ void Type_print_verbose(TypeGraph *tg, Type ty) {
 
         printf(" }");
 
-        break;
     }
 }
 

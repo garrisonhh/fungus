@@ -103,36 +103,6 @@ int main(int argc, char **argv) {
 
     Fungus fun = Fungus_new();
 
-    /*
-#ifdef DEBUG
-    // TODO REMOVE
-    IRContext irctx = IRContext_new();
-    ir_test(&fun, &irctx);
-
-#if 1
-    const char *out_path = "out_fungus.c";
-    FILE *fp = fopen(out_path, "w");
-    c_gen(fp, &fun, &irctx);
-    fclose(fp);
-
-    term_format(TERM_CYAN);
-    puts("C:");
-    term_format(TERM_RESET);
-
-    char *s = read_file(out_path, NULL);
-    printf("%s", s);
-    free(s);
-#else
-    term_format(TERM_CYAN);
-    puts("C:");
-    term_format(TERM_RESET);
-    c_gen(stdout, &fun, &irctx);
-#endif
-
-    exit(0);
-#endif
-    */
-
     // TODO opt parsing eventually
     if (argc == 1)
         repl(&fun);
