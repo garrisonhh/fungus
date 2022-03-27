@@ -1,39 +1,40 @@
-#ifndef RAW_H
-#define RAW_H
+#ifndef LEX_H
+#define LEX_H
 
 #include <stddef.h>
-
-#include "expr.h"
+#include <stdint.h>
 
 /*
- * TODO the lexer should just return a token stream, where tokens are just a
- * comptype and an index into the file string. all other work can be done later.
- *
- * TODO the lexer REALLY needs a rework, this is a hacky piece of crap tbh
+ * TODO file awareness for nice errors
  */
 
-typedef struct Fungus Fungus; // forward decl to fix header hell
+typedef uint32_t hsize_t;
 
-typedef struct RawExprBuffer {
-    Expr *exprs;
+#define TOK_TYPES\
+    TYPE(INVALID)\
+    TYPE(WORD)\
+    TYPE(SYMBOLS)\
+    TYPE(BOOL)\
+    TYPE(INT)\
+    TYPE(FLOAT)\
+    TYPE(STRING)
+
+#define TYPE(NAME) TOK_##NAME,
+typedef enum TokType { TOK_TYPES TOK_COUNT } TokType;
+#undef TYPE
+
+typedef struct TokBuf {
+    TokType *types;
+    hsize_t *starts, *lens;
     size_t len, cap;
-} RawExprBuf;
 
-// TODO lookups are dumb stupid just-get-it-working design, have so much easy
-// optimization potential
-typedef struct Lexer {
-    Bump pool;
-    Vec symbols, keywords;
-} Lexer;
+    // TODO File construct here
+    const char *str;
+} TokBuf;
 
-Lexer Lexer_new(void);
-void Lexer_del(Lexer *);
+TokBuf lex(const char *str, size_t len);
+void TokBuf_del(TokBuf *);
 
-void Lexer_dump(Lexer *);
-
-RawExprBuf tokenize(Fungus *, const char *str, size_t len);
-void RawExprBuf_del(RawExprBuf *);
-
-void RawExprBuf_dump(Fungus *, RawExprBuf *);
+void TokBuf_dump(TokBuf *);
 
 #endif

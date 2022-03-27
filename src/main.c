@@ -7,44 +7,14 @@
 #include "ir.h"
 #include "cgen.h"
 
-static bool eval(Fungus *fun, const char *text, size_t len) {
-    Fungus_tmp_clear(fun);
-
+static bool eval(const char *text, size_t len) {
     // tokenize
-    RawExprBuf rebuf = tokenize(fun, text, len);
-
-#if 1
-    RawExprBuf_dump(fun, &rebuf);
-#endif
-
-    if (global_error)
-        goto reset_lex;
-
-    // parse
-    Expr *ast = parse(fun, rebuf.exprs, rebuf.len);
-
-    if (global_error)
-        goto reset_parse;
-
-#if 1
-    puts(TC_CYAN "AST:" TC_RESET);
-    Expr_dump(fun, ast);
-#endif
-
-reset_parse:
-reset_lex:
-    RawExprBuf_del(&rebuf);
-
-    bool status = global_error;
-
-    global_error = false;
-
-    return status;
+    // TODO
 }
 
 #define REPL_BUF_SIZE 1024
 
-void repl(Fungus *fun) {
+void repl(void) {
     puts(TC_YELLOW "fungus v0 - by garrisonhh" TC_RESET);
 
     while (true) {
@@ -63,10 +33,18 @@ void repl(Fungus *fun) {
         for (len = 0; buf[len] && buf[len] != '\n'; ++len)
             ;
 
-        eval(fun, buf, len);
+        // tokenize
+        TokBuf tokbuf = lex(buf, len);
+
+#if 1
+        TokBuf_dump(&tokbuf);
+#endif
+
+        TokBuf_del(&tokbuf);
     }
 }
 
+/*
 static char *read_file(const char *filepath, size_t *out_len) {
     FILE *fp = fopen(filepath, "r");
 
@@ -90,58 +68,13 @@ static char *read_file(const char *filepath, size_t *out_len) {
 
     return text;
 }
-
-static void compile(Fungus *fun, const char *filename) {
-    size_t len;
-    const char *text = read_file(filename, &len);
-
-    eval(fun, text, len);
-}
+*/
 
 int main(int argc, char **argv) {
     ir_init();
 
-    Fungus fun = Fungus_new();
-
-    /*
-#ifdef DEBUG
-    // TODO REMOVE
-    IRContext irctx = IRContext_new();
-    ir_test(&fun, &irctx);
-
-#if 1
-    const char *out_path = "out_fungus.c";
-    FILE *fp = fopen(out_path, "w");
-    c_gen(fp, &fun, &irctx);
-    fclose(fp);
-
-    term_format(TERM_CYAN);
-    puts("C:");
-    term_format(TERM_RESET);
-
-    char *s = read_file(out_path, NULL);
-    printf("%s", s);
-    free(s);
-#else
-    term_format(TERM_CYAN);
-    puts("C:");
-    term_format(TERM_RESET);
-    c_gen(stdout, &fun, &irctx);
-#endif
-
-    exit(0);
-#endif
-    */
-
     // TODO opt parsing eventually
-    if (argc == 1)
-        repl(&fun);
-    else if (argc == 2)
-        compile(&fun, argv[1]);
-    else
-        fungus_panic("bad number of arguments!");
-
-    Fungus_del(&fun);
+    repl();
 
     return 0;
 }

@@ -47,6 +47,10 @@ typedef struct View {
     size_t len;
 } View;
 
+bool View_eq(const View *a, const View *b);
+// returns '\0' if past end of view
+char View_get(const View *, size_t index);
+
 typedef union Word {
     struct {
         const char *str;
@@ -56,10 +60,10 @@ typedef union Word {
     View as_view;
 } Word;
 
+#define WORD(STR) Word_new(STR, strlen(STR))
+
 Word Word_new(const char *str, size_t len);
 Word *Word_copy_of(const Word *src, Bump *pool);
-
-#define WORD(STR) Word_new(STR, strlen(STR))
 
 bool Word_eq(const Word *a, const Word *b);
 bool Word_eq_view(const Word *a, const View *b);

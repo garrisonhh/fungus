@@ -30,12 +30,14 @@ bool Fungus_define_symbol(Fungus *fun, Word symbol, Type *o_type) {
             goto invalid_symbol;
 
     // register symbol
+    /* TODO replace
     Word *copy = Word_copy_of(&symbol, &fun->lexer.pool);
 
     Vec_push(&fun->lexer.symbols, copy);
     Vec_qsort(&fun->lexer.symbols, lexeme_cmp); // TODO this is inefficient af
 
     *o_type = define_lexeme(fun, symbol);
+    */
 
     return true;
 
@@ -59,12 +61,14 @@ bool Fungus_define_keyword(Fungus *fun, Word keyword, Type *o_type) {
             goto invalid_keyword;
 
     // register keyword
+    /* TODO replace
     Word *copy = Word_copy_of(&keyword, &fun->lexer.pool);
 
     Vec_push(&fun->lexer.keywords, copy);
     Vec_qsort(&fun->lexer.keywords, lexeme_cmp); // TODO this is inefficient af
 
     *o_type = define_lexeme(fun, keyword);
+    */
 
     return true;
 
@@ -98,7 +102,6 @@ Type Fungus_base_keyword(Fungus *fun, Word keyword) {
 
 Fungus Fungus_new(void) {
     Fungus fun = {
-        .lexer = Lexer_new(),
         .types = TypeGraph_new(),
         .precedences = PrecGraph_new(),
         .rules = RuleTree_new(),
@@ -121,7 +124,6 @@ void Fungus_del(Fungus *fun) {
     RuleTree_del(&fun->rules);
     PrecGraph_del(&fun->precedences);
     TypeGraph_del(&fun->types);
-    Lexer_del(&fun->lexer);
 }
 
 void *Fungus_tmp_alloc(Fungus *fun, size_t n_bytes) {
@@ -147,7 +149,6 @@ Expr *Fungus_tmp_expr(Fungus *fun, Expr *parent, size_t children) {
 void Fungus_dump(Fungus *fun) {
     puts(TC_YELLOW "Fungus Definitions" TC_RESET);
 
-    Lexer_dump(&fun->lexer);
     TypeGraph_dump(&fun->types);
     PrecGraph_dump(&fun->precedences);
     RuleTree_dump(fun, &fun->rules);

@@ -9,7 +9,7 @@ void Fungus_define_base(Fungus *fun) {
      */
     fun->t_notype = Type_define(&fun->types, &(TypeDef){
         .name = WORD("NoType"),
-        .type = TY_ABSTRACT
+       .type = TY_ABSTRACT
     });
 
     // runtime

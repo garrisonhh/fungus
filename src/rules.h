@@ -69,15 +69,13 @@ typedef struct RuleEntry {
     unsigned postfixed: 1; // if rule has a lexeme at end
 } RuleEntry;
 
-// nodes could use hashmaps instead of vecs to store nexts, but I'm not sure
-// this would actually result in a performance improvement in most cases
+// could I hash TypeExprs here somehow?
 typedef struct RuleNode {
     Vec nexts;
     TypeExpr *te;
 
     Rule rule;
     unsigned terminates: 1; // whether `rule` is valid
-    unsigned repeats: 1; // whether `nexts` contains a self-reference
 } RuleNode;
 
 typedef struct RuleTree {

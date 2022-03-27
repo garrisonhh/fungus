@@ -159,6 +159,14 @@ void Bump_clear(Bump *b) {
 
 // views + words ===============================================================
 
+bool View_eq(const View *a, const View *b) {\
+    return a->len == b->len && !strncmp(a->str, b->str, a->len);
+}
+
+char View_get(const View *v, size_t index) {
+    return index < v->len ? v->str[index] : '\0';
+}
+
 Word Word_new(const char *str, size_t len) {
     return (Word){
         .str = str,

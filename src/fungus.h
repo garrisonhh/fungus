@@ -1,13 +1,12 @@
 #ifndef FUNGUS_H
 #define FUNGUS_H
 
-#include "lex.h"
+#include "expr.h"
 #include "types.h"
 #include "precedence.h"
 #include "rules.h"
 
 typedef struct Fungus {
-    Lexer lexer;
     TypeGraph types;
     PrecGraph precedences;
     RuleTree rules;
