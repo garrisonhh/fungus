@@ -63,7 +63,7 @@ File File_read_stdin(void) {
 
     // read lines from stdin until an empty line is read
 #define FGETS_BUFSIZE 4096
-    char buf[FGETS_BUFSIZE];
+    char buf[FGETS_BUFSIZE] = {0};
     char *str = NULL;
     size_t len = 0;
 
@@ -79,8 +79,6 @@ File File_read_stdin(void) {
 
         if (read_len <= 1)
             break;
-        else if (feof(stdin))
-            exit(0);
 
         str = realloc(str, (len + read_len + 1) * sizeof(*str));
 

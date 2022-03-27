@@ -6,7 +6,7 @@
 #include "data.h"
 
 /*
- * Files are how errors are given context
+ * Files are the context for tokens and smart errors
  */
 
 typedef struct File {

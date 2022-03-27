@@ -3,10 +3,6 @@
 
 #include "file.h"
 
-/*
- * TODO file awareness for nice errors
- */
-
 #define TOK_TYPES\
     TYPE(INVALID)\
     TYPE(WORD)\

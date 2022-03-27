@@ -135,9 +135,13 @@ static void tokenize(TokBuf *tb, const View *str) {
                 type = TOK_INT;
             }
 
-            // numbers should not have trailing alpha chars
-            if (ch_is_alpha(View_get(str, idx)))
+            if (ch_is_alpha(View_get(str, idx))) {
+                // numbers should not have trailing alpha chars
                 type = TOK_INVALID;
+            } else if (!ch_is_digit(View_get(str, idx - 1))) {
+                // numbers should only ever end with digits
+                type = TOK_INVALID;
+            }
         }
 
         if (type == TOK_INVALID) {

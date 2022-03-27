@@ -4,12 +4,10 @@
 #include "file.h"
 #include "lex.h"
 
-#define REPL_BUF_SIZE 1024
-
 void repl(void) {
     puts(TC_YELLOW "fungus v0 - by garrisonhh" TC_RESET);
 
-    while (true) {
+    while (!feof(stdin)) {
         // read stdin
         File file = File_read_stdin();
         if (global_error) goto cleanup_read;
@@ -22,6 +20,7 @@ void repl(void) {
         TokBuf_dump(&tokbuf);
 #endif
 
+        // cleanup
 cleanup_lex:
         TokBuf_del(&tokbuf);
 cleanup_read:
