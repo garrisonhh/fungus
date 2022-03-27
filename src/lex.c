@@ -11,8 +11,12 @@
 
 #define IN_RANGE(C, A, B) ((C) >= (A) && (C) <= (B))
 
+static bool ch_is_alpha(char c) {
+    return IN_RANGE(c, 'a', 'z') || IN_RANGE(c, 'A', 'Z');
+}
+
 static bool ch_is_alphaish(char c) {
-    return IN_RANGE(c, 'a', 'z') || IN_RANGE(c, 'A', 'Z') || c == '_';
+    return ch_is_alpha(c) || c == '_';
 }
 
 static bool ch_is_digit(char c) {
@@ -20,7 +24,7 @@ static bool ch_is_digit(char c) {
 }
 
 static bool ch_is_digitish(char c) {
-    return IN_RANGE(c, '0', '9') || c == '_';
+    return ch_is_digit(c) || c == '_';
 }
 
 static bool ch_is_word(char c) {
@@ -99,9 +103,8 @@ static void tokenize(TokBuf *tb, const View *str) {
                     c = View_get(str, ++idx);
 
                     if (!c) {
-                        // TODO
-                        fungus_panic("unfinished string from: %s",
-                                     &str->str[start]);
+                        File_error_from(tb->file, start, "unterminated string");
+                        goto lex_error;
                     }
                 } while (!(c == '"' && last != '\\'));
 
@@ -131,15 +134,22 @@ static void tokenize(TokBuf *tb, const View *str) {
             } else {
                 type = TOK_INT;
             }
+
+            // numbers should not have trailing alpha chars
+            if (ch_is_alpha(View_get(str, idx)))
+                type = TOK_INVALID;
         }
 
         if (type == TOK_INVALID) {
-            // TODO
-            fungus_panic("invalid token");
+            File_error_from(tb->file, start, "invalid token");
+            goto lex_error;
         }
 
         push_token(tb, type, start, idx - start);
     }
+
+lex_error:
+    global_error = true;
 }
 
 TokBuf lex(const File *file) {

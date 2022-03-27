@@ -12,15 +12,19 @@ void repl(void) {
     while (true) {
         // read stdin
         File file = File_read_stdin();
+        if (global_error) goto cleanup_read;
 
-        // tokenize
+        // lex
         TokBuf tokbuf = lex(&file);
+        if (global_error) goto cleanup_lex;
 
 #if 1
         TokBuf_dump(&tokbuf);
 #endif
 
+cleanup_lex:
         TokBuf_del(&tokbuf);
+cleanup_read:
         File_del(&file);
     }
 }

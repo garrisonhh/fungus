@@ -18,6 +18,9 @@
 
 #define ARRAY_SIZE(ARR) (sizeof(ARR) / sizeof(ARR[0]))
 
+#define MIN(A, B) ((A) < (B) ? (A) : (B))
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
+
 /*
  * for comparison functions:
  * cmp(a, b) > 0 // a > b
@@ -36,8 +39,11 @@ void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len);
 // term codes ==================================================================
 
 #define TC_RESET   "\x1b[0m"
+#define TC_BOLD    "\x1b[1m"
+#define TC_DIM     "\x1b[2m"
 #define TC_BLINK   "\x1b[5m"
 #define TC_INVERSE "\x1b[7m"
+
 #define TC_BLACK   "\x1b[30m"
 #define TC_RED     "\x1b[31m"
 #define TC_GREEN   "\x1b[32m"
@@ -46,6 +52,8 @@ void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len);
 #define TC_MAGENTA "\x1b[35m"
 #define TC_CYAN    "\x1b[36m"
 #define TC_WHITE   "\x1b[37m"
+
+#define TC_GRAY    "\x1b[90m"
 
 // errors ======================================================================
 
