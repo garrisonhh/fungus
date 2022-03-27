@@ -1,7 +1,7 @@
 #ifndef LEX_H
 #define LEX_H
 
-#include "fun_types.h"
+#include "file.h"
 
 /*
  * TODO file awareness for nice errors
@@ -25,11 +25,10 @@ typedef struct TokBuf {
     hsize_t *starts, *lens;
     size_t len, cap;
 
-    // TODO File construct here
-    const char *str;
+    const File *file;
 } TokBuf;
 
-TokBuf lex(const char *str, size_t len);
+TokBuf lex(const File *);
 void TokBuf_del(TokBuf *);
 
 void TokBuf_dump(TokBuf *);

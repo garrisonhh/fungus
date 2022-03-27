@@ -3,7 +3,7 @@
 
 #include "types.h"
 #include "rules.h"
-#include "literal_types.h"
+#include "fun_types.h"
 
 typedef struct Fungus Fungus;
 

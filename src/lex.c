@@ -57,7 +57,7 @@ static void push_token(TokBuf *tb, TokType type, hsize_t start, hsize_t len) {
     ++tb->len;
 }
 
-static void tokenize(TokBuf *tb, View *str) {
+static void tokenize(TokBuf *tb, const View *str) {
     hsize_t idx = 0;
 
     while (true) {
@@ -142,16 +142,16 @@ static void tokenize(TokBuf *tb, View *str) {
     }
 }
 
-TokBuf lex(const char *str, size_t len) {
+TokBuf lex(const File *file) {
     // make empty TokBuf
-    TokBuf tb = { .cap = TOKBUF_INIT_CAP, .str = str };
+    TokBuf tb = { .cap = TOKBUF_INIT_CAP, .file = file };
 
     tb.types = malloc(tb.cap * sizeof(*tb.types));
     tb.starts = malloc(tb.cap * sizeof(*tb.starts));
     tb.lens = malloc(tb.cap * sizeof(*tb.lens));
 
     // generate tokens
-    tokenize(&tb, &(View){ str, len });
+    tokenize(&tb, &file->text);
 
     return tb;
 }
@@ -185,7 +185,8 @@ void TokBuf_dump(TokBuf *tb) {
         }
 
         // TODO this is the only place where tb->str is used
-        col += printf("%.*s", (int)tb->lens[i], &tb->str[tb->starts[i]]);
+        col += printf("%.*s",
+                      (int)tb->lens[i], &tb->file->text.str[tb->starts[i]]);
 
         printf(TC_RESET " ");
         ++col;
