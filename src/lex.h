@@ -1,14 +1,11 @@
 #ifndef LEX_H
 #define LEX_H
 
-#include <stddef.h>
-#include <stdint.h>
+#include "fun_types.h"
 
 /*
  * TODO file awareness for nice errors
  */
-
-typedef uint32_t hsize_t;
 
 #define TOK_TYPES\
     TYPE(INVALID)\

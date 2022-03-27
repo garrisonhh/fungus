@@ -163,9 +163,7 @@ void TokBuf_del(TokBuf *tb) {
 }
 
 void TokBuf_dump(TokBuf *tb) {
-    puts(TC_CYAN "Tokens:" TC_RESET);
-
-    const char *colors[TOK_COUNT] = {
+    static const char *colors[TOK_COUNT] = {
         [TOK_SYMBOLS] = TC_WHITE,
         [TOK_WORD] = TC_BLUE,
         [TOK_BOOL] = TC_MAGENTA,
@@ -173,6 +171,8 @@ void TokBuf_dump(TokBuf *tb) {
         [TOK_FLOAT] = TC_MAGENTA,
         [TOK_STRING] = TC_GREEN,
     };
+
+    puts(TC_CYAN "Tokens:" TC_RESET);
 
     size_t col = 0;
 
@@ -184,6 +184,7 @@ void TokBuf_dump(TokBuf *tb) {
             col = 0;
         }
 
+        // TODO this is the only place where tb->str is used
         col += printf("%.*s", (int)tb->lens[i], &tb->str[tb->starts[i]]);
 
         printf(TC_RESET " ");

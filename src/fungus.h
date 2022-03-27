@@ -1,10 +1,13 @@
 #ifndef FUNGUS_H
 #define FUNGUS_H
 
+#include "fun_types.h"
 #include "expr.h"
 #include "types.h"
 #include "precedence.h"
 #include "rules.h"
+
+// fun types
 
 typedef struct Fungus {
     TypeGraph types;
