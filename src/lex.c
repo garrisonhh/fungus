@@ -148,6 +148,8 @@ static void tokenize(TokBuf *tb, const View *str) {
         push_token(tb, type, start, idx - start);
     }
 
+    return;
+
 lex_error:
     global_error = true;
 }

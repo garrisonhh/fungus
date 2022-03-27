@@ -26,6 +26,8 @@ cleanup_lex:
         TokBuf_del(&tokbuf);
 cleanup_read:
         File_del(&file);
+
+        global_error = false;
     }
 }
 
