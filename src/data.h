@@ -114,4 +114,19 @@ void IdSet_add_superset(IdSet *, IdSet *super);
 void IdSet_put(IdSet *, unsigned id);
 bool IdSet_has(IdSet *, unsigned id);
 
+// put-only hash set ===========================================================
+
+// TODO implement
+
+typedef struct HashSet {
+    Word *words;
+    size_t size, cap;
+} HashSet;
+
+HashSet HashSet_new(void);
+void HashSet_del(HashSet *);
+
+void HashSet_put(HashSet *, const Word *word);
+bool HashSet_has(HashSet *, const Word *word);
+
 #endif
