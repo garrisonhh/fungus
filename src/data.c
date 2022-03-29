@@ -253,7 +253,7 @@ void IdMap_put(IdMap *map, const Word *name, unsigned id) {
     ++map->size;
 }
 
-bool IdMap_get_checked(IdMap *map, const Word *name, unsigned *out_id) {
+bool IdMap_get_checked(const IdMap *map, const Word *name, unsigned *out_id) {
     IdMapNode *trav = map->nodes[name->hash % map->cap];
 
     for (; trav; trav = trav->next) {
@@ -267,7 +267,7 @@ bool IdMap_get_checked(IdMap *map, const Word *name, unsigned *out_id) {
     return false;
 }
 
-unsigned IdMap_get(IdMap *map, const Word *name) {
+unsigned IdMap_get(const IdMap *map, const Word *name) {
     unsigned id;
 
     if (IdMap_get_checked(map, name, &id))
@@ -375,4 +375,109 @@ bool IdSet_has(IdSet *set, unsigned id) {
     }
 
     return false;
+}
+
+// put-only pash map + set =====================================================
+
+static HashMap HashMap_new_lower(bool is_set) {
+    return (HashMap){
+        .keys = malloc(DATA_INIT_CAP * sizeof(Word)),
+        .values = is_set ? NULL : malloc(DATA_INIT_CAP * sizeof(void *)),
+        .cap = DATA_INIT_CAP,
+
+        .is_set = is_set
+    };
+}
+
+HashMap HashMap_new(void) {
+    return HashMap_new_lower(false);
+}
+
+void HashMap_del(HashMap *map) {
+    free(map->keys);
+    free(map->values);
+}
+
+static void HashMap_put_lower(HashMap *map, const Word *key, void *value) {
+    size_t index = key->hash % map->cap;
+
+    while (map->keys[index].str)
+        index = (index + 1) % map->cap;
+
+    map->keys[index] = *key;
+    map->values[index] = value;
+}
+
+static void HashMap_resize(HashMap *map, size_t new_cap) {
+    size_t old_cap = map->cap;
+    Word *old_keys = map->keys;
+    void **old_values = map->values;
+
+    map->cap = new_cap;
+    map->keys = calloc(map->cap, sizeof(*map->keys));
+
+    if (!map->is_set)
+        map->values = calloc(map->cap, sizeof(*map->values));
+
+    for (size_t i = 0; i < old_cap; ++i) {
+        if (old_keys[i].str) {
+            HashMap_put_lower(map, &old_keys[i],
+                              map->is_set ? NULL : old_values[i]);
+        }
+    }
+
+    free(old_keys);
+    free(old_values);
+}
+
+void HashMap_put(HashMap *map, const Word *key, void *value) {
+    if (map->size * 2 > map->cap)
+        HashMap_resize(map, map->cap * 2);
+
+    HashMap_put_lower(map, key, value);
+
+    ++map->size;
+}
+
+bool HashMap_get_checked(const HashMap *map, const Word *key, void **o_value) {
+    size_t index = key->hash % map->cap;
+
+    while (map->keys[index].str) {
+        if (Word_eq(&map->keys[index], key)) {
+            if (!map->is_set)
+                *o_value = map->values[index];
+
+            return true;
+        }
+
+        index = (index + 1) % map->cap;
+    }
+
+    return false;
+}
+
+void *HashMap_get(const HashMap *map, const Word *key) {
+    void *value;
+
+    if (HashMap_get_checked(map, key, &value))
+        return value;
+
+    fungus_panic("HashMap failed to retrieve '%.*s'!\n",
+                 (int)key->len, key->str);
+}
+
+HashSet HashSet_new(void) {
+    return (HashSet){ HashMap_new_lower(true) };
+}
+
+void HashSet_del(HashSet *set) {
+    HashMap_del(&set->map);
+}
+
+void HashSet_put(HashSet *set, const Word *word) {
+    HashMap_put(&set->map, word, NULL);
+}
+
+bool HashSet_has(HashSet *set, const Word *word) {
+    return HashMap_get_checked(&set->map, word, NULL);
 }

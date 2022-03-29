@@ -91,8 +91,8 @@ void IdMap_del(IdMap *);
 void IdMap_put(IdMap *, const Word *name, unsigned id);
 
 // get will panic if name isn't found, checked allows you to handle errors
-bool IdMap_get_checked(IdMap *, const Word *name, unsigned *out_id);
-unsigned IdMap_get(IdMap *, const Word *name);
+bool IdMap_get_checked(const IdMap *, const Word *name, unsigned *out_id);
+unsigned IdMap_get(const IdMap *, const Word *name);
 
 void IdMap_remove(IdMap *, const Word *name);
 
@@ -114,14 +114,27 @@ void IdSet_add_superset(IdSet *, IdSet *super);
 void IdSet_put(IdSet *, unsigned id);
 bool IdSet_has(IdSet *, unsigned id);
 
-// put-only hash set ===========================================================
+// put-only hash map + set =====================================================
 
-// TODO implement
-
-typedef struct HashSet {
-    Word *words;
+typedef struct HashMap {
+    Word *keys;
+    void **values;
     size_t size, cap;
-} HashSet;
+
+    unsigned is_set: 1;
+} HashMap;
+
+typedef struct HashSet { HashMap map; } HashSet;
+
+HashMap HashMap_new(void);
+void HashMap_del(HashMap *);
+
+// key strings are NOT copied, assumed to be owned by HashMap owner
+void HashMap_put(HashMap *, const Word *key, void *value);
+
+// HashMap_get panics, checked does not
+bool HashMap_get_checked(const HashMap *, const Word *key, void **o_value);
+void *HashMap_get(const HashMap *, const Word *key);
 
 HashSet HashSet_new(void);
 void HashSet_del(HashSet *);
