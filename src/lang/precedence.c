@@ -17,9 +17,6 @@ static void *PG_alloc(PrecGraph *pg, size_t n_bytes) {
 }
 
 static PrecEntry *PG_get(PrecGraph *pg, Prec handle) {
-    if (handle.id > pg->entries.len)
-        fungus_panic("attempted to get an invalid precedence.");
-
     return pg->entries.data[handle.id];
 }
 
@@ -59,7 +56,7 @@ Prec Prec_define(PrecGraph *pg, PrecDef *def) {
         // verify this isn't idiotic TODO this should be an error not a panic
         if (PG_higher_than(pg, entry, def->below[i])) {
             fungus_panic("attempted circular precedence definition: "
-                         "%.*s <-> %.*s",
+                         "%.*s <=> %.*s",
                          (int)entry->name->len, entry->name->str,
                          (int)below_entry->name->len, below_entry->name->str);
         }
@@ -85,13 +82,14 @@ void PrecGraph_dump(PrecGraph *pg) {
     for (size_t i = 0; i < pg->entries.len; ++i) {
         PrecEntry *entry = pg->entries.data[i];
 
-        printf("%.*s", (int)entry->name->len, entry->name->str);
+        printf("%.*s <%s>", (int)entry->name->len, entry->name->str,
+               entry->assoc == ASSOC_LEFT ? "left" : "right");
 
         if (entry->above_len) {
             printf(" >");
 
             for (size_t j = 0; j < entry->above_len; ++j) {
-                Word *above_name = PG_get(pg, entry->above[j])->name;
+                const Word *above_name = PG_get(pg, entry->above[j])->name;
 
                 printf(" %.*s", (int)above_name->len, above_name->str);
             }

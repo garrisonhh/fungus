@@ -6,26 +6,30 @@
  * and symbolic runtime definition of precedences.
  */
 
-#include "data.h"
+#include "../data.h"
 
 typedef struct PrecHandle { unsigned id; } Prec;
 
 #define MAX_PRECEDENCES 256
 
+typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
+
 typedef struct PrecEntry {
-    Word *name;
+    const Word *name;
 
     // list of precedences this precedence is higher than
-    // TODO eventually a smarter data structure, like a hash set?
+    // TODO impl IdSet here
     Prec above[MAX_PRECEDENCES];
     size_t above_len;
+
+    Associativity assoc;
 } PrecEntry;
 
 typedef struct PrecGraph {
     Bump pool;
     Vec entries; // entries indexed by id
 
-    // TODO name => id hashmap
+    // TODO impl IdMap here
 } PrecGraph;
 
 typedef struct PrecDef {

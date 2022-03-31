@@ -1,45 +1,15 @@
 #ifndef RULES_H
 #define RULES_H
 
-#include "types.h"
+#include <stddef.h>
+
 #include "precedence.h"
-
-#ifndef MAX_RULE_LEN
-#define MAX_RULE_LEN 64
-#endif
-
-typedef struct Fungus Fungus;
+#include "pattern.h"
+#include "../data.h"
 
 /*
- * patterns are defined something like this (intentially pseudocode-y):
- *
- * (Pattern){
- *     .pat = { 0, 1, 0 },
- *     .returns = 0,
- *     .where = {
- *         number,
- *         plus_lexeme
- *     }
- * }
- *
- * this is exactly like some rust-like syntax:
- *
- * fn add(lhs: T, symbol: S, rhs: T): T
- *         where T: Number,
- *               S: +
- *
- * typeexprs are deepcopied on Rule_define call
+ * RuleTree is for storing rule data throughout AST parsing
  */
-typedef struct Pattern {
-    size_t *pat;
-    size_t len;
-    size_t returns;
-    TypeExpr **where;
-    size_t where_len;
-} Pattern;
-
-// TODO should Associativity not be a part of Precedence?
-typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
 
 /*
  * fill this out in order to define a rule
@@ -50,32 +20,31 @@ typedef struct RuleDef {
     Word name;
     Pattern pat;
     Prec prec;
-    Associativity assoc;
 } RuleDef;
 
 typedef struct RuleHandle { unsigned id; } Rule;
 
 // used to store rule data within ruletree entries
 typedef struct RuleEntry {
-    Rule rule;
-    Type ty;
-
+    const Word *name;
+    // Rule rule;
     Pattern pat;
     Prec prec;
-    Associativity assoc;
 
-    // flags
+    // flags for infix parsing
     unsigned prefixed: 1; // if rule has a lexeme at start
     unsigned postfixed: 1; // if rule has a lexeme at end
 } RuleEntry;
 
-// could I hash TypeExprs here somehow?
-typedef struct RuleNode {
-    Vec nexts;
-    TypeExpr *te;
+#define RULENODE_NEXT_LEN 64
 
-    Rule rule;
-    unsigned terminates: 1; // whether `rule` is valid
+typedef struct RuleNode {
+    Rule rule; // can check validity with Rule_is_valid
+
+    struct RuleNode *next_expr; // if node can be followed by expr
+    struct RuleNode *next_lxm[RULENODE_NEXT_LEN];
+    const Word *next_lxm_type[RULENODE_NEXT_LEN];
+    size_t num_next_lxms;
 } RuleNode;
 
 typedef struct RuleTree {
@@ -87,9 +56,10 @@ typedef struct RuleTree {
 RuleTree RuleTree_new(void);
 void RuleTree_del(RuleTree *);
 
-Rule Rule_define(Fungus *, RuleDef *def);
-RuleEntry *Rule_get(RuleTree *, Rule rule);
+Rule Rule_define(RuleTree *, RuleDef *def);
+bool Rule_is_valid(Rule rule);
+RuleEntry *Rule_get(const RuleTree *, Rule rule);
 
-void RuleTree_dump(Fungus *, RuleTree *);
+void RuleTree_dump(const RuleTree *);
 
 #endif

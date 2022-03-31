@@ -94,6 +94,17 @@ File File_read_stdin(void) {
     return f;
 }
 
+File File_from_str(const char *filepath, const char *str, size_t len) {
+   File f = {
+       .filepath = filepath,
+       .text = { str, len }
+   };
+
+   get_file_lines(&f);
+
+   return f;
+}
+
 void File_del(File *f) {
     free((char *)f->text.str);
     free(f->lines);

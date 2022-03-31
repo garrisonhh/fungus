@@ -30,8 +30,26 @@ cleanup_read:
     }
 }
 
+
+#include "lang/pattern.h"
+#include "lang/rules.h"
+
 int main(int argc, char **argv) {
     // TODO opt parsing eventually
+
+#if 1
+    RuleTree rt = RuleTree_new();
+
+    Rule_define(&rt, &(RuleDef){
+        .name = WORD("Add"),
+        .pat = Pattern_from(&rt.pool, "a: Number `+ b: Number")
+    });
+
+    RuleTree_dump(&rt);
+
+    RuleTree_del(&rt);
+    exit(0);
+#endif
 
     repl();
 

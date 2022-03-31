@@ -21,6 +21,7 @@ typedef struct File {
 
 File File_open(const char *filepath);
 File File_read_stdin(void);
+File File_from_str(const char *filepath, const char *str, size_t len);
 void File_del(File *);
 
 // print out locations in a file

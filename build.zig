@@ -58,9 +58,18 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             // current rewrite build
             const sources = [_][]const u8 {
                 "main.c",
-                "file.c",
+
+                // lexical analysis
                 "lex.c",
 
+                // parsing
+                "parse.c",
+                "lang/rules.c",
+                "lang/precedence.c",
+                "lang/pattern.c",
+
+                // utility
+                "file.c",
                 "utils.c",
                 "data.c",
             };
