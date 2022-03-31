@@ -46,6 +46,8 @@ Rule Rule_define(RuleTree *rt, RuleDef *def) {
         .postfixed = !def->pat.is_expr[def->pat.len - 1],
     };
 
+    Vec_push(&rt->entries, entry);
+
     // place entry
     Pattern *pat = &def->pat;
     RuleNode *trav = rt->root;
@@ -69,8 +71,7 @@ Rule Rule_define(RuleTree *rt, RuleDef *def) {
             }
 
             if (!next) {
-                next =
-                    trav->next_lxm[trav->num_next_lxms] = RT_new_node(rt);
+                next = trav->next_lxm[trav->num_next_lxms] = RT_new_node(rt);
                 trav->next_lxm_type[trav->num_next_lxms] = pat->pat[i];
                 ++trav->num_next_lxms;
             }
@@ -92,7 +93,7 @@ bool Rule_is_valid(Rule rule) {
     return rule.id > 0;
 }
 
-RuleEntry *Rule_get(const RuleTree *rt, Rule rule) {
+const RuleEntry *Rule_get(const RuleTree *rt, Rule rule) {
     assert(Rule_is_valid(rule));
 
     return rt->entries.data[rule.id - 1];
@@ -101,8 +102,21 @@ RuleEntry *Rule_get(const RuleTree *rt, Rule rule) {
 #define INDENT 2
 
 static void RuleNode_dump(const RuleTree *rt, RuleNode *node, int level) {
+    // print terminus name
+    if (Rule_is_valid(node->rule)) {
+        const Word *name = Rule_get(rt, node->rule)->name;
+
+        printf(TC_RED " -> %.*s" TC_RESET,
+               (int)name->len, name->str);
+    }
+
+    // print newline after everything but root
+    if (level)
+        puts("");
+
+    // print nexts
     if (node->next_expr) {
-        printf("%*s" TC_BLUE "expr" TC_RESET "\n", INDENT * level, "");
+        printf("%*s" TC_BLUE "expr" TC_RESET, INDENT * level, "");
 
         RuleNode_dump(rt, node->next_expr, level + 1);
     }
@@ -110,7 +124,7 @@ static void RuleNode_dump(const RuleTree *rt, RuleNode *node, int level) {
     for (size_t i = 0; i < node->num_next_lxms; ++i) {
         const Word *name = node->next_lxm_type[i];
 
-        printf("%*s%.*s\n", INDENT * level, "", (int)name->len, name->str);
+        printf("%*s%.*s", INDENT * level, "", (int)name->len, name->str);
 
         RuleNode_dump(rt, node->next_lxm[i], level + 1);
     }
@@ -118,8 +132,6 @@ static void RuleNode_dump(const RuleTree *rt, RuleNode *node, int level) {
 
 void RuleTree_dump(const RuleTree *rt) {
     puts(TC_CYAN "RuleTree:" TC_RESET);
-
     RuleNode_dump(rt, rt->root, 0);
-
     puts("");
 }

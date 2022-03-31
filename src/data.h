@@ -30,6 +30,10 @@ typedef struct Bump {
     Vec pages, lost_n_found;
     char *page;
     size_t bump;
+
+#ifdef DEBUG
+    size_t total, allocated;
+#endif
 } Bump;
 
 Bump Bump_new(void);

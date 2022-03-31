@@ -50,7 +50,8 @@ static void get_file_lines(File *f) {
 File File_open(const char *filepath) {
     File f = {
         .filepath = filepath,
-        .text = read_file(filepath)
+        .text = read_file(filepath),
+        .owns_text = true
     };
 
     get_file_lines(&f);
@@ -59,7 +60,7 @@ File File_open(const char *filepath) {
 }
 
 File File_read_stdin(void) {
-    File f = { .filepath = "stdin" };
+    File f = { .filepath = "stdin", .owns_text = true };
 
     // read lines from stdin until an empty line is read
 #define FGETS_BUFSIZE 4096
@@ -106,7 +107,9 @@ File File_from_str(const char *filepath, const char *str, size_t len) {
 }
 
 void File_del(File *f) {
-    free((char *)f->text.str);
+    if (f->owns_text)
+        free((char *)f->text.str);
+
     free(f->lines);
 }
 

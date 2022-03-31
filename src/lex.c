@@ -5,10 +5,6 @@
 #include "data.h"
 #include "utils.h"
 
-#ifndef TOKBUF_INIT_CAP
-#define TOKBUF_INIT_CAP 256
-#endif
-
 #define IN_RANGE(C, A, B) ((C) >= (A) && (C) <= (B))
 
 static bool ch_is_alpha(char c) {
@@ -158,10 +154,15 @@ lex_error:
     global_error = true;
 }
 
+#ifndef TOKBUF_INIT_CAP
+#define TOKBUF_INIT_CAP 32
+#endif
+
 TokBuf lex(const File *file) {
     // make empty TokBuf
     TokBuf tb = { .cap = TOKBUF_INIT_CAP, .file = file };
 
+    // custom allocator for tokbuf might be dope in the far future
     tb.types = malloc(tb.cap * sizeof(*tb.types));
     tb.starts = malloc(tb.cap * sizeof(*tb.starts));
     tb.lens = malloc(tb.cap * sizeof(*tb.lens));

@@ -58,7 +58,7 @@ void RuleTree_del(RuleTree *);
 
 Rule Rule_define(RuleTree *, RuleDef *def);
 bool Rule_is_valid(Rule rule);
-RuleEntry *Rule_get(const RuleTree *, Rule rule);
+const RuleEntry *Rule_get(const RuleTree *, Rule rule);
 
 void RuleTree_dump(const RuleTree *);
 

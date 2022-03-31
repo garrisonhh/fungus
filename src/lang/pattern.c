@@ -35,15 +35,19 @@ Pattern Pattern_from(Bump *pool, const char *str) {
 
     // move words to pattern
     Pattern pat = {
-        .pat = (const Word **)words.data,
-        .is_expr = malloc(words.len * sizeof(bool)),
+        .pat = Bump_alloc(pool, words.len * sizeof(const Word *)),
+        .is_expr = Bump_alloc(pool, words.len * sizeof(bool)),
         .len = words.len
     };
 
-    for (size_t i = 0; i < pat.len; ++i)
+    for (size_t i = 0; i < pat.len; ++i) {
+        pat.pat[i] = Word_copy_of(words.data[i], pool);
         pat.is_expr[i] = !ispunct(pat.pat[i]->str[0]);
+    }
 
+    Vec_del(&words);
     TokBuf_del(&tokens);
+    File_del(&f);
 
     return pat;
 }

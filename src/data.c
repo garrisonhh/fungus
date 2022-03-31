@@ -96,6 +96,10 @@ static void new_page(Bump *b) {
     b->bump = 0;
 
     Vec_push(&b->pages, b->page);
+
+#ifdef DEBUG
+    b->allocated += BUMP_PAGE_SIZE;
+#endif
 }
 
 Bump Bump_new(void) {
@@ -110,11 +114,20 @@ Bump Bump_new(void) {
 }
 
 void Bump_del(Bump *b) {
+#ifdef DEBUG
+    char buf[256];
+    sprintf(buf, "%zu/%zu", b->total, b->allocated);
+    printf("deleting bump: %10s\n", buf);
+#endif
+
     for (size_t i = 0; i < b->pages.len; ++i)
         free(b->pages.data[i]);
 
     for (size_t i = 0; i < b->lost_n_found.len; ++i)
         free(b->lost_n_found.data[i]);
+
+    Vec_del(&b->pages);
+    Vec_del(&b->lost_n_found);
 }
 
 void *Bump_alloc(Bump *b, size_t nbytes) {
@@ -130,6 +143,10 @@ void *Bump_alloc(Bump *b, size_t nbytes) {
 
         Vec_push(&b->lost_n_found, mem);
 
+#ifdef DEBUG
+        b->allocated += nbytes;
+#endif
+
         return mem;
     } else if (nbytes + b->bump > BUMP_PAGE_SIZE) {
         // page would overflow if allocating this memory, need a new one
@@ -140,6 +157,10 @@ void *Bump_alloc(Bump *b, size_t nbytes) {
     void *ptr = &b->page[b->bump];
 
     b->bump += nbytes;
+
+#ifdef DEBUG
+    b->total += nbytes;
+#endif
 
     return ptr;
 }
@@ -155,6 +176,10 @@ void Bump_clear(Bump *b) {
     // reset bump
     b->page = b->pages.data[0];
     b->bump = 0;
+
+#ifdef DEBUG
+    b->total = 0;
+#endif
 }
 
 // views + words ===============================================================

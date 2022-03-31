@@ -11,12 +11,14 @@
 
 typedef struct File {
     const char *filepath;
+    View text;
 
     // a list of char indices for the beginning of each line
     hsize_t *lines;
     size_t lines_len;
 
-    View text;
+    // flags
+    unsigned owns_text: 1;
 } File;
 
 File File_open(const char *filepath);

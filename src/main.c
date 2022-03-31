@@ -44,6 +44,22 @@ int main(int argc, char **argv) {
         .name = WORD("Add"),
         .pat = Pattern_from(&rt.pool, "a: Number `+ b: Number")
     });
+    Rule_define(&rt, &(RuleDef){
+        .name = WORD("Subtract"),
+        .pat = Pattern_from(&rt.pool, "a: Number `- b: Number")
+    });
+    Rule_define(&rt, &(RuleDef){
+        .name = WORD("Multiply"),
+        .pat = Pattern_from(&rt.pool, "a: Number `* b: Number")
+    });
+    Rule_define(&rt, &(RuleDef){
+        .name = WORD("Divide"),
+        .pat = Pattern_from(&rt.pool, "a: Number `/ b: Number")
+    });
+    Rule_define(&rt, &(RuleDef){
+        .name = WORD("Modulo"),
+        .pat = Pattern_from(&rt.pool, "a: Number `% b: Number")
+    });
 
     RuleTree_dump(&rt);
 
