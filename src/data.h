@@ -144,6 +144,8 @@ HashSet HashSet_new(void);
 void HashSet_del(HashSet *);
 
 void HashSet_put(HashSet *, const Word *word);
-bool HashSet_has(HashSet *, const Word *word);
+bool HashSet_has(const HashSet *, const Word *word);
+
+void HashSet_print(const HashSet *);
 
 #endif

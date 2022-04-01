@@ -18,8 +18,8 @@
  */
 typedef struct RuleDef {
     Word name;
-    Pattern pat;
     Prec prec;
+    Pattern pat;
 } RuleDef;
 
 typedef struct RuleHandle { unsigned id; } Rule;
@@ -27,7 +27,6 @@ typedef struct RuleHandle { unsigned id; } Rule;
 // used to store rule data within ruletree entries
 typedef struct RuleEntry {
     const Word *name;
-    // Rule rule;
     Pattern pat;
     Prec prec;
 

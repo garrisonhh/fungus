@@ -3,11 +3,13 @@
 PrecGraph PrecGraph_new(void) {
     return (PrecGraph){
         .pool = Bump_new(),
-        .entries = Vec_new()
+        .entries = Vec_new(),
+        .by_name = IdMap_new()
     };
 }
 
 void PrecGraph_del(PrecGraph *pg) {
+    IdMap_del(&pg->by_name);
     Vec_del(&pg->entries);
     Bump_del(&pg->pool);
 }
@@ -16,11 +18,11 @@ static void *PG_alloc(PrecGraph *pg, size_t n_bytes) {
     return Bump_alloc(&pg->pool, n_bytes);
 }
 
-static PrecEntry *PG_get(PrecGraph *pg, Prec handle) {
+static PrecEntry *PG_get(const PrecGraph *pg, Prec handle) {
     return pg->entries.data[handle.id];
 }
 
-static bool PG_higher_than(PrecGraph *pg, PrecEntry *entry, Prec object) {
+static bool PG_higher_than(const PrecGraph *pg, PrecEntry *entry, Prec object) {
     // check if object is directly contained in lhs->above
     for (size_t i = 0; i < entry->above_len; ++i)
         if (entry->above[i].id == object.id)
@@ -48,6 +50,7 @@ Prec Prec_define(PrecGraph *pg, PrecDef *def) {
         entry->above[i] = def->above[i];
 
     Vec_push(&pg->entries, entry);
+    IdMap_put(&pg->by_name, entry->name, handle.id);
 
     // add to any below lists
     for (size_t i = 0; i < def->below_len; ++i) {
@@ -67,7 +70,29 @@ Prec Prec_define(PrecGraph *pg, PrecDef *def) {
     return handle;
 }
 
-Comparison Prec_cmp(PrecGraph *pg, Prec a, Prec b) {
+bool Prec_by_name_checked(PrecGraph *pg, const Word *name, Prec *o_prec) {
+    unsigned id;
+
+    if (IdMap_get_checked(&pg->by_name, name, &id)) {
+        o_prec->id = id;
+
+        return true;
+    }
+
+    return false;
+}
+
+Prec Prec_by_name(PrecGraph *pg, const Word *name) {
+    Prec res;
+
+    if (Prec_by_name_checked(pg, name, &res))
+        return res;
+
+    fungus_panic("failed to retrieve precedence %.*s.",
+                 (int)name->len, name->str);
+}
+
+Comparison Prec_cmp(const PrecGraph *pg, Prec a, Prec b) {
     if (PG_higher_than(pg, PG_get(pg, a), b))
         return GT;
     else if (PG_higher_than(pg, PG_get(pg, b), a))
@@ -76,7 +101,7 @@ Comparison Prec_cmp(PrecGraph *pg, Prec a, Prec b) {
         return EQ;
 }
 
-void PrecGraph_dump(PrecGraph *pg) {
+void PrecGraph_dump(const PrecGraph *pg) {
     puts(TC_CYAN "PrecGraph:" TC_RESET);
 
     for (size_t i = 0; i < pg->entries.len; ++i) {

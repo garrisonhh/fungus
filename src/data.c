@@ -406,7 +406,7 @@ bool IdSet_has(IdSet *set, unsigned id) {
 
 static HashMap HashMap_new_lower(bool is_set) {
     return (HashMap){
-        .keys = malloc(DATA_INIT_CAP * sizeof(Word)),
+        .keys = calloc(DATA_INIT_CAP, sizeof(Word)),
         .values = is_set ? NULL : malloc(DATA_INIT_CAP * sizeof(void *)),
         .cap = DATA_INIT_CAP,
 
@@ -430,7 +430,9 @@ static void HashMap_put_lower(HashMap *map, const Word *key, void *value) {
         index = (index + 1) % map->cap;
 
     map->keys[index] = *key;
-    map->values[index] = value;
+
+    if (!map->is_set)
+        map->values[index] = value;
 }
 
 static void HashMap_resize(HashMap *map, size_t new_cap) {
@@ -503,6 +505,23 @@ void HashSet_put(HashSet *set, const Word *word) {
     HashMap_put(&set->map, word, NULL);
 }
 
-bool HashSet_has(HashSet *set, const Word *word) {
+bool HashSet_has(const HashSet *set, const Word *word) {
     return HashMap_get_checked(&set->map, word, NULL);
+}
+
+void HashSet_print(const HashSet *set) {
+    bool first = true;
+
+    for (size_t i = 0; i < set->map.cap; ++i) {
+        const Word *key = &set->map.keys[i];
+
+        if (key->str) {
+            if (first)
+                first = false;
+            else
+                printf(" ");
+
+            printf("%.*s", (int)key->len, key->str);
+        }
+    }
 }

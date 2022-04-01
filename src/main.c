@@ -30,40 +30,20 @@ cleanup_read:
     }
 }
 
-
-#include "lang/pattern.h"
-#include "lang/rules.h"
+#if 1
+#include "lang.h"
+#include "lang/fungus.h"
+#endif
 
 int main(int argc, char **argv) {
     // TODO opt parsing eventually
 
 #if 1
-    RuleTree rt = RuleTree_new();
+    Lang fun = base_fungus();
 
-    Rule_define(&rt, &(RuleDef){
-        .name = WORD("Add"),
-        .pat = Pattern_from(&rt.pool, "a: Number `+ b: Number")
-    });
-    Rule_define(&rt, &(RuleDef){
-        .name = WORD("Subtract"),
-        .pat = Pattern_from(&rt.pool, "a: Number `- b: Number")
-    });
-    Rule_define(&rt, &(RuleDef){
-        .name = WORD("Multiply"),
-        .pat = Pattern_from(&rt.pool, "a: Number `* b: Number")
-    });
-    Rule_define(&rt, &(RuleDef){
-        .name = WORD("Divide"),
-        .pat = Pattern_from(&rt.pool, "a: Number `/ b: Number")
-    });
-    Rule_define(&rt, &(RuleDef){
-        .name = WORD("Modulo"),
-        .pat = Pattern_from(&rt.pool, "a: Number `% b: Number")
-    });
+    Lang_dump(&fun);
 
-    RuleTree_dump(&rt);
-
-    RuleTree_del(&rt);
+    Lang_del(&fun);
     exit(0);
 #endif
 

@@ -4,6 +4,8 @@
 /*
  * precedence is represented by a directed acyclic graph, allowing for intuitive
  * and symbolic runtime definition of precedences.
+ *
+ * TODO simplifying this seems like a good idea
  */
 
 #include "../data.h"
@@ -28,8 +30,7 @@ typedef struct PrecEntry {
 typedef struct PrecGraph {
     Bump pool;
     Vec entries; // entries indexed by id
-
-    // TODO impl IdMap here
+    IdMap by_name;
 } PrecGraph;
 
 typedef struct PrecDef {
@@ -42,8 +43,10 @@ PrecGraph PrecGraph_new(void);
 void PrecGraph_del(PrecGraph *);
 
 Prec Prec_define(PrecGraph *, PrecDef *def);
-Comparison Prec_cmp(PrecGraph *, Prec a, Prec b);
+bool Prec_by_name_checked(PrecGraph *, const Word *name, Prec *o_prec);
+Prec Prec_by_name(PrecGraph *, const Word *name);
+Comparison Prec_cmp(const PrecGraph *, Prec a, Prec b);
 
-void PrecGraph_dump(PrecGraph *);
+void PrecGraph_dump(const PrecGraph *);
 
 #endif

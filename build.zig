@@ -64,9 +64,11 @@ pub fn build(b: *std.build.Builder) anyerror!void {
 
                 // parsing
                 "parse.c",
+                "lang.c",
                 "lang/rules.c",
                 "lang/precedence.c",
                 "lang/pattern.c",
+                "lang/fungus.c",
 
                 // utility
                 "file.c",

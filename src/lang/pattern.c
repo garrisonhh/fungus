@@ -14,8 +14,8 @@ Pattern Pattern_from(Bump *pool, const char *str) {
     File f = File_from_str("pattern", str, strlen(str));
     TokBuf tokens = lex(&f);
 
-    // copy exprs + symbols
-    Vec words = Vec_new(); // Vec<Word *>
+    // copy exprs + lexemes
+    Vec words = Vec_new(), is_expr = Vec_new();
 
     for (size_t i = 1; i < tokens.len; ++i) {
         if (tokens.types[i] == TOK_SYMBOLS) {
@@ -25,10 +25,12 @@ Pattern Pattern_from(Bump *pool, const char *str) {
                 Word expr_ident = word_of_tok(&tokens, i - 1);
 
                 Vec_push(&words, Word_copy_of(&expr_ident, pool));
+                Vec_push(&is_expr, (void *)1);
             } else if (tok.str[0] == '`') {
-                Word sym = Word_new(&tok.str[1], tok.len - 1);
+                Word lxm = Word_new(&tok.str[1], tok.len - 1);
 
-                Vec_push(&words, Word_copy_of(&sym, pool));
+                Vec_push(&words, Word_copy_of(&lxm, pool));
+                Vec_push(&is_expr, NULL);
             }
         }
     }
@@ -42,9 +44,10 @@ Pattern Pattern_from(Bump *pool, const char *str) {
 
     for (size_t i = 0; i < pat.len; ++i) {
         pat.pat[i] = Word_copy_of(words.data[i], pool);
-        pat.is_expr[i] = !ispunct(pat.pat[i]->str[0]);
+        pat.is_expr[i] = (bool)is_expr.data[i];
     }
 
+    Vec_del(&is_expr);
     Vec_del(&words);
     TokBuf_del(&tokens);
     File_del(&f);
