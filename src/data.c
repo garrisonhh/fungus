@@ -493,6 +493,34 @@ void *HashMap_get(const HashMap *map, const Word *key) {
                  (int)key->len, key->str);
 }
 
+size_t HashMap_get_longest(const HashMap *map, const View *key, void **o_val) {
+    hash_t hash = fnv_hash_start();
+    size_t matched = 0;
+    void *best = NULL;
+
+    for (size_t i = 0; i < key->len; ++i) {
+        hash = fnv_hash_next(hash, key->str[i]);
+
+        Word slice = {
+            .str = key->str,
+            .len = i + 1,
+            .hash = hash
+        };
+
+        void *value = NULL;
+
+        if (HashMap_get_checked(map, &slice, &value)) {
+            best = value;
+            matched = i;
+        }
+    }
+
+    if (o_val)
+        *o_val = best;
+
+    return matched;
+}
+
 HashSet HashSet_new(void) {
     return (HashSet){ HashMap_new_lower(true) };
 }
@@ -507,6 +535,10 @@ void HashSet_put(HashSet *set, const Word *word) {
 
 bool HashSet_has(const HashSet *set, const Word *word) {
     return HashMap_get_checked(&set->map, word, NULL);
+}
+
+size_t HashSet_longest(const HashSet *set, const View *word) {
+    return HashMap_get_longest(&set->map, word, NULL);
 }
 
 void HashSet_print(const HashSet *set) {

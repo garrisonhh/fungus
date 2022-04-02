@@ -81,8 +81,23 @@ Rule Rule_define(RuleTree *rt, RuleDef *def) {
     }
 
     // place rule
-    if (Rule_is_valid(trav->rule))
-        fungus_panic("duplicate rule"); // TODO more intelligent error
+    if (Rule_is_valid(trav->rule)) {
+        fungus_error("duplicate rules:");
+
+#define PRINT_RULE(PAT, NAME) {\
+    Pattern_print(PAT);\
+    printf(" -> %.*s\n", (int)(NAME)->len, (NAME)->str);\
+}
+        const RuleEntry *entry = Rule_get(rt, trav->rule);
+
+        PRINT_RULE(&entry->pat, entry->name);
+        PRINT_RULE(pat, &def->name);
+
+#undef PRINT_RULE
+
+        // TODO don't panic
+        abort();
+    }
 
     trav->rule = handle;
 

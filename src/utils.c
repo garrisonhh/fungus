@@ -66,3 +66,14 @@ hash_t fnv_hash(const char *data, size_t nbytes) {
 
     return hash;
 }
+
+hash_t fnv_hash_start(void) {
+    return FNV_BASIS;
+}
+
+hash_t fnv_hash_next(hash_t hash, char byte) {
+    hash ^= (hash_t)byte;
+    hash *= FNV_PRIME;
+
+    return hash;
+}

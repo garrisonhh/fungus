@@ -4,17 +4,22 @@
 
 #define PRECS\
     PREC("Lowest")\
+    PREC("Assignment")\
     PREC("AddSub")\
     PREC("MulDiv")\
     PREC("Highest")\
 
 // table of name, prec, pattern
 #define RULES\
-    RULE("Add",      "AddSub", "a: Number `+ b: Number")\
-    RULE("Subtract", "AddSub", "a: Number `- b: Number")\
-    RULE("Multiply", "MulDiv", "a: Number `* b: Number")\
-    RULE("Divide",   "MulDiv", "a: Number `/ b: Number")\
-    RULE("Modulo",   "MulDiv", "a: Number `% b: Number")\
+    RULE("Add",       "AddSub",     "a: Number `+ b: Number")\
+    RULE("Subtract",  "AddSub",     "a: Number `- b: Number")\
+    RULE("Multiply",  "MulDiv",     "a: Number `* b: Number")\
+    RULE("Divide",    "MulDiv",     "a: Number `/ b: Number")\
+    RULE("Modulo",    "MulDiv",     "a: Number `% b: Number")\
+    \
+    RULE("Assign",    "Assignment", "name: Ident `= rvalue: Any")\
+    RULE("ConstDecl", "Assignment", "`const assign: Assign")\
+    RULE("LetDecl",   "Assignment", "`let assign: Assign")\
 
 Lang base_fungus(void) {
 #ifdef DEBUG

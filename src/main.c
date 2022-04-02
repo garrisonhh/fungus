@@ -3,8 +3,12 @@
 
 #include "file.h"
 #include "lex.h"
+#include "parse.h"
+#include "lang/fungus.h"
 
 void repl(void) {
+    Lang fun = base_fungus();
+
     puts(TC_YELLOW "fungus v0 - by garrisonhh" TC_RESET);
 
     while (!feof(stdin)) {
@@ -20,7 +24,14 @@ void repl(void) {
         TokBuf_dump(&tokbuf);
 #endif
 
+        // parse
+        Bump parse_pool = Bump_new();
+        Expr *ast = parse(&parse_pool, &fun, &tokbuf);
+        if (global_error) goto cleanup_parse;
+
         // cleanup
+cleanup_parse:
+        Bump_del(&parse_pool);
 cleanup_lex:
         TokBuf_del(&tokbuf);
 cleanup_read:
@@ -28,24 +39,12 @@ cleanup_read:
 
         global_error = false;
     }
-}
 
-#if 1
-#include "lang.h"
-#include "lang/fungus.h"
-#endif
+    Lang_del(&fun);
+}
 
 int main(int argc, char **argv) {
     // TODO opt parsing eventually
-
-#if 1
-    Lang fun = base_fungus();
-
-    Lang_dump(&fun);
-
-    Lang_del(&fun);
-    exit(0);
-#endif
 
     repl();
 

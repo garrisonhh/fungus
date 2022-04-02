@@ -139,12 +139,16 @@ void HashMap_put(HashMap *, const Word *key, void *value);
 // HashMap_get panics, checked does not
 bool HashMap_get_checked(const HashMap *, const Word *key, void **o_value);
 void *HashMap_get(const HashMap *, const Word *key);
+// matches as much of the key as possible, returns length matched
+size_t HashMap_get_longest(const HashMap *, const View *key, void **o_value);
 
 HashSet HashSet_new(void);
 void HashSet_del(HashSet *);
 
 void HashSet_put(HashSet *, const Word *word);
 bool HashSet_has(const HashSet *, const Word *word);
+// matches as many chars as possible, returning length
+size_t HashSet_longest(const HashSet *, const View *word);
 
 void HashSet_print(const HashSet *);
 

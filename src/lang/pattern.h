@@ -28,6 +28,6 @@ typedef struct Pattern {
  */
 Pattern Pattern_from(Bump *, const char *str);
 
-void Pattern_print(Pattern *);
+void Pattern_print(const Pattern *);
 
 #endif

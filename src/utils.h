@@ -70,4 +70,8 @@ typedef uint64_t hash_t;
 
 hash_t fnv_hash(const char *data, size_t nbytes);
 
+// hash a byte at a time
+hash_t fnv_hash_start(void);
+hash_t fnv_hash_next(hash_t, char byte);
+
 #endif
