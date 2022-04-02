@@ -34,4 +34,6 @@ void File_error_at(const File *, hsize_t start, hsize_t len, const char *fmt,
                    ...);
 void File_error_from(const File *, hsize_t start, const char *fmt, ...);
 
+static inline hsize_t File_eof(const File *f) { return f->text.len; }
+
 #endif

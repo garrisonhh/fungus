@@ -13,6 +13,9 @@
 
 // TODO use File_errors throughout this file
 
+#define EXPR_ERROR(FILE_, EXPR, ...)\
+    File_error_at(FILE_, (EXPR)->tok_start, (EXPR)->tok_len, __VA_ARGS__)
+
 static Expr *new_expr(Bump *pool, ExprType type, hsize_t start, hsize_t len) {
     Expr *expr = Bump_alloc(pool, sizeof(*expr));
 
@@ -96,6 +99,28 @@ static void gen_flat_list(Vec *list, Bump *pool, const TokBuf *tb) {
     }
 }
 
+static void verify_scopes(const Vec *list, const File *file) {
+    int level = 0;
+
+    for (size_t i = 0; i < list->len; ++i) {
+        Expr *expr = list->data[i];
+
+        if (expr->type == EX_LEXEME && expr->tok_len == 1) {
+            char ch = file->text.str[expr->tok_start];
+
+            if (ch == '{') {
+                ++level;
+            } else if (ch == '}') {
+                if (--level < 0)
+                    EXPR_ERROR(file, expr, "unmatched curly.");
+            }
+        }
+    }
+
+    if (level > 0)
+        File_error_from(file, File_eof(file), "unfinished scope at EOF.");
+}
+
 Scope gen_scope_tree(Bump *pool, const TokBuf *tb) {
     Vec root_list = Vec_new();
 
@@ -113,10 +138,12 @@ Scope gen_scope_tree(Bump *pool, const TokBuf *tb) {
     for (size_t i = 0; i < root_list.len; ++i) {
         Expr *expr = root_list.data[i];
 
-        printf("%+16s | `%.*s`\n", exnames[expr->type],
+        printf("%16s | `%.*s`\n", exnames[expr->type],
                (int)expr->tok_len, &text[expr->tok_start]);
     }
 #endif
+
+    verify_scopes(&root_list, tb->file);
 
     // TODO generate tree from flat list
 
