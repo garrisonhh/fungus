@@ -46,6 +46,7 @@ Prec Prec_define(PrecGraph *, PrecDef *def);
 bool Prec_by_name_checked(PrecGraph *, const Word *name, Prec *o_prec);
 Prec Prec_by_name(PrecGraph *, const Word *name);
 Comparison Prec_cmp(const PrecGraph *, Prec a, Prec b);
+Associativity Prec_assoc(const PrecGraph *, Prec prec);
 
 void PrecGraph_dump(const PrecGraph *);
 

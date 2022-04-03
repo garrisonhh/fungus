@@ -101,6 +101,10 @@ Comparison Prec_cmp(const PrecGraph *pg, Prec a, Prec b) {
         return EQ;
 }
 
+Associativity Prec_assoc(const PrecGraph *pg, Prec prec) {
+    return PG_get(pg, prec)->assoc;
+}
+
 void PrecGraph_dump(const PrecGraph *pg) {
     puts(TC_CYAN "PrecGraph:" TC_RESET);
 

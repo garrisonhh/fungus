@@ -250,13 +250,101 @@ static Expr *try_match(Bump *pool, const File *f, const RuleTree *rules,
     return rule_copy_of_slice(pool, best, slice, best_len);
 }
 
+static Expr **lhs_of(Expr *expr) {
+    assert(expr->type == EX_RULE);
+
+    return &expr->exprs[0];
+}
+
+static Expr **rhs_of(Expr *expr) {
+    assert(expr->type == EX_RULE);
+
+    return &expr->exprs[expr->len - 1];
+}
+
+typedef Expr **(*side_of_func)(Expr *);
+
+typedef enum { LEFT, RIGHT } RotDir;
+
+// returns if rotated
+static bool try_rotate(const Lang *lang, Expr *expr, RotDir dir,
+                       Expr **o_expr) {
+    assert(expr->type == EX_RULE);
+
+    side_of_func from_side = dir == RIGHT ? lhs_of : rhs_of;
+    side_of_func to_side = dir == RIGHT ? rhs_of : lhs_of;
+
+    printf("trying rotate %s\n", dir ? "r" : "l");
+
+    // grab pivot, check if it should swap
+    Expr **pivot = from_side(expr);
+
+    if ((*pivot)->type != EX_RULE)
+        return false;
+
+    puts("pivot could swap");
+
+    // grab swap node, check if it could swap
+    Expr **swap = to_side(*pivot);
+
+    if ((*swap)->type == EX_LEXEME)
+        return false;
+
+    puts("swap could swap");
+
+    // check if precedence necessitates a swap
+    Prec expr_prec = Rule_get(&lang->rules, expr->rule)->prec;
+    Prec pivot_prec = Rule_get(&lang->rules, (*pivot)->rule)->prec;
+
+    Comparison cmp = Prec_cmp(&lang->precs, expr_prec, pivot_prec);
+
+    bool prec_should_swap = cmp == GT;
+
+    if (!prec_should_swap && cmp == EQ) {
+        prec_should_swap = dir == RIGHT
+            ? Prec_assoc(&lang->precs, expr_prec) == ASSOC_RIGHT
+            : Prec_assoc(&lang->precs, expr_prec) == ASSOC_LEFT;
+    }
+
+    if (!prec_should_swap)
+        return false;
+
+    puts("prec should swap");
+
+    // perform the swap
+    *o_expr = *pivot;
+
+    Expr *mid = *swap;
+    *swap = expr;
+    *pivot = mid;
+
+    return true;
+}
+
+/*
+ * given a just-collapsed rule expr, checks if it needs to be rearranged to
+ * respect precedence rules
+ */
+static Expr *correct_precedence(const Lang *lang, Expr *expr) {
+    assert(expr->type == EX_RULE);
+
+    Expr *corrected;
+
+    if (try_rotate(lang, expr, RIGHT, &corrected)
+     || try_rotate(lang, expr, LEFT, &corrected)) {
+        return corrected;
+    }
+
+    return expr;
+}
+
 /*
  * heavily modifies `slice`. pass length in by pointer, after calling func the
  * returned slice will contain the fully collapsed scope and length will be
  * modified to reflect this
  */
 static Expr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
-                           Expr **slice, size_t *io_len) {
+                             Expr **slice, size_t *io_len) {
     const RuleTree *rules = &lang->rules;
     size_t len = *io_len;
 
@@ -279,6 +367,13 @@ static Expr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
                 continue;
             }
 
+
+            puts("checking prec on:");
+            Expr_dump(found, f);
+            found = correct_precedence(lang, found);
+            puts("corrected to:");
+            Expr_dump(found, f);
+
             // stitch slice
             size_t move_len = match_len - 1;
 
@@ -300,35 +395,10 @@ static Expr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
     return slice;
 }
 
-static Expr *correct_precedence(Expr *expr) {
-    // TODO
-
-    return expr;
-}
-
 Expr *parse_scope(Bump *pool, const File *f, const Lang *lang, Expr *expr) {
     assert(expr->type == EX_SCOPE);
 
-    // collapse rules
-    size_t len = expr->len;
-    Expr **exprs = expr->exprs;
-
-    exprs = collapse_rules(pool, f, lang, exprs, &len);
-
-    // correct precedence
-
-    /*
-    expr = correct_precedence(expr);
-    */
-
-    // return scope
-    expr->exprs = exprs;
-    expr->len = len;
-
-    puts(TC_CYAN "AST:" TC_RESET);
-    Expr_dump(expr, f);
-
-    exit(0);
+    expr->exprs = collapse_rules(pool, f, lang, expr->exprs, &expr->len);
 
     return expr;
 }
