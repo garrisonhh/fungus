@@ -11,13 +11,10 @@
  *    before they can be used for parsing
  */
 
-// TODO use File_errors throughout this file
+// stage 1: scope tree =========================================================
 
 // TODO get rid of this
 #define MAX_SCOPE_STACK 1024
-
-#define EXPR_ERROR(FILE_, EXPR, ...)\
-    File_error_at(FILE_, (EXPR)->tok_start, (EXPR)->tok_len, __VA_ARGS__)
 
 #define X(A) #A,
 const char *EX_NAME[EX_COUNT] = { EXPR_TYPES };
@@ -38,13 +35,8 @@ static Expr *new_expr(Bump *pool, ExprType type, hsize_t start, hsize_t len) {
 static Expr *new_scope(Bump *pool, Expr **exprs, size_t len) {
     Expr *expr = Bump_alloc(pool, sizeof(*expr));
 
-    Expr *left = exprs[0];
-    Expr *right = exprs[len - 1];
-
     *expr = (Expr){
         .type = EX_SCOPE,
-        .tok_start = left->tok_start,
-        .tok_len = right->tok_start + right->tok_len - left->tok_start,
         .scope = {
             .exprs = exprs,
             .len = len
@@ -129,7 +121,7 @@ static void verify_scopes(const Vec *list, const File *file) {
                 ++level;
             } else if (ch == '}') {
                 if (--level < 0)
-                    EXPR_ERROR(file, expr, "unmatched curly.");
+                    Expr_error(file, expr, "unmatched curly.");
             }
         }
     }
@@ -203,17 +195,65 @@ static Expr *gen_scope_tree(Bump *pool, const TokBuf *tb) {
     return expr;
 }
 
+// stage 2: rule parsing =======================================================
+
+static void collapse_rules() {
+
+}
+
+Expr *parse_scope(Bump *pool, const File *f, const Lang *lang, Expr *expr) {
+    assert(expr->type == EX_SCOPE);
+
+    Expr **slice = expr->scope.exprs;
+
+    for (size_t i = 0; i < expr->scope.len; ++i)
+        Expr_error(f, slice[i], "look");
+
+    fungus_panic("TODO this");
+
+    return expr;
+}
+
+// general =====================================================================
+
 Expr *parse(Bump *pool, const Lang *lang, const TokBuf *tb) {
-    Expr *raw_tree = gen_scope_tree(pool, tb);
+    return parse_scope(pool, tb->file, lang, gen_scope_tree(pool, tb));
+}
 
-    // TODO the rest of the fucking owl
+static hsize_t Expr_tok_start(const Expr *expr) {
+    while (expr->type == EX_SCOPE)
+        expr = expr->scope.exprs[0];
 
-    return raw_tree;
+    return expr->tok_start;
+}
+
+static hsize_t Expr_tok_len(const Expr *expr) {
+    hsize_t start = Expr_tok_start(expr);
+
+    while (expr->type == EX_SCOPE)
+        expr = expr->scope.exprs[expr->scope.len - 1];
+
+    return expr->tok_start + expr->tok_len - start;
+}
+
+void Expr_error(const File *f, const Expr *expr, const char *fmt, ...) {
+    va_list args;
+
+    va_start(args, fmt);
+    File_verror_at(f, Expr_tok_start(expr), Expr_tok_len(expr), fmt, args);
+    va_end(args);
+}
+
+void Expr_error_from(const File *f, const Expr *expr, const char *fmt, ...) {
+    va_list args;
+
+    va_start(args, fmt);
+    File_verror_from(f, Expr_tok_start(expr), fmt, args);
+    va_end(args);
 }
 
 void Expr_dump(const Expr *expr, const File *file) {
     const char *text = file->text.str;
-
     const Expr *scopes[MAX_SCOPE_STACK];
     size_t indices[MAX_SCOPE_STACK];
     size_t size = 0;

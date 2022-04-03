@@ -30,6 +30,11 @@ void File_del(File *);
 void File_display_at(FILE *, const File *, hsize_t start, hsize_t len);
 void File_display_from(FILE *, const File *, hsize_t start);
 
+void File_verror_at(const File *, hsize_t start, hsize_t len, const char *fmt,
+                    va_list args);
+void File_verror_from(const File *, hsize_t start, const char *fmt,
+                      va_list args);
+
 void File_error_at(const File *, hsize_t start, hsize_t len, const char *fmt,
                    ...);
 void File_error_from(const File *, hsize_t start, const char *fmt, ...);

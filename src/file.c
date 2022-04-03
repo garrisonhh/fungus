@@ -210,23 +210,31 @@ static void File_error_msg(const File *f, FileLoc loc, const char *fmt,
     fprintf(stderr, "\n");
 }
 
+void File_verror_at(const File *f, hsize_t start, hsize_t len, const char *fmt,
+                    va_list args) {
+    File_error_msg(f, loc_of(f, start), fmt, args);
+    File_display_at(stderr, f, start, len);
+}
+
+void File_verror_from(const File *f, hsize_t start, const char *fmt,
+                      va_list args) {
+    File_error_msg(f, loc_of(f, start), fmt, args);
+    File_display_from(stderr, f, start);
+}
+
 void File_error_at(const File *f, hsize_t start, hsize_t len, const char *fmt,
                    ...) {
     va_list args;
 
     va_start(args, fmt);
-    File_error_msg(f, loc_of(f, start), fmt, args);
+    File_verror_at(f, start, len, fmt, args);
     va_end(args);
-
-    File_display_at(stderr, f, start, len);
 }
 
 void File_error_from(const File *f, hsize_t start, const char *fmt, ...) {
     va_list args;
 
     va_start(args, fmt);
-    File_error_msg(f, loc_of(f, start), fmt, args);
+    File_verror_from(f, start, fmt, args);
     va_end(args);
-
-    File_display_from(stderr, f, start);
 }

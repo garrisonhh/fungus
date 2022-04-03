@@ -20,19 +20,29 @@ typedef enum ExprType { EXPR_TYPES EX_COUNT } ExprType;
 
 extern const char *EX_NAME[EX_COUNT];
 
-typedef struct Scope {
+typedef struct ExprScope {
     struct Expr **exprs;
     size_t len;
-} Scope;
+} ExprScope;
 
 typedef struct Expr {
     ExprType type;
-    hsize_t tok_start, tok_len;
-    Scope scope; // only used for scopes TODO don't waste this memory
+
+    union {
+        // for non-scopes
+        struct { hsize_t tok_start, tok_len; };
+        // for scopes
+        ExprScope scope;
+    };
 } Expr;
 
+// parses scope from raw tokens
 Expr *parse(Bump *, const Lang *, const TokBuf *);
+// parses an expr scope given a language
+Expr *parse_scope(Bump *, const File *, const Lang *, Expr *);
 
+void Expr_error(const File *, const Expr *, const char *fmt, ...);
+void Expr_error_from(const File *, const Expr *, const char *fmt, ...);
 void Expr_dump(const Expr *, const File *);
 
 #endif
