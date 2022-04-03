@@ -14,7 +14,7 @@ void repl(void) {
     while (!feof(stdin)) {
         // read stdin
         File file = File_read_stdin();
-        if (global_error) goto cleanup_read;
+        if (global_error || feof(stdin)) goto cleanup_read;
 
         // lex
         TokBuf tokbuf = lex(&file);
@@ -28,6 +28,11 @@ void repl(void) {
         Bump parse_pool = Bump_new();
         Expr *ast = parse(&parse_pool, &fun, &tokbuf);
         if (global_error) goto cleanup_parse;
+
+#if 1
+        puts(TC_CYAN "ast:" TC_RESET);
+        Expr_dump(ast, tokbuf.file);
+#endif
 
         // cleanup
 cleanup_parse:

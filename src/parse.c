@@ -13,8 +13,15 @@
 
 // TODO use File_errors throughout this file
 
+// TODO get rid of this
+#define MAX_SCOPE_STACK 1024
+
 #define EXPR_ERROR(FILE_, EXPR, ...)\
     File_error_at(FILE_, (EXPR)->tok_start, (EXPR)->tok_len, __VA_ARGS__)
+
+#define X(A) #A,
+const char *EX_NAME[EX_COUNT] = { EXPR_TYPES };
+#undef X
 
 static Expr *new_expr(Bump *pool, ExprType type, hsize_t start, hsize_t len) {
     Expr *expr = Bump_alloc(pool, sizeof(*expr));
@@ -29,21 +36,31 @@ static Expr *new_expr(Bump *pool, ExprType type, hsize_t start, hsize_t len) {
 }
 
 static Expr *new_scope(Bump *pool, Expr **exprs, size_t len) {
-    assert(len > 0);
-
     Expr *expr = Bump_alloc(pool, sizeof(*expr));
 
-    Expr *leftmost = exprs[0];
-    Expr *rightmost = exprs[len - 1];
+    Expr *left = exprs[0];
+    Expr *right = exprs[len - 1];
 
     *expr = (Expr){
         .type = EX_SCOPE,
-        .tok_start = leftmost->tok_start,
-        .tok_len =
-            (rightmost->tok_start + rightmost->tok_len) - leftmost->tok_start
+        .tok_start = left->tok_start,
+        .tok_len = right->tok_start + right->tok_len - left->tok_start,
+        .scope = {
+            .exprs = exprs,
+            .len = len
+        }
     };
 
     return expr;
+}
+
+static Expr *scope_from_vec(Bump *pool, Vec *vec) {
+    Expr **exprs = Bump_alloc(pool, vec->len * sizeof(*exprs));
+
+    for (size_t j = 0; j < vec->len; ++j)
+        exprs[j] = vec->data[j];
+
+    return new_scope(pool, exprs, vec->len);
 }
 
 // turns tokens -> list of exprs, separating `{` and `}` as symbols but not
@@ -121,16 +138,50 @@ static void verify_scopes(const Vec *list, const File *file) {
         File_error_from(file, File_eof(file), "unfinished scope at EOF.");
 }
 
-Scope gen_scope_tree(Bump *pool, const TokBuf *tb) {
+// takes a verified list from gen_flat_list and makes a scope tree
+static Expr *unflatten_list(Bump *pool, const File *file, const Vec *list) {
+    const char *text = file->text.str;
+
+    Vec levels[MAX_SCOPE_STACK];
+    size_t level = 0;
+
+    levels[level++] = Vec_new();
+
+    for (size_t i = 0; i < list->len; ++i) {
+        Expr *expr = list->data[i];
+
+        if (expr->type == EX_LEXEME) {
+            if (text[expr->tok_start] == '{') {
+                // create new scope vec
+                levels[level++] = Vec_new();
+
+                continue;
+            } else if (text[expr->tok_start] == '}') {
+                // turn scope vec into a scope on pool
+                Vec *vec = &levels[--level];
+
+                expr = scope_from_vec(pool, vec);
+
+                Vec_del(vec);
+            }
+        }
+
+        Vec_push(&levels[level - 1], expr);
+    }
+
+    Expr *tree = scope_from_vec(pool, &levels[0]);
+
+    Vec_del(&levels[0]);
+
+    return tree;
+}
+
+static Expr *gen_scope_tree(Bump *pool, const TokBuf *tb) {
     Vec root_list = Vec_new();
 
     gen_flat_list(&root_list, pool, tb);
 
 #if 1
-#define X(A) #A,
-    const char *exnames[] = { EXPR_TYPES };
-#undef X
-
     const char *text = tb->file->text.str;
 
     puts(TC_CYAN "generated flat list:" TC_RESET);
@@ -138,21 +189,74 @@ Scope gen_scope_tree(Bump *pool, const TokBuf *tb) {
     for (size_t i = 0; i < root_list.len; ++i) {
         Expr *expr = root_list.data[i];
 
-        printf("%16s | `%.*s`\n", exnames[expr->type],
+        printf("%10s `%.*s`\n", EX_NAME[expr->type],
                (int)expr->tok_len, &text[expr->tok_start]);
     }
 #endif
 
     verify_scopes(&root_list, tb->file);
 
-    // TODO generate tree from flat list
+    Expr *expr = unflatten_list(pool, tb->file, &root_list);
 
-    exit(0);
+    Vec_del(&root_list);
+
+    return expr;
 }
 
 Expr *parse(Bump *pool, const Lang *lang, const TokBuf *tb) {
-    Scope scope = gen_scope_tree(pool, tb);
+    Expr *raw_tree = gen_scope_tree(pool, tb);
 
-    // TODO
-    return NULL;
+    // TODO the rest of the fucking owl
+
+    return raw_tree;
+}
+
+void Expr_dump(const Expr *expr, const File *file) {
+    const char *text = file->text.str;
+
+    const Expr *scopes[MAX_SCOPE_STACK];
+    size_t indices[MAX_SCOPE_STACK];
+    size_t size = 0;
+
+    while (true) {
+        // print levels TODO
+        if (size > 0) {
+            for (size_t i = 0; i < size - 1; ++i) {
+                const char *c = "│";
+
+                if (indices[i] == scopes[i]->scope.len)
+                    c = " ";
+
+                printf("%s   ", c);
+            }
+
+            const char *c = indices[size - 1] == scopes[size - 1]->scope.len
+                ? "*" : "|";
+
+            printf("%s── ", c);
+        }
+
+        printf("%-10s", EX_NAME[expr->type]);
+
+        // print expr
+        if (expr->type == EX_SCOPE) {
+            scopes[size] = expr;
+            indices[size] = 0;
+            ++size;
+        } else {
+            printf(" `%.*s`", (int)expr->tok_len,
+                   &text[expr->tok_start]);
+        }
+
+        puts("");
+
+        // get next expr
+        while (size > 0 && indices[size - 1] >= scopes[size - 1]->scope.len)
+            --size;
+
+        if (!size)
+            break;
+
+        expr = scopes[size - 1]->scope.exprs[indices[size - 1]++];
+    }
 }

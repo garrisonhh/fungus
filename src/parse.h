@@ -6,8 +6,8 @@
 
 #define EXPR_TYPES\
     X(INVALID)\
-    X(LEXEME)\
     X(SCOPE)\
+    X(LEXEME)\
     X(IDENT)\
     X(LIT_BOOL)\
     X(LIT_INT)\
@@ -18,6 +18,8 @@
 typedef enum ExprType { EXPR_TYPES EX_COUNT } ExprType;
 #undef X
 
+extern const char *EX_NAME[EX_COUNT];
+
 typedef struct Scope {
     struct Expr **exprs;
     size_t len;
@@ -26,9 +28,11 @@ typedef struct Scope {
 typedef struct Expr {
     ExprType type;
     hsize_t tok_start, tok_len;
-    Scope scope; // only used for scopes TODO don't waste memory?
+    Scope scope; // only used for scopes TODO don't waste this memory
 } Expr;
 
 Expr *parse(Bump *, const Lang *, const TokBuf *);
+
+void Expr_dump(const Expr *, const File *);
 
 #endif

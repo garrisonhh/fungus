@@ -231,6 +231,17 @@ IdMap IdMap_new(void) {
 }
 
 void IdMap_del(IdMap *map) {
+    for (size_t i = 0; i < map->cap; ++i) {
+        IdMapNode *trav = map->nodes[i];
+
+        while (trav) {
+            IdMapNode *next = trav->next;
+
+            free(trav);
+            trav = next;
+        }
+    }
+
     free(map->nodes);
 }
 
