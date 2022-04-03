@@ -22,6 +22,7 @@ void repl(void) {
 
 #if 1
         TokBuf_dump(&tokbuf);
+        puts("");
 #endif
 
         // parse
@@ -30,7 +31,7 @@ void repl(void) {
         if (global_error) goto cleanup_parse;
 
 #if 1
-        puts(TC_CYAN "ast:" TC_RESET);
+        puts(TC_CYAN "AST:" TC_RESET);
         Expr_dump(ast, tokbuf.file);
 #endif
 

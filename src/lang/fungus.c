@@ -11,6 +11,8 @@
 
 // table of name, prec, pattern
 #define RULES\
+    RULE("Parens",    "Highest",    "`( expr: Any `)")\
+    \
     RULE("Add",       "AddSub",     "a: Number `+ b: Number")\
     RULE("Subtract",  "AddSub",     "a: Number `- b: Number")\
     RULE("Multiply",  "MulDiv",     "a: Number `* b: Number")\

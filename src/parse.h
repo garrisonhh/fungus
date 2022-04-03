@@ -7,6 +7,7 @@
 #define EXPR_TYPES\
     X(INVALID)\
     X(SCOPE)\
+    X(RULE)\
     X(LEXEME)\
     X(IDENT)\
     X(LIT_BOOL)\
@@ -20,19 +21,19 @@ typedef enum ExprType { EXPR_TYPES EX_COUNT } ExprType;
 
 extern const char *EX_NAME[EX_COUNT];
 
-typedef struct ExprScope {
-    struct Expr **exprs;
-    size_t len;
-} ExprScope;
-
 typedef struct Expr {
     ExprType type;
 
     union {
         // for non-scopes
         struct { hsize_t tok_start, tok_len; };
-        // for scopes
-        ExprScope scope;
+        // for scopes + rules
+        struct {
+            struct Expr **exprs;
+            size_t len;
+
+            Rule rule;
+        };
     };
 } Expr;
 

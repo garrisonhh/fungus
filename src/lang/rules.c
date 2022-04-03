@@ -40,10 +40,7 @@ Rule Rule_define(RuleTree *rt, RuleDef *def) {
     *entry = (RuleEntry){
         .name = Word_copy_of(&def->name, &rt->pool),
         .pat = def->pat,
-        .prec = def->prec,
-
-        .prefixed = !def->pat.is_expr[0],
-        .postfixed = !def->pat.is_expr[def->pat.len - 1],
+        .prec = def->prec
     };
 
     Vec_push(&rt->entries, entry);

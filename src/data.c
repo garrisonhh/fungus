@@ -216,9 +216,7 @@ bool Word_eq(const Word *a, const Word *b) {
 }
 
 bool Word_eq_view(const Word *a, const View *b) {
-    Word bw = Word_new(b->str, b->len);
-
-    return Word_eq(a, &bw);
+    return a->len == b->len && !strncmp(a->str, b->str, a->len);
 }
 
 // idmap =======================================================================

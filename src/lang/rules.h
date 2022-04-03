@@ -29,10 +29,6 @@ typedef struct RuleEntry {
     const Word *name;
     Pattern pat;
     Prec prec;
-
-    // flags for infix parsing
-    unsigned prefixed: 1; // if rule has a lexeme at start
-    unsigned postfixed: 1; // if rule has a lexeme at end
 } RuleEntry;
 
 #define RULENODE_NEXT_LEN 64

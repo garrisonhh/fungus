@@ -37,22 +37,38 @@ static Expr *new_scope(Bump *pool, Expr **exprs, size_t len) {
 
     *expr = (Expr){
         .type = EX_SCOPE,
-        .scope = {
-            .exprs = exprs,
-            .len = len
-        }
+        .exprs = exprs,
+        .len = len
     };
 
     return expr;
 }
 
-static Expr *scope_from_vec(Bump *pool, Vec *vec) {
-    Expr **exprs = Bump_alloc(pool, vec->len * sizeof(*exprs));
+static Expr *scope_copy_of_slice(Bump *pool, Expr **slice, size_t len) {
+    Expr **exprs = Bump_alloc(pool, len * sizeof(*exprs));
 
-    for (size_t j = 0; j < vec->len; ++j)
-        exprs[j] = vec->data[j];
+    for (size_t j = 0; j < len; ++j)
+        exprs[j] = slice[j];
 
-    return new_scope(pool, exprs, vec->len);
+    return new_scope(pool, exprs, len);
+}
+
+static Expr *rule_copy_of_slice(Bump *pool, Rule rule, Expr **slice,
+                                size_t len) {
+    Expr *expr = Bump_alloc(pool, sizeof(*expr));
+    Expr **exprs = Bump_alloc(pool, len * sizeof(*exprs));
+
+    for (size_t j = 0; j < len; ++j)
+        exprs[j] = slice[j];
+
+    *expr = (Expr){
+        .type = EX_RULE,
+        .exprs = exprs,
+        .len = len,
+        .rule = rule
+    };
+
+    return expr;
 }
 
 // turns tokens -> list of exprs, separating `{` and `}` as symbols but not
@@ -152,7 +168,7 @@ static Expr *unflatten_list(Bump *pool, const File *file, const Vec *list) {
                 // turn scope vec into a scope on pool
                 Vec *vec = &levels[--level];
 
-                expr = scope_from_vec(pool, vec);
+                expr = scope_copy_of_slice(pool, (Expr **)vec->data, vec->len);
 
                 Vec_del(vec);
             }
@@ -161,7 +177,8 @@ static Expr *unflatten_list(Bump *pool, const File *file, const Vec *list) {
         Vec_push(&levels[level - 1], expr);
     }
 
-    Expr *tree = scope_from_vec(pool, &levels[0]);
+    Expr *tree =
+        scope_copy_of_slice(pool, (Expr **)levels[0].data, levels[0].len);
 
     Vec_del(&levels[0]);
 
@@ -172,20 +189,6 @@ static Expr *gen_scope_tree(Bump *pool, const TokBuf *tb) {
     Vec root_list = Vec_new();
 
     gen_flat_list(&root_list, pool, tb);
-
-#if 1
-    const char *text = tb->file->text.str;
-
-    puts(TC_CYAN "generated flat list:" TC_RESET);
-
-    for (size_t i = 0; i < root_list.len; ++i) {
-        Expr *expr = root_list.data[i];
-
-        printf("%10s `%.*s`\n", EX_NAME[expr->type],
-               (int)expr->tok_len, &text[expr->tok_start]);
-    }
-#endif
-
     verify_scopes(&root_list, tb->file);
 
     Expr *expr = unflatten_list(pool, tb->file, &root_list);
@@ -197,19 +200,135 @@ static Expr *gen_scope_tree(Bump *pool, const TokBuf *tb) {
 
 // stage 2: rule parsing =======================================================
 
-static void collapse_rules() {
+// tries to match and collapse a rule on a slice, returns NULL if no match found
+static Expr *try_match(Bump *pool, const File *f, const RuleTree *rules,
+                       Expr **slice, size_t len, size_t *o_match_len) {
+    // match a rule
+    RuleNode *trav = rules->root;
+    Rule best;
+    size_t best_len = 0;
 
+    for (size_t i = 0; i < len; ++i) {
+        // match next node
+        Expr *expr = slice[i];
+        RuleNode *next = NULL;
+
+        if (expr->type == EX_LEXEME) {
+            // match lexeme
+            View token = { &f->text.str[expr->tok_start], expr->tok_len };
+
+            for (size_t j = 0; j < trav->num_next_lxms; ++j) {
+                if (Word_eq_view(trav->next_lxm_type[j], &token)) {
+                    next = trav->next_lxm[j];
+                    break;
+                }
+            }
+        } else {
+            // match anything
+            next = trav->next_expr;
+        }
+
+        // no nodes matched
+        if (!next)
+            break;
+
+        // nodes matched
+        if (Rule_is_valid(next->rule)) {
+            best = next->rule;
+            best_len = i + 1;
+        }
+
+        trav = next;
+    }
+
+    // return match if found
+    if (!best_len)
+        return NULL;
+
+    *o_match_len = best_len;
+
+    return rule_copy_of_slice(pool, best, slice, best_len);
+}
+
+/*
+ * heavily modifies `slice`. pass length in by pointer, after calling func the
+ * returned slice will contain the fully collapsed scope and length will be
+ * modified to reflect this
+ */
+static Expr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
+                           Expr **slice, size_t *io_len) {
+    const RuleTree *rules = &lang->rules;
+    size_t len = *io_len;
+
+    // loop until a full passthrough of slice fails to match any rules
+    bool matched;
+
+    do {
+        matched = false;
+
+        size_t i = 0;
+
+        while (i < len) {
+            // try to match rules on this index until none can be matched
+            size_t match_len;
+            Expr *found =
+                try_match(pool, f, rules, &slice[i], len - i, &match_len);
+
+            if (!found) {
+                ++i;
+                continue;
+            }
+
+            // stitch slice
+            size_t move_len = match_len - 1;
+
+            for (size_t j = 1; j <= i; ++j)
+                slice[i + move_len - j] = slice[i - j];
+
+            slice[i + move_len] = found;
+
+            // fix slice ptr + len
+            slice += move_len;
+            len -= move_len;
+
+            matched = true;
+        }
+    } while (matched);
+
+    *io_len = len;
+
+    return slice;
+}
+
+static Expr *correct_precedence(Expr *expr) {
+    // TODO
+
+    return expr;
 }
 
 Expr *parse_scope(Bump *pool, const File *f, const Lang *lang, Expr *expr) {
     assert(expr->type == EX_SCOPE);
 
-    Expr **slice = expr->scope.exprs;
+    // collapse rules
+    size_t len = expr->len;
+    Expr **exprs = expr->exprs;
 
-    for (size_t i = 0; i < expr->scope.len; ++i)
-        Expr_error(f, slice[i], "look");
+    exprs = collapse_rules(pool, f, lang, exprs, &len);
 
-    fungus_panic("TODO this");
+    // correct precedence
+
+    /*
+    expr = correct_precedence(expr);
+    */
+
+    // return scope
+    expr->exprs = exprs;
+    expr->len = len;
+
+    puts(TC_CYAN "AST:" TC_RESET);
+    Expr_dump(expr, f);
+
+    exit(0);
 
     return expr;
 }
@@ -221,8 +340,8 @@ Expr *parse(Bump *pool, const Lang *lang, const TokBuf *tb) {
 }
 
 static hsize_t Expr_tok_start(const Expr *expr) {
-    while (expr->type == EX_SCOPE)
-        expr = expr->scope.exprs[0];
+    while (expr->type == EX_SCOPE || expr->type == EX_RULE)
+        expr = expr->exprs[0];
 
     return expr->tok_start;
 }
@@ -230,8 +349,8 @@ static hsize_t Expr_tok_start(const Expr *expr) {
 static hsize_t Expr_tok_len(const Expr *expr) {
     hsize_t start = Expr_tok_start(expr);
 
-    while (expr->type == EX_SCOPE)
-        expr = expr->scope.exprs[expr->scope.len - 1];
+    while (expr->type == EX_SCOPE || expr->type == EX_RULE)
+        expr = expr->exprs[expr->len - 1];
 
     return expr->tok_start + expr->tok_len - start;
 }
@@ -259,18 +378,18 @@ void Expr_dump(const Expr *expr, const File *file) {
     size_t size = 0;
 
     while (true) {
-        // print levels TODO
+        // print levels
         if (size > 0) {
             for (size_t i = 0; i < size - 1; ++i) {
                 const char *c = "│";
 
-                if (indices[i] == scopes[i]->scope.len)
+                if (indices[i] == scopes[i]->len)
                     c = " ";
 
                 printf("%s   ", c);
             }
 
-            const char *c = indices[size - 1] == scopes[size - 1]->scope.len
+            const char *c = indices[size - 1] == scopes[size - 1]->len
                 ? "*" : "|";
 
             printf("%s── ", c);
@@ -279,7 +398,7 @@ void Expr_dump(const Expr *expr, const File *file) {
         printf("%-10s", EX_NAME[expr->type]);
 
         // print expr
-        if (expr->type == EX_SCOPE) {
+        if (expr->type == EX_SCOPE || expr->type == EX_RULE) {
             scopes[size] = expr;
             indices[size] = 0;
             ++size;
@@ -291,12 +410,12 @@ void Expr_dump(const Expr *expr, const File *file) {
         puts("");
 
         // get next expr
-        while (size > 0 && indices[size - 1] >= scopes[size - 1]->scope.len)
+        while (size > 0 && indices[size - 1] >= scopes[size - 1]->len)
             --size;
 
         if (!size)
             break;
 
-        expr = scopes[size - 1]->scope.exprs[indices[size - 1]++];
+        expr = scopes[size - 1]->exprs[indices[size - 1]++];
     }
 }
