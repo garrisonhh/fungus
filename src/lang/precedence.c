@@ -43,6 +43,7 @@ Prec Prec_define(PrecGraph *pg, PrecDef *def) {
 
     *entry = (PrecEntry){
         .name = Word_copy_of(&def->name, &pg->pool),
+        .assoc = def->assoc,
         .above_len = def->above_len
     };
 

@@ -3,11 +3,11 @@
 #include "fungus.h"
 
 #define PRECS\
-    PREC("Lowest")\
-    PREC("Assignment")\
-    PREC("AddSub")\
-    PREC("MulDiv")\
-    PREC("Highest")\
+    PREC("Lowest",     LEFT)\
+    PREC("Assignment", RIGHT)\
+    PREC("AddSub",     LEFT)\
+    PREC("MulDiv",     LEFT)\
+    PREC("Highest",    LEFT)
 
 // table of name, prec, pattern
 #define RULES\
@@ -34,8 +34,11 @@ Lang base_fungus(void) {
     Lang fun = Lang_new(WORD("Fungus"));
 
     // precedences
-#define PREC(NAME) WORD(NAME),
+#define PREC(NAME, ASSOC) WORD(NAME),
     Word prec_names[] = { PRECS };
+#undef PREC
+#define PREC(NAME, ASSOC) ASSOC_##ASSOC,
+    Associativity prec_assocs[] = { PRECS };
 #undef PREC
 
     Prec last;
@@ -51,6 +54,7 @@ Lang base_fungus(void) {
 
         last = Lang_make_prec(&fun, &(PrecDef){
             .name = prec_names[i],
+            .assoc = prec_assocs[i],
             .above = above,
             .above_len = above_len
         });

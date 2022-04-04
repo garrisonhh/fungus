@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdalign.h>
@@ -516,11 +517,17 @@ size_t HashMap_get_longest(const HashMap *map, const View *key, void **o_val) {
             .hash = hash
         };
 
+#ifdef DEBUG
+        Word test = Word_new(slice.str, slice.len);
+
+        assert(Word_eq(&slice, &test));
+#endif
+
         void *value = NULL;
 
         if (HashMap_get_checked(map, &slice, &value)) {
             best = value;
-            matched = i;
+            matched = slice.len;
         }
     }
 

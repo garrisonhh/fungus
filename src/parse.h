@@ -8,6 +8,7 @@
     X(INVALID)\
     X(SCOPE)\
     X(RULE)\
+    \
     X(LEXEME)\
     X(IDENT)\
     X(LIT_BOOL)\
@@ -29,10 +30,9 @@ typedef struct Expr {
         struct { hsize_t tok_start, tok_len; };
         // for scopes + rules
         struct {
+            Rule rule;
             struct Expr **exprs;
             size_t len;
-
-            Rule rule;
         };
     };
 } Expr;

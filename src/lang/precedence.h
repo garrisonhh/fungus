@@ -35,6 +35,7 @@ typedef struct PrecGraph {
 
 typedef struct PrecDef {
     Word name;
+    Associativity assoc;
     Prec *above, *below;
     size_t above_len, below_len;
 } PrecDef;

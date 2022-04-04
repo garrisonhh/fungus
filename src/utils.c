@@ -56,17 +56,6 @@ void fungus_panic(const char *msg, ...) {
 #define FNV_BASIS 14695981039346656037ull
 
 // fnv-1a
-hash_t fnv_hash(const char *data, size_t nbytes) {
-    hash_t hash = FNV_BASIS;
-
-    for (size_t i = 0; i < nbytes; ++i) {
-        hash ^= (hash_t)data[i];
-        hash *= FNV_PRIME;
-    }
-
-    return hash;
-}
-
 hash_t fnv_hash_start(void) {
     return FNV_BASIS;
 }
@@ -77,3 +66,13 @@ hash_t fnv_hash_next(hash_t hash, char byte) {
 
     return hash;
 }
+
+hash_t fnv_hash(const char *data, size_t nbytes) {
+    hash_t hash = fnv_hash_start();
+
+    for (size_t i = 0; i < nbytes; ++i)
+        hash = fnv_hash_next(hash, data[i]);
+
+    return hash;
+}
+

@@ -21,6 +21,8 @@
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 
+#define IN_RANGE(C, A, B) ((C) >= (A) && (C) <= (B))
+
 /*
  * for comparison functions:
  * cmp(a, b) > 0 // a > b

@@ -9,6 +9,8 @@
 void repl(void) {
     Lang fun = base_fungus();
 
+    Lang_dump(&fun);
+
     puts(TC_YELLOW "fungus v0 - by garrisonhh" TC_RESET);
 
     while (!feof(stdin)) {
@@ -20,7 +22,7 @@ void repl(void) {
         TokBuf tokbuf = lex(&file);
         if (global_error) goto cleanup_lex;
 
-#if 1
+#if 0
         TokBuf_dump(&tokbuf);
         puts("");
 #endif

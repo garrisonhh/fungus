@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include "parse.h"
+#include "lex/char_classify.h"
 
 /*
  * parsing works in two stages:
@@ -75,7 +76,6 @@ static Expr *rule_copy_of_slice(Bump *pool, Rule rule, Expr **slice,
 // creating the tree yet
 static void gen_flat_list(Vec *list, Bump *pool, const TokBuf *tb) {
     ExprType convert_toktype[TOK_COUNT] = {
-        [TOK_INVALID] = EX_INVALID,
         [TOK_WORD] = EX_LEXEME,
         [TOK_BOOL] = EX_LIT_BOOL,
         [TOK_INT] = EX_LIT_INT,
@@ -85,6 +85,8 @@ static void gen_flat_list(Vec *list, Bump *pool, const TokBuf *tb) {
 
     for (size_t i = 0; i < tb->len; ++i) {
         TokType toktype = tb->types[i];
+
+        assert(toktype != TOK_INVALID);
 
         if (toktype == TOK_SYMBOLS) {
             // split symbols on `{` and `}`
@@ -200,6 +202,60 @@ static Expr *gen_scope_tree(Bump *pool, const TokBuf *tb) {
 
 // stage 2: rule parsing =======================================================
 
+// translates `scope` into the target language
+static void translate_scope(Bump *pool, const File *f, const Lang *lang,
+                            Expr *scope) {
+    assert(scope->type == EX_SCOPE);
+
+    Expr **exprs = scope->exprs;
+    size_t len = scope->len;
+    Vec list = Vec_new();
+
+    for (size_t i = 0; i < len; ++i) {
+        Expr *expr = exprs[i];
+
+        if (expr->type == EX_LEXEME) {
+            // symbols must be split up and fully matched, words can be idents
+            // or stay lexemes
+            View tok = { &f->text.str[expr->tok_start], expr->tok_len };
+
+            if (ch_is_symbol(tok.str[0])) {
+                hsize_t sym_start = expr->tok_start;
+                size_t match_len;
+
+                // match as many syms as possible
+                while (tok.len > 0
+                    && (match_len = HashSet_longest(&lang->syms, &tok))) {
+                    Expr *sym = new_expr(pool, EX_LEXEME, sym_start, match_len);
+
+                    Vec_push(&list, sym);
+
+                    tok.str += match_len;
+                    tok.len -= match_len;
+                    sym_start += expr->tok_start;
+                }
+
+                if (tok.len > 0) {
+                    File_error_from(f, sym_start, "unknown symbol");
+                    fungus_panic("TODO don't panic");
+                }
+            } else {
+                Word word = Word_new(tok.str, tok.len);
+
+                if (!HashSet_has(&lang->words, &word))
+                    expr->type = EX_IDENT;
+
+                Vec_push(&list, expr);
+            }
+        } else {
+            Vec_push(&list, expr);
+        }
+    }
+
+    scope->exprs = realloc(list.data, list.len * sizeof(Expr **));
+    scope->len = list.len;
+}
+
 // tries to match and collapse a rule on a slice, returns NULL if no match found
 static Expr *try_match(Bump *pool, const File *f, const RuleTree *rules,
                        Expr **slice, size_t len, size_t *o_match_len) {
@@ -262,39 +318,14 @@ static Expr **rhs_of(Expr *expr) {
     return &expr->exprs[expr->len - 1];
 }
 
-typedef Expr **(*side_of_func)(Expr *);
-
 typedef enum { LEFT, RIGHT } RotDir;
 
-// returns if rotated
-static bool try_rotate(const Lang *lang, Expr *expr, RotDir dir,
-                       Expr **o_expr) {
-    assert(expr->type == EX_RULE);
+static bool expr_precedes(const Lang *lang, RotDir dir, Expr *a, Expr *b) {
+    assert(a->type == EX_RULE);
+    assert(b->type == EX_RULE);
 
-    side_of_func from_side = dir == RIGHT ? lhs_of : rhs_of;
-    side_of_func to_side = dir == RIGHT ? rhs_of : lhs_of;
-
-    printf("trying rotate %s\n", dir ? "r" : "l");
-
-    // grab pivot, check if it should swap
-    Expr **pivot = from_side(expr);
-
-    if ((*pivot)->type != EX_RULE)
-        return false;
-
-    puts("pivot could swap");
-
-    // grab swap node, check if it could swap
-    Expr **swap = to_side(*pivot);
-
-    if ((*swap)->type == EX_LEXEME)
-        return false;
-
-    puts("swap could swap");
-
-    // check if precedence necessitates a swap
-    Prec expr_prec = Rule_get(&lang->rules, expr->rule)->prec;
-    Prec pivot_prec = Rule_get(&lang->rules, (*pivot)->rule)->prec;
+    Prec expr_prec = Rule_get(&lang->rules, a->rule)->prec;
+    Prec pivot_prec = Rule_get(&lang->rules, b->rule)->prec;
 
     Comparison cmp = Prec_cmp(&lang->precs, expr_prec, pivot_prec);
 
@@ -306,10 +337,36 @@ static bool try_rotate(const Lang *lang, Expr *expr, RotDir dir,
             : Prec_assoc(&lang->precs, expr_prec) == ASSOC_LEFT;
     }
 
-    if (!prec_should_swap)
+    return prec_should_swap;
+}
+
+// returns if rotated
+static bool try_rotate(const Lang *lang, Expr *expr, RotDir dir,
+                       Expr **o_expr) {
+    typedef Expr **(*side_of_func)(Expr *);
+    assert(expr->type == EX_RULE);
+
+    side_of_func from_side = dir == RIGHT ? lhs_of : rhs_of;
+    side_of_func to_side = dir == RIGHT ? rhs_of : lhs_of;
+
+    // grab pivot, check if it should swap
+    Expr **pivot = from_side(expr);
+
+    if ((*pivot)->type != EX_RULE || !expr_precedes(lang, dir, expr, *pivot))
         return false;
 
-    puts("prec should swap");
+    printf("trying to rotate %s:\n", dir ? "R" : "L");
+
+    // grab swap node, check if it could swap
+    Expr **swap = to_side(*pivot);
+
+    while ((*swap)->type == EX_RULE && expr_precedes(lang, dir, expr, *swap))
+        swap = to_side(*swap);
+
+    if ((*swap)->type == EX_LEXEME)
+        return false;
+
+    puts("swap can rotate");
 
     // perform the swap
     *o_expr = *pivot;
@@ -323,7 +380,7 @@ static bool try_rotate(const Lang *lang, Expr *expr, RotDir dir,
 
 /*
  * given a just-collapsed rule expr, checks if it needs to be rearranged to
- * respect precedence rules
+ * respect precedence rules and rearranges
  */
 static Expr *correct_precedence(const Lang *lang, Expr *expr) {
     assert(expr->type == EX_RULE);
@@ -354,9 +411,7 @@ static Expr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
     do {
         matched = false;
 
-        size_t i = 0;
-
-        while (i < len) {
+        for (size_t i = 0; i < len;) {
             // try to match rules on this index until none can be matched
             size_t match_len;
             Expr *found =
@@ -367,12 +422,10 @@ static Expr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
                 continue;
             }
 
+            puts("correcting expr:");
+            Expr_dump(found, f);
 
-            puts("checking prec on:");
-            Expr_dump(found, f);
             found = correct_precedence(lang, found);
-            puts("corrected to:");
-            Expr_dump(found, f);
 
             // stitch slice
             size_t move_len = match_len - 1;
@@ -395,9 +448,13 @@ static Expr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
     return slice;
 }
 
+/*
+ * given a raw scope, parse it using a lang
+ */
 Expr *parse_scope(Bump *pool, const File *f, const Lang *lang, Expr *expr) {
     assert(expr->type == EX_SCOPE);
 
+    translate_scope(pool, f, lang, expr);
     expr->exprs = collapse_rules(pool, f, lang, expr->exprs, &expr->len);
 
     return expr;
@@ -405,8 +462,33 @@ Expr *parse_scope(Bump *pool, const File *f, const Lang *lang, Expr *expr) {
 
 // general =====================================================================
 
+static size_t ast_used_memory(Expr *expr) {
+    size_t used = sizeof(*expr);
+
+    switch (expr->type) {
+    case EX_SCOPE:
+    case EX_RULE:
+        used += expr->len * sizeof(*expr->exprs);
+
+        for (size_t i = 0; i < expr->len; ++i)
+            used += ast_used_memory(expr->exprs[i]);
+
+        break;
+    default:
+        break;
+    }
+
+    return used;
+}
+
 Expr *parse(Bump *pool, const Lang *lang, const TokBuf *tb) {
-    return parse_scope(pool, tb->file, lang, gen_scope_tree(pool, tb));
+    Expr *ast = parse_scope(pool, tb->file, lang, gen_scope_tree(pool, tb));
+
+#ifdef DEBUG
+    printf("parse generated ast of size %zu.\n", ast_used_memory(ast));
+#endif
+
+    return ast;
 }
 
 static hsize_t Expr_tok_start(const Expr *expr) {
@@ -473,8 +555,7 @@ void Expr_dump(const Expr *expr, const File *file) {
             indices[size] = 0;
             ++size;
         } else {
-            printf(" `%.*s`", (int)expr->tok_len,
-                   &text[expr->tok_start]);
+            printf(" `%.*s`", (int)expr->tok_len, &text[expr->tok_start]);
         }
 
         puts("");

@@ -1,47 +1,9 @@
 #include <stdlib.h>
-#include <stdbool.h>
 
 #include "lex.h"
 #include "data.h"
 #include "utils.h"
-
-#define IN_RANGE(C, A, B) ((C) >= (A) && (C) <= (B))
-
-static bool ch_is_alpha(char c) {
-    return IN_RANGE(c, 'a', 'z') || IN_RANGE(c, 'A', 'Z');
-}
-
-static bool ch_is_alphaish(char c) {
-    return ch_is_alpha(c) || c == '_';
-}
-
-static bool ch_is_digit(char c) {
-    return IN_RANGE(c, '0', '9');
-}
-
-static bool ch_is_digitish(char c) {
-    return ch_is_digit(c) || c == '_';
-}
-
-static bool ch_is_word(char c) {
-    return ch_is_alphaish(c) || ch_is_digit(c);
-}
-
-static bool ch_is_space(char c) {
-    switch (c) {
-    case 0x20:
-    case 0x0A:
-    case 0x0D:
-    case 0x09:
-        return true;
-    default:
-        return false;
-    }
-}
-
-static bool ch_is_symbol(char c) {
-    return IN_RANGE(c, ' ', '~') && !ch_is_word(c) && !ch_is_space(c);
-}
+#include "lex/char_classify.h"
 
 static void push_token(TokBuf *tb, TokType type, hsize_t start, hsize_t len) {
     if (tb->len >= tb->cap) {

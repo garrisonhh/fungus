@@ -1,6 +1,3 @@
-#include <string.h>
-#include <ctype.h>
-
 #include "pattern.h"
 #include "../lex.h"
 
@@ -64,12 +61,6 @@ Pattern Pattern_from(Bump *pool, const char *str) {
     Vec_del(&words);
     TokBuf_del(&tokens);
     File_del(&f);
-
-#ifdef DEBUG
-    printf("parsed pattern: ");
-    Pattern_print(&pat);
-    puts("");
-#endif
 
     return pat;
 }
