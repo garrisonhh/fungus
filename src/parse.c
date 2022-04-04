@@ -202,8 +202,8 @@ static Expr *gen_scope_tree(Bump *pool, const TokBuf *tb) {
 
 // stage 2: rule parsing =======================================================
 
-// translates `scope` into the target language
-static void translate_scope(Bump *pool, const File *f, const Lang *lang,
+// translates `scope` into the target language, returns success
+static bool translate_scope(Bump *pool, const File *f, const Lang *lang,
                             Expr *scope) {
     assert(scope->type == EX_SCOPE);
 
@@ -232,12 +232,13 @@ static void translate_scope(Bump *pool, const File *f, const Lang *lang,
 
                     tok.str += match_len;
                     tok.len -= match_len;
-                    sym_start += expr->tok_start;
+                    sym_start += match_len;
                 }
 
                 if (tok.len > 0) {
                     File_error_from(f, sym_start, "unknown symbol");
-                    fungus_panic("TODO don't panic");
+
+                    return false;
                 }
             } else {
                 Word word = Word_new(tok.str, tok.len);
@@ -254,6 +255,8 @@ static void translate_scope(Bump *pool, const File *f, const Lang *lang,
 
     scope->exprs = realloc(list.data, list.len * sizeof(Expr **));
     scope->len = list.len;
+
+    return true;
 }
 
 // tries to match and collapse a rule on a slice, returns NULL if no match found
@@ -355,8 +358,6 @@ static bool try_rotate(const Lang *lang, Expr *expr, RotDir dir,
     if ((*pivot)->type != EX_RULE || !expr_precedes(lang, dir, expr, *pivot))
         return false;
 
-    printf("trying to rotate %s:\n", dir ? "R" : "L");
-
     // grab swap node, check if it could swap
     Expr **swap = to_side(*pivot);
 
@@ -365,8 +366,6 @@ static bool try_rotate(const Lang *lang, Expr *expr, RotDir dir,
 
     if ((*swap)->type == EX_LEXEME)
         return false;
-
-    puts("swap can rotate");
 
     // perform the swap
     *o_expr = *pivot;
@@ -422,9 +421,6 @@ static Expr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
                 continue;
             }
 
-            puts("correcting expr:");
-            Expr_dump(found, f);
-
             found = correct_precedence(lang, found);
 
             // stitch slice
@@ -454,7 +450,9 @@ static Expr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
 Expr *parse_scope(Bump *pool, const File *f, const Lang *lang, Expr *expr) {
     assert(expr->type == EX_SCOPE);
 
-    translate_scope(pool, f, lang, expr);
+    if (!translate_scope(pool, f, lang, expr))
+        return NULL;
+
     expr->exprs = collapse_rules(pool, f, lang, expr->exprs, &expr->len);
 
     return expr;
@@ -484,8 +482,11 @@ static size_t ast_used_memory(Expr *expr) {
 Expr *parse(Bump *pool, const Lang *lang, const TokBuf *tb) {
     Expr *ast = parse_scope(pool, tb->file, lang, gen_scope_tree(pool, tb));
 
+    if (!ast)
+        global_error = true;
 #ifdef DEBUG
-    printf("parse generated ast of size %zu.\n", ast_used_memory(ast));
+    else
+        printf("parse generated ast of size %zu.\n", ast_used_memory(ast));
 #endif
 
     return ast;
@@ -523,7 +524,7 @@ void Expr_error_from(const File *f, const Expr *expr, const char *fmt, ...) {
     va_end(args);
 }
 
-void Expr_dump(const Expr *expr, const File *file) {
+void Expr_dump(const Expr *expr, const Lang *lang, const File *file) {
     const char *text = file->text.str;
     const Expr *scopes[MAX_SCOPE_STACK];
     size_t indices[MAX_SCOPE_STACK];
@@ -531,6 +532,8 @@ void Expr_dump(const Expr *expr, const File *file) {
 
     while (true) {
         // print levels
+        printf(TC_DIM);
+
         if (size > 0) {
             for (size_t i = 0; i < size - 1; ++i) {
                 const char *c = "│";
@@ -547,15 +550,33 @@ void Expr_dump(const Expr *expr, const File *file) {
             printf("%s── ", c);
         }
 
-        printf("%-10s", EX_NAME[expr->type]);
+        printf(TC_RESET);
+
+        if (expr->type == EX_RULE) {
+            const Word *name = Rule_get(&lang->rules, expr->rule)->name;
+
+            printf(TC_RED "%.*s" TC_RESET, (int)name->len, name->str);
+        } else if (expr->type == EX_SCOPE) {
+            printf(TC_RED "scope" TC_RESET);
+
+            // printf("%-10s", EX_NAME[expr->type]);
+        }
 
         // print expr
         if (expr->type == EX_SCOPE || expr->type == EX_RULE) {
             scopes[size] = expr;
             indices[size] = 0;
             ++size;
+        } else if (expr->type == EX_LEXEME) {
+            printf("%.*s", (int)expr->tok_len, &text[expr->tok_start]);
         } else {
-            printf(" `%.*s`", (int)expr->tok_len, &text[expr->tok_start]);
+            switch (expr->type) {
+            case EX_IDENT: printf(TC_BLUE); break;
+            case EX_LIT_STRING: printf(TC_GREEN); break;
+            default: printf(TC_MAGENTA); break;
+            }
+
+            printf("%.*s" TC_RESET, (int)expr->tok_len, &text[expr->tok_start]);
         }
 
         puts("");

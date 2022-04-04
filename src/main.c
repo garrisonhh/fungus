@@ -34,7 +34,7 @@ void repl(void) {
 
 #if 1
         puts(TC_CYAN "AST:" TC_RESET);
-        Expr_dump(ast, tokbuf.file);
+        Expr_dump(ast, &fun, tokbuf.file);
 #endif
 
         // cleanup

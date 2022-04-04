@@ -29,6 +29,7 @@ typedef struct Expr {
         // for non-scopes
         struct { hsize_t tok_start, tok_len; };
         // for scopes + rules
+        // TODO should I store scope Lang somehow?
         struct {
             Rule rule;
             struct Expr **exprs;
@@ -39,11 +40,11 @@ typedef struct Expr {
 
 // parses scope from raw tokens
 Expr *parse(Bump *, const Lang *, const TokBuf *);
-// parses an expr scope given a language
+// parses an expr scope given a language, returns NULL on failure
 Expr *parse_scope(Bump *, const File *, const Lang *, Expr *);
 
 void Expr_error(const File *, const Expr *, const char *fmt, ...);
 void Expr_error_from(const File *, const Expr *, const char *fmt, ...);
-void Expr_dump(const Expr *, const File *);
+void Expr_dump(const Expr *, const Lang *, const File *);
 
 #endif
