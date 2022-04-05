@@ -10,20 +10,21 @@
     X(RULE)\
     \
     X(LEXEME)\
+    X(LIT_LEXEME)\
     X(IDENT)\
     X(LIT_BOOL)\
     X(LIT_INT)\
     X(LIT_FLOAT)\
     X(LIT_STRING)\
 
-#define X(A) EX_##A,
-typedef enum ExprType { EXPR_TYPES EX_COUNT } ExprType;
+#define X(A) REX_##A,
+typedef enum RawExprType { EXPR_TYPES REX_COUNT } RExprType;
 #undef X
 
-extern const char *EX_NAME[EX_COUNT];
+extern const char *REX_NAME[REX_COUNT];
 
-typedef struct Expr {
-    ExprType type;
+typedef struct RawExpr {
+    RExprType type;
 
     union {
         // for non-scopes
@@ -32,19 +33,19 @@ typedef struct Expr {
         // TODO should I store scope Lang somehow?
         struct {
             Rule rule;
-            struct Expr **exprs;
+            struct RExpr **exprs;
             size_t len;
         };
     };
-} Expr;
+} RExpr;
 
 // parses scope from raw tokens
-Expr *parse(Bump *, const Lang *, const TokBuf *);
+RExpr *parse(Bump *, const Lang *, const TokBuf *);
 // parses an expr scope given a language, returns NULL on failure
-Expr *parse_scope(Bump *, const File *, const Lang *, Expr *);
+RExpr *parse_scope(Bump *, const File *, const Lang *, RExpr *);
 
-void Expr_error(const File *, const Expr *, const char *fmt, ...);
-void Expr_error_from(const File *, const Expr *, const char *fmt, ...);
-void Expr_dump(const Expr *, const Lang *, const File *);
+void RExpr_error(const File *, const RExpr *, const char *fmt, ...);
+void RExpr_error_from(const File *, const RExpr *, const char *fmt, ...);
+void RExpr_dump(const RExpr *, const Lang *, const File *);
 
 #endif

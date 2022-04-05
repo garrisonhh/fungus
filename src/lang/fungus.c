@@ -2,6 +2,8 @@
 
 #include "fungus.h"
 
+Lang fungus_lang;
+
 #define PRECS\
     PREC("Lowest",     LEFT)\
     PREC("Assignment", RIGHT)\
@@ -11,26 +13,19 @@
 
 // table of name, prec, pattern
 #define RULES\
-    RULE("Parens",    "Highest",    "`( expr: Any `)")\
+    RULE("Parens",    "Highest",    "`( expr: T `) -> T")\
     \
-    RULE("Add",       "AddSub",     "a: Number `+ b: Number")\
-    RULE("Subtract",  "AddSub",     "a: Number `- b: Number")\
-    RULE("Multiply",  "MulDiv",     "a: Number `* b: Number")\
-    RULE("Divide",    "MulDiv",     "a: Number `/ b: Number")\
-    RULE("Modulo",    "MulDiv",     "a: Number `% b: Number")\
+    RULE("Add",       "AddSub",     "a: T `+ b: T -> T")\
+    RULE("Subtract",  "AddSub",     "a: T `- b: T -> T")\
+    RULE("Multiply",  "MulDiv",     "a: T `* b: T -> T")\
+    RULE("Divide",    "MulDiv",     "a: T `/ b: T -> T")\
+    RULE("Modulo",    "MulDiv",     "a: T `% b: T -> T")\
     \
-    RULE("Assign",    "Assignment", "name: Ident `= rvalue: Any")\
-    RULE("ConstDecl", "Assignment", "`const assign: Assign")\
-    RULE("LetDecl",   "Assignment", "`let assign: Assign")\
+    // RULE("Assign",    "Assignment", "name: Ident `= rvalue: T -> T")\
+    // RULE("ConstDecl", "Assignment", "`const assign: Assign")\
+    // RULE("LetDecl",   "Assignment", "`let assign: Assign")
 
-Lang base_fungus(void) {
-#ifdef DEBUG
-    // ensure called only once
-    static bool called = false;
-    assert(!called);
-    called = true;
-#endif
-
+void fungus_lang_init(void) {
     Lang fun = Lang_new(WORD("Fungus"));
 
     // precedences
@@ -73,5 +68,9 @@ Lang base_fungus(void) {
     RULES
 #undef RULE
 
-    return fun;
+    fungus_lang = fun;
+}
+
+void fungus_lang_quit(void) {
+    Lang_del(&fungus_lang);
 }

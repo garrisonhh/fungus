@@ -5,11 +5,10 @@
 #include "lex.h"
 #include "parse.h"
 #include "lang/fungus.h"
+#include "lang/pattern.h"
 
 void repl(void) {
-    Lang fun = base_fungus();
-
-    Lang_dump(&fun);
+    Lang_dump(&fungus_lang);
 
     puts(TC_YELLOW "fungus v0 - by garrisonhh" TC_RESET);
 
@@ -22,19 +21,14 @@ void repl(void) {
         TokBuf tokbuf = lex(&file);
         if (global_error) goto cleanup_lex;
 
-#if 0
-        TokBuf_dump(&tokbuf);
-        puts("");
-#endif
-
         // parse
         Bump parse_pool = Bump_new();
-        Expr *ast = parse(&parse_pool, &fun, &tokbuf);
+        RExpr *ast = parse(&parse_pool, &fungus_lang, &tokbuf);
         if (global_error) goto cleanup_parse;
 
 #if 1
         puts(TC_CYAN "AST:" TC_RESET);
-        Expr_dump(ast, &fun, tokbuf.file);
+        RExpr_dump(ast, &fungus_lang, tokbuf.file);
 #endif
 
         // cleanup
@@ -47,14 +41,21 @@ cleanup_read:
 
         global_error = false;
     }
-
-    Lang_del(&fun);
 }
 
 int main(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
+    fungus_lang_init();
+    pattern_lang_init();
+
     // TODO opt parsing eventually
 
     repl();
+
+    pattern_lang_quit();
+    fungus_lang_quit();
 
     return 0;
 }

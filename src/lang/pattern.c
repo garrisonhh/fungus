@@ -1,9 +1,27 @@
+#include <assert.h>
+
 #include "pattern.h"
+#include "../lang.h"
 #include "../lex.h"
 
+Lang pattern_lang;
+
+void pattern_lang_init(void) {
+    Lang lang = Lang_new(WORD("PatternLang"));
+
+    // TODO
+
+    pattern_lang = lang;
+}
+
+void pattern_lang_quit(void) {
+    Lang_del(&pattern_lang);
+}
+
 static Word word_of_tok(TokBuf *tokens, size_t idx) {
-    return Word_new(&tokens->file->text.str[tokens->starts[idx]],
-                    tokens->lens[idx]);
+    const char *text = tokens->file->text.str;
+
+    return Word_new(&text[tokens->starts[idx]], tokens->lens[idx]);
 }
 
 // assumes pattern is correct since this is not user-facing
@@ -14,13 +32,16 @@ Pattern Pattern_from(Bump *pool, const char *str) {
 
     // copy exprs + lexemes
     Vec words = Vec_new(), is_expr = Vec_new();
-    bool capture_lxm = false;
+    bool capture_lxm = false, capture_return = false;
 
     for (size_t i = 0; i < tokens.len; ++i) {
         if (tokens.types[i] == TOK_SYMBOLS) {
             Word tok = word_of_tok(&tokens, i);
 
-            if (i > 0 && Word_eq_view(&tok, &(View){ ":", 1 })) {
+            if (Word_eq_view(&tok, &(View){ "->", 2 })) {
+                assert(i <= tokens.len - 2);
+                capture_return = true;
+            } else if (i > 0 && Word_eq_view(&tok, &(View){ ":", 1 })) {
                 Word expr_ident = word_of_tok(&tokens, i - 1);
 
                 Vec_push(&words, Word_copy_of(&expr_ident, pool));
@@ -42,6 +63,10 @@ Pattern Pattern_from(Bump *pool, const char *str) {
             Vec_push(&is_expr, NULL);
 
             capture_lxm = false;
+        } else if (tokens.types[i] == TOK_WORD && capture_return) {
+            // TODO
+
+            capture_return = true;
         }
     }
 

@@ -13,17 +13,13 @@
 #define BASE_TYPES\
     TYPE(NONE,      "NONE",      1, 0, {0})\
     \
-    TYPE(RUNTYPE,   "RunType",   1, 0, {0})\
-    TYPE(PRIMITIVE, "Primitive", 1, 1, {{TY_RUNTYPE}})\
+    TYPE(PRIMITIVE, "Primitive", 1, 0, {0})\
     TYPE(NUMBER,    "Number",    1, 1, {{TY_PRIMITIVE}})\
     \
     TYPE(BOOL,      "bool",      0, 1, {{TY_PRIMITIVE}})\
     TYPE(STRING,    "string",    0, 1, {{TY_PRIMITIVE}})\
     TYPE(INT,       "int",       0, 1, {{TY_NUMBER}})\
     TYPE(FLOAT,     "float",     0, 1, {{TY_NUMBER}})\
-    \
-    TYPE(COMPTYPE,  "CompType",  1, 0, {0})\
-    TYPE(IDENT,     "Ident",     0, 1, {{TY_COMPTYPE}})\
 
 #define TYPE(A, ...) TY_##A,
 typedef enum BaseType { BASE_TYPES TY_COUNT } BaseType;
