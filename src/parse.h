@@ -6,11 +6,12 @@
 
 #define EXPR_TYPES\
     X(INVALID)\
+    \
     X(SCOPE)\
     X(RULE)\
-    \
     X(LEXEME)\
     X(LIT_LEXEME)\
+    \
     X(IDENT)\
     X(LIT_BOOL)\
     X(LIT_INT)\
@@ -33,7 +34,7 @@ typedef struct RawExpr {
         // TODO should I store scope Lang somehow?
         struct {
             Rule rule;
-            struct RExpr **exprs;
+            struct RawExpr **exprs;
             size_t len;
         };
     };

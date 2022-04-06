@@ -85,41 +85,53 @@ static void gen_flat_list(Vec *list, Bump *pool, const TokBuf *tb) {
 
     for (size_t i = 0; i < tb->len; ++i) {
         TokType toktype = tb->types[i];
+        hsize_t start = tb->starts[i], len = tb->lens[i];
 
         assert(toktype != TOK_INVALID);
 
         if (toktype == TOK_SYMBOLS) {
-            // split symbols on `{` and `}`
-            hsize_t start = tb->starts[i], len = tb->lens[i];
             const char *text = &tb->file->text.str[start];
-            hsize_t last_split = 0;
 
-            for (hsize_t i = 0; i < len; ++i) {
-                if (text[i] == '{' || text[i] == '}') {
-                    if (i > last_split) {
-                        RExpr *expr = new_expr(pool, REX_LEXEME,
-                                              start + last_split,
-                                              i - last_split);
+            if (text[0] == '`') {
+                // escaped literal lexeme
+                if (len == 1)
+                    File_error_at(tb->file, start, len, "bare lexeme escape.");
 
-                        Vec_push(list, expr);
-                    }
-
-                    Vec_push(list, new_expr(pool, REX_LEXEME, start + i, 1));
-
-                    last_split = i + 1;
-                }
-            }
-
-            if (last_split < len) {
-                RExpr *expr = new_expr(pool, REX_LEXEME, start + last_split,
-                                      len - last_split);
+                RExpr *expr = new_expr(pool, REX_LIT_LEXEME, start, len);
 
                 Vec_push(list, expr);
+            } else {
+                // split symbols on `{` and `}`
+                hsize_t last_split = 0;
+
+                for (hsize_t i = 0; i < len; ++i) {
+                    if (text[i] == '{' || text[i] == '}') {
+                        if (i > last_split) {
+                            RExpr *expr = new_expr(pool, REX_LEXEME,
+                                                  start + last_split,
+                                                  i - last_split);
+
+                            Vec_push(list, expr);
+                        }
+
+                        RExpr *expr = new_expr(pool, REX_LEXEME, start + i, 1);
+
+                        Vec_push(list, expr);
+
+                        last_split = i + 1;
+                    }
+                }
+
+                if (last_split < len) {
+                    RExpr *expr = new_expr(pool, REX_LEXEME, start + last_split,
+                                           len - last_split);
+
+                    Vec_push(list, expr);
+                }
             }
         } else {
             // direct token -> expr translation
-            RExpr *expr = new_expr(pool, convert_toktype[toktype], tb->starts[i],
-                                  tb->lens[i]);
+            RExpr *expr = new_expr(pool, convert_toktype[toktype], start, len);
 
             Vec_push(list, expr);
         }
@@ -455,6 +467,9 @@ static RExpr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
 RExpr *parse_scope(Bump *pool, const File *f, const Lang *lang, RExpr *expr) {
     assert(expr->type == REX_SCOPE);
 
+    puts("scope:");
+    RExpr_dump(expr, lang, f);
+
     if (!translate_scope(pool, f, lang, expr))
         return NULL;
 
@@ -570,15 +585,13 @@ void RExpr_dump(const RExpr *expr, const Lang *lang, const File *file) {
             scopes[size] = expr;
             indices[size] = 0;
             ++size;
-        } else if (expr->type == REX_LEXEME) {
-            printf( "%.*s", (int)expr->tok_len, &text[expr->tok_start]);
-        } else if (expr->type == REX_LIT_LEXEME) {
-            printf("`%.*s", (int)expr->tok_len, &text[expr->tok_start]);
+        } else if (expr->type == REX_LEXEME || expr->type == REX_LIT_LEXEME) {
+            printf("%.*s", (int)expr->tok_len, &text[expr->tok_start]);
         } else {
             switch (expr->type) {
             case REX_IDENT:      printf(TC_BLUE);    break;
             case REX_LIT_STRING: printf(TC_GREEN);   break;
-            default:            printf(TC_MAGENTA); break;
+            default:             printf(TC_MAGENTA); break;
             }
 
             printf("%.*s" TC_RESET, (int)expr->tok_len, &text[expr->tok_start]);

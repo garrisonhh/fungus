@@ -23,12 +23,12 @@ void repl(void) {
 
         // parse
         Bump parse_pool = Bump_new();
-        RExpr *ast = parse(&parse_pool, &fungus_lang, &tokbuf);
+        RExpr *raw_ast = parse(&parse_pool, &fungus_lang, &tokbuf);
         if (global_error) goto cleanup_parse;
 
 #if 1
         puts(TC_CYAN "AST:" TC_RESET);
-        RExpr_dump(ast, &fungus_lang, tokbuf.file);
+        RExpr_dump(raw_ast, &fungus_lang, tokbuf.file);
 #endif
 
         // cleanup
