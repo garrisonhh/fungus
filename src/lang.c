@@ -34,11 +34,13 @@ Rule Lang_legislate(Lang *lang, RuleDef *rule_def) {
     Pattern *pat = &rule_def->pat;
 
     for (size_t i = 0; i < pat->len; ++i) {
-        if (!pat->is_expr[i]) {
-            const Word *lxm = pat->pat[i];
-            HashSet *set = ispunct(lxm->str[0]) ? &lang->syms : &lang->words;
+        MatchAtom *atom = &pat->matches[i];
 
-            HashSet_put(set, lxm);
+        if (atom->type == MATCH_LEXEME) {
+            HashSet *set =
+                ispunct(atom->lxm->str[0]) ? &lang->syms : &lang->words;
+
+            HashSet_put(set, atom->lxm);
         }
     }
 
@@ -48,7 +50,7 @@ Rule Lang_legislate(Lang *lang, RuleDef *rule_def) {
 Prec Lang_make_prec(Lang *lang, PrecDef *prec_def) {
     Prec prec = Prec_define(&lang->precs, prec_def);
 
-    // will need to do something here at some point
+    // will need to do something here at some point I'm sure
 
     return prec;
 }

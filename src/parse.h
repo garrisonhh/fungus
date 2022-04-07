@@ -10,9 +10,9 @@
     X(SCOPE)\
     X(RULE)\
     X(LEXEME)\
-    X(LIT_LEXEME)\
     \
     X(IDENT)\
+    X(LIT_LEXEME)\
     X(LIT_BOOL)\
     X(LIT_INT)\
     X(LIT_FLOAT)\

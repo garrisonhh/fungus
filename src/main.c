@@ -7,6 +7,7 @@
 #include "lang/fungus.h"
 #include "lang/pattern.h"
 
+#if 0
 void repl(void) {
     Lang_dump(&fungus_lang);
 
@@ -22,6 +23,7 @@ void repl(void) {
         if (global_error) goto cleanup_lex;
 
         // parse
+#if 0
         Bump parse_pool = Bump_new();
         RExpr *raw_ast = parse(&parse_pool, &fungus_lang, &tokbuf);
         if (global_error) goto cleanup_parse;
@@ -31,9 +33,11 @@ void repl(void) {
         RExpr_dump(raw_ast, &fungus_lang, tokbuf.file);
 #endif
 
+
         // cleanup
 cleanup_parse:
         Bump_del(&parse_pool);
+#endif
 cleanup_lex:
         TokBuf_del(&tokbuf);
 cleanup_read:
@@ -42,20 +46,27 @@ cleanup_read:
         global_error = false;
     }
 }
+#endif
 
 int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
 
-    fungus_lang_init();
+#if 1
     pattern_lang_init();
+
+    pattern_lang_quit();
+#else
+    pattern_lang_init();
+    fungus_lang_init();
 
     // TODO opt parsing eventually
 
     repl();
 
-    pattern_lang_quit();
     fungus_lang_quit();
+    pattern_lang_quit();
+#endif
 
     return 0;
 }

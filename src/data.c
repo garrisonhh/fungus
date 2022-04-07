@@ -377,6 +377,8 @@ static void IdSet_resize(IdSet *set, size_t new_cap) {
 }
 
 void IdSet_add_superset(IdSet *set, IdSet *super) {
+    assert(set != super);
+
     Vec_push(&set->supersets, super);
 
     for (size_t i = 0; i < set->cap; ++i)

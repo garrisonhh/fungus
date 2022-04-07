@@ -7,17 +7,26 @@
  * TypeHandle uses the top 2 bytes to store a TypeGraph id, and the bottom
  * 2 to store a Type id local to its TypeGraph
  */
-static_assert(sizeof(((Type *)0)->id) == 4, "Type handle bits are broken :(");
+static_assert(sizeof(((Type *)0)->id) == sizeof(unsigned),
+              "Type handle bits are broken :(");
 
 TypeGraph TypeGraph_new(void) {
     static uint16_t id_counter = 0;
 
-    return (TypeGraph){
+    TypeGraph tg = {
         .pool = Bump_new(),
         .entries = Vec_new(),
         .by_name = IdMap_new(),
         .id = id_counter++
     };
+
+    // Any type
+    Type_define(&tg, &(TypeDef){
+        .name = WORD("Any"),
+        .type = TTY_ABSTRACT
+    });
+
+    return tg;
 }
 
 void TypeGraph_del(TypeGraph *tg) {
@@ -31,29 +40,6 @@ void TypeGraph_del(TypeGraph *tg) {
     IdMap_del(&tg->by_name);
     Vec_del(&tg->entries);
     Bump_del(&tg->pool);
-}
-
-void TypeGraph_define_base(TypeGraph *tg) {
-#ifdef DEBUG
-#define TYPE(A, ...) TY_##A,
-    BaseType base_types[] = { BASE_TYPES };
-#undef TYPE
-#endif
-
-#define TYPE(ENUM, NAME, ABSTRACT, IS_LEN, IS) {\
-    .name = WORD(NAME),\
-    .type = ABSTRACT ? TTY_ABSTRACT : TTY_CONCRETE,\
-    .is = (Type[])IS,\
-    .is_len = IS_LEN\
-},
-    TypeDef base_defs[] = { BASE_TYPES };
-#undef TYPE
-
-    for (size_t i = 0; i < TY_COUNT; ++i) {
-        Type ty = Type_define(tg, &base_defs[i]);
-
-        assert(ty.id == base_types[i]);
-    }
 }
 
 static void *TG_alloc(TypeGraph *tg, size_t n_bytes) {
@@ -116,7 +102,17 @@ static TypeExpr *TG_deepcopy_expr(TypeGraph *tg, TypeExpr *expr) {
 */
 
 static Type make_handle(TypeGraph *tg, uint16_t local_id) {
-    return (Type){ (unsigned)(tg->id << 16) & (unsigned)local_id };
+    return (Type){ (((uint32_t)tg->id) << 16) | (uint32_t)local_id };
+}
+
+static void add_type_to_abstract(TypeGraph *tg, Type ty, TypeEntry *entry,
+                                 Type to) {
+    TypeEntry *set_entry = Type_get(tg, to);
+
+    IdSet_put(set_entry->type_set, ty.id);
+
+    if (entry->type == TTY_ABSTRACT)
+        IdSet_add_superset(entry->type_set, set_entry->type_set);
 }
 
 Type Type_define(TypeGraph *tg, TypeDef *def) {
@@ -141,14 +137,12 @@ Type Type_define(TypeGraph *tg, TypeDef *def) {
     }
 
     // place id in abstract type sets
-    for (size_t i = 0; i < def->is_len; ++i) {
-        TypeEntry *set_entry = Type_get(tg, def->is[i]);
+    for (size_t i = 0; i < def->is_len; ++i)
+        add_type_to_abstract(tg, handle, entry, def->is[i]);
 
-        IdSet_put(set_entry->type_set, handle.id);
-
-        if (entry->type == TTY_ABSTRACT)
-            IdSet_add_superset(entry->type_set, set_entry->type_set);
-    }
+    // place id in Any set
+    if (tg->entries.len > 0)
+        add_type_to_abstract(tg, handle, entry, tg->ty_any);
 
     Vec_push(&tg->entries, entry);
     IdMap_put(&tg->by_name, entry->name, handle.id);
@@ -201,14 +195,14 @@ bool Type_is(const TypeGraph *tg, Type ty, Type of) {
         && IdSet_has(of_entry->type_set, ty.id);
 }
 
-bool TypeExpr_is(const TypeGraph *tg, TypeExpr *expr, Type of) {
+bool TypeExpr_is(const TypeGraph *tg, const TypeExpr *expr, Type of) {
     return TypeExpr_matches(tg, expr, &(TypeExpr){
         .type = TET_ATOM,
         .atom = of
     });
 }
 
-bool Type_matches(const TypeGraph *tg, Type ty, TypeExpr *pat) {
+bool Type_matches(const TypeGraph *tg, Type ty, const TypeExpr *pat) {
     switch (pat->type) {
     case TET_ATOM:
         // whether atom is the other atom
@@ -226,7 +220,8 @@ bool Type_matches(const TypeGraph *tg, Type ty, TypeExpr *pat) {
     }
 }
 
-bool TypeExpr_matches(const TypeGraph *tg, TypeExpr *expr, TypeExpr *pat) {
+bool TypeExpr_matches(const TypeGraph *tg, const TypeExpr *expr,
+                      const TypeExpr *pat) {
     switch (expr->type) {
     case TET_ATOM:
         return Type_matches(tg, expr->atom, pat);
@@ -260,6 +255,45 @@ bool TypeExpr_matches(const TypeGraph *tg, TypeExpr *expr, TypeExpr *pat) {
 
             return true;
         }
+    }
+}
+
+bool TypeExpr_equals(const TypeExpr *a, const TypeExpr *b) {
+    if (a->type != b->type)
+        return false;
+
+    switch (a->type) {
+    case TET_ATOM:
+        return a->atom.id == b->atom.id;
+    case TET_SUM:
+        if (a->len != b->len)
+            return false;
+
+        // TODO this is slow as balls. implement a TypeSet for sums
+        for (size_t i = 0; i < a->len; ++i) {
+            bool found = false;
+
+            for (size_t j = 0; j < b->len; ++j) {
+                if (TypeExpr_equals(a->exprs[i], b->exprs[j])) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+                return false;
+        }
+
+        return true;
+    case TET_PRODUCT:
+        if (a->len != b->len)
+            return false;
+
+        for (size_t i = 0; i < a->len; ++i)
+            if (!TypeExpr_equals(a->exprs[i], b->exprs[i]))
+                return false;
+
+        return true;
     }
 }
 
@@ -308,7 +342,7 @@ TypeExpr *TypeExpr_product(Bump *pool, size_t n, ...) {
     return te;
 }
 
-void TypeExpr_print(const TypeGraph *tg, TypeExpr *expr) {
+void TypeExpr_print(const TypeGraph *tg, const TypeExpr *expr) {
     switch (expr->type) {
     case TET_ATOM:
         Type_print(tg, expr->atom);

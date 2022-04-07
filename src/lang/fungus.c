@@ -3,6 +3,7 @@
 #include "fungus.h"
 
 Lang fungus_lang;
+TypeGraph fungus_types;
 
 #define PRECS\
     PREC("Lowest",     LEFT)\
@@ -73,4 +74,37 @@ void fungus_lang_init(void) {
 
 void fungus_lang_quit(void) {
     Lang_del(&fungus_lang);
+}
+
+void fungus_types_init(void) {
+    TypeGraph types = TypeGraph_new();
+
+#ifdef DEBUG
+#define TYPE(A, ...) TY_##A,
+    BaseType base_types[] = { BASE_TYPES };
+#undef TYPE
+#endif
+
+#define TYPE(ENUM, NAME, ABSTRACT, IS_LEN, IS) {\
+    .name = WORD(NAME),\
+    .type = ABSTRACT ? TTY_ABSTRACT : TTY_CONCRETE,\
+    .is = (Type[])IS,\
+    .is_len = IS_LEN\
+},
+    TypeDef base_defs[] = { BASE_TYPES };
+#undef TYPE
+
+    for (size_t i = 0; i < TY_COUNT; ++i) {
+        Type ty = Type_define(&types, &base_defs[i]);
+
+#ifdef DEBUG
+        assert(ty.id == base_types[i]);
+#endif
+    }
+
+    fungus_types = types;
+}
+
+void fungus_types_quit(void) {
+    TypeGraph_del(&fungus_types);
 }

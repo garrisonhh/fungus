@@ -6,6 +6,7 @@
 #include "precedence.h"
 #include "pattern.h"
 #include "../data.h"
+#include "../types.h"
 
 /*
  * RuleTree is for storing rule data throughout AST parsing
@@ -29,30 +30,39 @@ typedef struct RuleEntry {
     const Word *name;
     Pattern pat;
     Prec prec;
+    Type ty;
 } RuleEntry;
 
 #define RULENODE_NEXT_LEN 64
 
 typedef struct RuleNode {
-    Rule rule; // can check validity with Rule_is_valid
+    // parallel vecs
+    Vec next_atoms; // MatchAtom predicates
+    Vec next_nodes; // RuleNodes associated with a MatchAtom
 
-    struct RuleNode *next_expr; // if node can be followed by expr
-    struct RuleNode *next_lxm[RULENODE_NEXT_LEN];
-    const Word *next_lxm_type[RULENODE_NEXT_LEN];
-    size_t num_next_lxms;
+    // rule
+    Rule rule;
+    unsigned has_rule: 1;
 } RuleNode;
 
 typedef struct RuleTree {
     Bump pool;
-    Vec entries;
+    Vec entries; // entries[0] represents Scope, nevre contains an actual entry
+    IdMap by_name;
     RuleNode *root; // dummy rulenode, contains no valid type info
+
+    // this is the internal type system for Rules, used for Pattern matching
+    TypeGraph types;
+
+    Type ty_scope, ty_any;
 } RuleTree;
 
 RuleTree RuleTree_new(void);
 void RuleTree_del(RuleTree *);
 
 Rule Rule_define(RuleTree *, RuleDef *def);
-bool Rule_is_valid(Rule rule);
+Rule Rule_by_name(const RuleTree *, const Word *name);
+Type Rule_typeof(const RuleTree *, Rule rule);
 const RuleEntry *Rule_get(const RuleTree *, Rule rule);
 
 void RuleTree_dump(const RuleTree *);

@@ -3,29 +3,13 @@
 
 #include <stdint.h>
 
-#include "../data.h"
+#include "data.h"
 
 /*
  * TypeGraph is how fungus stores types within scopes.
  */
 
-// table of enum, name, abstractness, ... (is)
-#define BASE_TYPES\
-    TYPE(NONE,      "NONE",      1, 0, {0})\
-    \
-    TYPE(PRIMITIVE, "Primitive", 1, 0, {0})\
-    TYPE(NUMBER,    "Number",    1, 1, {{TY_PRIMITIVE}})\
-    \
-    TYPE(BOOL,      "bool",      0, 1, {{TY_PRIMITIVE}})\
-    TYPE(STRING,    "string",    0, 1, {{TY_PRIMITIVE}})\
-    TYPE(INT,       "int",       0, 1, {{TY_NUMBER}})\
-    TYPE(FLOAT,     "float",     0, 1, {{TY_NUMBER}})\
-
-#define TYPE(A, ...) TY_##A,
-typedef enum BaseType { BASE_TYPES TY_COUNT } BaseType;
-#undef TYPE
-
-typedef struct TypeHandle { unsigned id; } Type;
+typedef struct TypeHandle { uint32_t id; } Type;
 
 typedef enum TypeExprType {
     // basic unit like `u64`
@@ -47,6 +31,8 @@ typedef struct TypeExpr {
             struct TypeExpr **exprs;
             size_t len;
         };
+
+        // TODO hashing TypeExprs + TypeSet for sum types
     };
 } TypeExpr;
 
@@ -72,7 +58,7 @@ typedef struct TypeEntry {
 
     TypeType type;
     union {
-        IdSet *type_set; // abstract
+        IdSet *type_set; // for abstract types
     };
 } TypeEntry;
 
@@ -81,14 +67,12 @@ typedef struct TypeGraph {
     Vec entries;
     IdMap by_name;
 
+    Type ty_any;
     uint16_t id;
 } TypeGraph;
 
 TypeGraph TypeGraph_new(void);
 void TypeGraph_del(TypeGraph *);
-
-// fungus base types need to be defined for top level scope
-void TypeGraph_define_base(TypeGraph *);
 
 Type Type_define(TypeGraph *, TypeDef *def);
 bool Type_by_name(const TypeGraph *, Word *name, Type *o_type);
@@ -101,16 +85,20 @@ TypeExpr *TypeExpr_deepcopy(Bump *pool, TypeExpr *expr);
 bool TypeExpr_deepequals(TypeExpr *expr, TypeExpr *other);
 
 bool Type_is(const TypeGraph *, Type ty, Type of);
-bool TypeExpr_is(const TypeGraph *, TypeExpr *expr, Type of);
-bool Type_matches(const TypeGraph *, Type ty, TypeExpr *pat);
-bool TypeExpr_matches(const TypeGraph *, TypeExpr *expr, TypeExpr *pat);
+bool TypeExpr_is(const TypeGraph *, const TypeExpr *expr, Type of);
+bool Type_matches(const TypeGraph *, Type ty, const TypeExpr *pat);
+bool TypeExpr_matches(const TypeGraph *, const TypeExpr *expr,
+                      const TypeExpr *pat);
+
+// exact recursive equality
+bool TypeExpr_equals(const TypeExpr *, const TypeExpr *);
 
 // TypeExpr convenience funcs
 TypeExpr *TypeExpr_atom(Bump *pool, Type ty);
 TypeExpr *TypeExpr_sum(Bump *pool, size_t n, ...);
 TypeExpr *TypeExpr_product(Bump *pool, size_t n, ...);
 
-void TypeExpr_print(const TypeGraph *, TypeExpr *expr);
+void TypeExpr_print(const TypeGraph *, const TypeExpr *expr);
 void Type_print(const TypeGraph *, Type ty);
 void Type_print_verbose(const TypeGraph *, Type ty);
 void TypeGraph_dump(const TypeGraph *);

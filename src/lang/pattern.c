@@ -8,15 +8,30 @@ Lang pattern_lang;
 
 #define PRECS\
     PREC("Lowest",  LEFT)\
-    PREC("Decl",    LEFT)\
-    PREC("Bang",    LEFT)\
-    PREC("Or",      LEFT)\
+    PREC("Default", LEFT)\
     PREC("Highest", LEFT)
 
-#define RULES\
-    RULE("MatchExpr", "Decl", 3, {{0}, { ":", MATCH_LEXEME }, {0}})\
-    RULE("TypeOr",    "Or",   3, {{0}, { "|", MATCH_LEXEME }, {0}})\
-    RULE("TypeBang",  "Bang", 3, {{0}, { "!", MATCH_LEXEME }, {0}})\
+static MatchAtom new_match_expr(Bump *pool, const char *name,
+                                 const TypeExpr *rule_expr,
+                                 const TypeExpr *type_expr) {
+    Word name_word = WORD(name);
+
+    return (MatchAtom){
+        .type = MATCH_EXPR,
+        .name = Word_copy_of(&name_word, pool),
+        .rule_expr = rule_expr,
+        .type_expr = type_expr
+    };
+}
+
+static MatchAtom new_match_lxm(Bump *pool, const char *lxm) {
+    Word lxm_word = WORD(lxm);
+
+    return (MatchAtom){
+        .type = MATCH_LEXEME,
+        .name = Word_copy_of(&lxm_word, pool)
+    };
+}
 
 void pattern_lang_init(void) {
     Lang lang = Lang_new(WORD("PatternLang"));
@@ -50,67 +65,51 @@ void pattern_lang_init(void) {
         }
     }
 
-    // rules
-    typedef struct RuleAtom {
-        const char *word;
-        MatchType matches;
-    } RuleAtom;
-
+    // rules (pattern lang does not use sema for type checking, you can ignore)
     {
-#define RULE(NAME, PREC, PAT_LEN, ...) WORD(NAME),
-        Word names[] = { RULES };
-#undef RULE
-#define RULE_COUNT (ARRAY_SIZE(names))
+        RuleTree *rules = &lang.rules;
+        TypeGraph *rtg = &rules->types;
+        Bump *p = &rules->pool;
+        MatchAtom *matches;
 
-        Prec precs[RULE_COUNT];
-        {
-#define RULE(NAME, PREC, PAT_LEN, ...) WORD(PREC),
-            Word prec_names[] = { RULES };
-#undef RULE
+        Word default_word = WORD("Default");
+        Prec default_prec = Prec_by_name(&lang.precs, &default_word);
 
-            for (size_t i = 0; i < RULE_COUNT; ++i)
-                precs[i] = Prec_by_name(&lang.precs, &prec_names[i]);
-        }
+        // match expr
+        matches = Bump_alloc(p, 3 * sizeof(*matches));
 
-#define RULE(NAME, PREC, PAT_LEN, ...) PAT_LEN,
-        size_t lens[] = { RULES };
-#undef RULE
-#define RULE(NAME, PREC, PAT_LEN, ...) __VA_ARGS__,
-        RuleAtom atoms[][32] = { RULES };
-#undef RULE
+        matches[0] =
+            new_match_expr(p, "ident", TypeExpr_atom(p, rtg->ty_any), NULL);
+        matches[1] = new_match_lxm(p, ":");
+        matches[2] =
+            new_match_expr(p, "type", TypeExpr_atom(p, rtg->ty_any), NULL);
 
-        Bump *pool = &lang.rules.pool;
-
-        for (size_t i = 0; i < RULE_COUNT; ++i) {
-            // create pattern from metaprogrammed stuff
-            RuleAtom *pattern = atoms[i];
-            size_t len = lens[i];
-
-            // pattern lang is unique in that it is only used to generate an
-            // AST, so typing etc. can be ignored
-            Pattern2 pat = {
-                .atoms = Bump_alloc(pool, len * sizeof(*pat.atoms)),
-                .matches = Bump_alloc(pool, len * sizeof(*pat.matches)),
-                .len = len
-            };
-
-            for (size_t j = 0; j < len; ++j) {
-                if (pattern->word)
-                    pat.atoms[j] = WORD(pattern->word);
-                pat.matches[j] = pattern->matches;
+        Lang_legislate(&lang, &(RuleDef){
+            .name = WORD("MatchExpr"),
+            .prec = default_prec,
+            .pat = {
+                .matches = matches,
+                .len = 3
             }
+        });
 
-            continue;
+        // type bang
+        matches = Bump_alloc(p, 3 * sizeof(*matches));
 
-            // legislate
-            Lang_legislate(&lang, &(RuleDef){
-                .name = names[i],
-                .prec = precs[i],
-                // TODO .pat = pat
-            });
-        }
+        matches[0] =
+            new_match_expr(p, "lhs", TypeExpr_atom(p, rtg->ty_any), NULL);
+        matches[1] = new_match_lxm(p, "!");
+        matches[2] =
+            new_match_expr(p, "rhs", TypeExpr_atom(p, rtg->ty_any), NULL);
 
-#undef RULE_COUNT
+        Lang_legislate(&lang, &(RuleDef){
+            .name = WORD("TypeBang"),
+            .prec = default_prec,
+            .pat = {
+                .matches = matches,
+                .len = 3
+            }
+        });
     }
 
     pattern_lang = lang;
@@ -124,86 +123,54 @@ void pattern_lang_quit(void) {
     Lang_del(&pattern_lang);
 }
 
-static Word word_of_tok(TokBuf *tokens, size_t idx) {
-    const char *text = tokens->file->text.str;
-
-    return Word_new(&text[tokens->starts[idx]], tokens->lens[idx]);
-}
-
 // assumes pattern is correct since this is not user-facing
 // lol this is a mess and will be replaced.
 Pattern Pattern_from(Bump *pool, const char *str) {
     File f = File_from_str("pattern", str, strlen(str));
+
+    // create ast
     TokBuf tokens = lex(&f);
 
-    // copy exprs + lexemes
-    Vec words = Vec_new(), is_expr = Vec_new();
-    bool capture_lxm = false, capture_return = false;
-
-    for (size_t i = 0; i < tokens.len; ++i) {
-        if (tokens.types[i] == TOK_SYMBOLS) {
-            Word tok = word_of_tok(&tokens, i);
-
-            if (Word_eq_view(&tok, &(View){ "->", 2 })) {
-                assert(i <= tokens.len - 2);
-                capture_return = true;
-            } else if (i > 0 && Word_eq_view(&tok, &(View){ ":", 1 })) {
-                Word expr_ident = word_of_tok(&tokens, i - 1);
-
-                Vec_push(&words, Word_copy_of(&expr_ident, pool));
-                Vec_push(&is_expr, (void *)1);
-            } else if (tok.str[0] == '`') {
-                if (tok.len > 1) {
-                    Word lxm = Word_new(&tok.str[1], tok.len - 1);
-
-                    Vec_push(&words, Word_copy_of(&lxm, pool));
-                    Vec_push(&is_expr, NULL);
-                } else {
-                    capture_lxm = true;
-                }
-            }
-        } else if (tokens.types[i] == TOK_WORD && capture_lxm) {
-            Word lxm = word_of_tok(&tokens, i);
-
-            Vec_push(&words, Word_copy_of(&lxm, pool));
-            Vec_push(&is_expr, NULL);
-
-            capture_lxm = false;
-        } else if (tokens.types[i] == TOK_WORD && capture_return) {
-            // TODO
-
-            capture_return = true;
-        }
-    }
-
-    // move words to pattern
-    Pattern pat = {
-        .pat = Bump_alloc(pool, words.len * sizeof(const Word *)),
-        .is_expr = Bump_alloc(pool, words.len * sizeof(bool)),
-        .len = words.len
-    };
-
-    for (size_t i = 0; i < pat.len; ++i) {
-        pat.pat[i] = Word_copy_of(words.data[i], pool);
-        pat.is_expr[i] = (bool)is_expr.data[i];
-    }
-
-    Vec_del(&is_expr);
-    Vec_del(&words);
     TokBuf_del(&tokens);
+
+    // create pat
+    Pattern pat = {0};
+
     File_del(&f);
 
     return pat;
 }
 
-void Pattern_print(const Pattern *pat) {
+void Pattern_print(const Pattern *pat, const TypeGraph *rule_types,
+                   const TypeGraph *types) {
     for (size_t i = 0; i < pat->len; ++i) {
         if (i) printf(" ");
 
-        const Word *word = pat->pat[i];
+        MatchAtom *atom = &pat->matches[i];
 
-        printf("%s%.*s" TC_RESET,
-               pat->is_expr[i] ? TC_BLUE : TC_WHITE,
-               (int)word->len, word->str);
+        switch (atom->type) {
+        case MATCH_EXPR: {
+            const Word *name = atom->name;
+
+            printf("%.*s: ", (int)name->len, name->str);
+
+            if (atom->rule_expr)
+                TypeExpr_print(rule_types, atom->rule_expr);
+
+            printf("!");
+
+            if (atom->type_expr)
+                TypeExpr_print(types, atom->type_expr);
+
+            break;
+        }
+        case MATCH_LEXEME: {
+            const Word *lxm = atom->lxm;
+
+            printf("`%.*s", (int)lxm->len, lxm->str);
+
+            break;
+        }
+        }
     }
 }

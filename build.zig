@@ -63,12 +63,15 @@ pub fn build(b: *std.build.Builder) anyerror!void {
                 "lex.c",
 
                 // parsing
-                "parse.c",
+                // "parse.c",
                 "lang.c",
                 "lang/rules.c",
                 "lang/precedence.c",
                 "lang/pattern.c",
                 "lang/fungus.c",
+
+                // sema
+                "types.c",
 
                 // utility
                 "file.c",

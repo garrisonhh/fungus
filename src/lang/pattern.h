@@ -2,6 +2,7 @@
 #define PATTERN_H
 
 #include "../data.h"
+#include "../types.h"
 
 /*
  * TODO:
@@ -14,62 +15,44 @@
 
 typedef enum MatchType {
     MATCH_EXPR,
-    MATCH_LEXEME,
-    MATCH_SCOPE,
-    MATCH_RULE
+    MATCH_LEXEME
 } MatchType;
 
-typedef struct Where {
-    View name;
-    View is;
-} Where;
+typedef struct MatchAtom {
+    MatchType type;
 
-typedef struct Pattern2 {
-    // parallel arrays
-    Word *atoms;
-    MatchType *matches;
-    size_t len;
+    union {
+        // expr
+        struct {
+            const Word *name;
+            const TypeExpr *rule_expr; // RuleTree Type typeexpr (maybe NULL)
+            const TypeExpr *type_expr; // Type typeexpr (maybe NULL)
+        };
 
-    // types of params + return, stored for sema to compile and check
-    View *types;
-    View return_type;
+        // lexeme
+        const Word *lxm;
+    };
+} MatchAtom;
 
-    // templating stuff
-    Where *wheres;
-    size_t where_len;
-} Pattern2;
-
-// create using Pattern_from
 typedef struct Pattern {
-    // parallel arrays:
-    // if is_expr[i], then match any expr. else, match lexeme pat[i]
-    const Word **pat;
-    bool *is_expr; // TODO use MatchType instead
+    MatchAtom *matches;
     size_t len;
+    const TypeExpr *returns;
 
-    // stored for sema to compile and check
-    View *types;
-    View return_type;
+    // TODO template (relative variable) stuff
 } Pattern;
 
 void pattern_lang_init(void);
 void pattern_lang_quit(void);
 
 /*
- * Patterns are compiled from a bastardized syntax for internal use, this is
- * simply because writing out large struct definitions for patterns is annoying,
- * especially when the compiler can do it for me.
+ * Patterns dogfood the lexer + parser.
  *
- * this small DSL simply looks something like this:
- * "a: T `+ b: T -> T where T = Number"
- *
- * (more formally:)
- * - a list of `ident: typeexpr`s or lexemes escaped with a `
- *
- * in the future I can make my own pattern dsl from within fungus itself!
+ * TODO describe the pattern DSL
  */
 Pattern Pattern_from(Bump *, const char *str);
 
-void Pattern_print(const Pattern *);
+void Pattern_print(const Pattern *, const TypeGraph *rule_types,
+                   const TypeGraph *types);
 
 #endif
