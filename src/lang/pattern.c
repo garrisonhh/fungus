@@ -141,7 +141,30 @@ void pattern_lang_init(void) {
                 .len = 3
             }
         });
+
+#if 1
+        // testing
+        matches = Bump_alloc(p, 4 * sizeof(*matches));
+
+        matches[0] = new_match_lxm(p, ">>");
+        matches[1] =
+            new_match_expr(p, "lhs", TypeExpr_atom(p, rtg->ty_any), NULL);
+        matches[2] = new_match_lxm(p, "!");
+        matches[3] =
+            new_match_expr(p, "rhs", TypeExpr_atom(p, rtg->ty_any), NULL);
+
+        Lang_legislate(&lang, &(RuleDef){
+            .name = WORD("BangTest"),
+            .prec = bang_prec,
+            .pat = {
+                .matches = matches,
+                .len = 4
+            }
+        });
     }
+#endif
+
+    RuleTree_crystallize(&lang.rules);
 
     pattern_lang = lang;
 
@@ -152,6 +175,19 @@ void pattern_lang_init(void) {
 
 void pattern_lang_quit(void) {
     Lang_del(&pattern_lang);
+}
+
+bool MatchAtom_equals(const MatchAtom *a, const MatchAtom *b) {
+    if (a->type == b->type) {
+        switch (a->type) {
+        case MATCH_LEXEME:
+            return Word_eq(a->lxm, b->lxm);
+        case MATCH_EXPR:
+            return TypeExpr_equals(a->rule_expr, b->rule_expr);
+        }
+    }
+
+    return false;
 }
 
 // assumes pattern is correct since this is not user-facing

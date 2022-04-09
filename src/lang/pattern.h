@@ -45,6 +45,8 @@ typedef struct Pattern {
 void pattern_lang_init(void);
 void pattern_lang_quit(void);
 
+bool MatchAtom_equals(const MatchAtom *, const MatchAtom *);
+
 /*
  * Patterns dogfood the lexer + parser.
  *

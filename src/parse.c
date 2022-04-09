@@ -285,50 +285,92 @@ static bool translate_scope(Bump *pool, const File *f, const Lang *lang,
     return true;
 }
 
+// find index of first match within a Vec<RuleNode *>
+static bool expr_match_of(const File *f, const RuleTree *rules,
+                          const RExpr *expr, const Vec *nodes, size_t *o_idx) {
+    if (expr->type.id == rules->ty_lexeme.id) {
+        // match lexeme
+        View token = { &f->text.str[expr->tok_start], expr->tok_len };
+
+        for (size_t i = 0; i < nodes->len; ++i) {
+            const MatchAtom *pred = ((RuleNode *)nodes->data[i])->pred;
+
+            if (pred->type == MATCH_LEXEME
+             && Word_eq_view(pred->lxm, &token)) {
+                *o_idx = i;
+
+                return true;
+            }
+        }
+    } else {
+        // match a rule typeexpr
+        for (size_t i = 0; i < nodes->len; ++i) {
+            const MatchAtom *pred = ((RuleNode *)nodes->data[i])->pred;
+
+            if (pred->type == MATCH_EXPR
+             && Type_matches(&rules->types, expr->type, pred->rule_expr)) {
+                *o_idx = i;
+
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 // tries to match and collapse a rule on a slice, returns NULL if no match found
 static RExpr *try_match(Bump *pool, const File *f, const RuleTree *rules,
-                        RExpr **slice, size_t len, size_t *o_match_len) {
-    // TODO backtracking
+                        RExpr **slice, size_t *io_start, size_t *io_len) {
+    size_t start = *io_start, len = *io_len;
+
+    // check backtracking
+    if (start > 0) {
+        RExpr *first = slice[start];
+
+        // find backtrack
+        size_t idx;
+
+        if (!expr_match_of(f, rules, first, &rules->roots, &idx))
+            goto no_backtrack;
+
+        RuleBacktrack *bt = rules->backtracks.data[idx];
+        RExpr *prev = slice[start - 1];
+
+        if (!expr_match_of(f, rules, prev, &bt->backs, &idx))
+            goto no_backtrack;
+
+        // backtrack possible, try to match on it
+        size_t prev_start = start - 1, prev_len = len + 1;
+        RExpr *prev_match = try_match(pool, f, rules, slice,
+                                      &prev_start, &prev_len);
+
+        if (prev_match) {
+            // found a previous match!
+            *io_start = prev_start;
+            *io_len = prev_len;
+
+            return prev_match;
+        }
+
+no_backtrack:;
+    }
 
     // match a rule
     const Vec *nexts = &rules->roots;
     Rule best;
     size_t best_len = 0;
 
-    for (size_t i = 0; i < len; ++i) {
-        // match next node
-        RExpr *expr = slice[i];
-        RuleNode *next = NULL;
+    for (size_t i = 0; i < len - start; ++i) {
+        const RuleNode *next = NULL;
+        size_t idx;
 
-        if (expr->type.id == rules->ty_lexeme.id) {
-            // match lexeme
-            View token = { &f->text.str[expr->tok_start], expr->tok_len };
-
-            for (size_t j = 0; j < nexts->len; ++j) {
-                const MatchAtom *pred = ((RuleNode *)nexts->data[j])->pred;
-
-                if (pred->type == MATCH_LEXEME
-                 && Word_eq_view(pred->lxm, &token)) {
-                    next = nexts->data[j];
-                    break;
-                }
-            }
+        if (expr_match_of(f, rules, slice[start + i], nexts, &idx)) {
+            next = nexts->data[idx];
         } else {
-            // match a rule typeexpr
-            for (size_t j = 0; j < nexts->len; ++j) {
-                const MatchAtom *pred = ((RuleNode *)nexts->data[j])->pred;
-
-                if (pred->type == MATCH_EXPR
-                 && Type_matches(&rules->types, expr->type, pred->rule_expr)) {
-                    next = nexts->data[j];
-                    break;
-                }
-            }
-        }
-
-        // no nodes matched
-        if (!next)
+            // no nodes matched
             break;
+        }
 
         // nodes matched
         if (next->has_rule) {
@@ -343,9 +385,10 @@ static RExpr *try_match(Bump *pool, const File *f, const RuleTree *rules,
     if (!best_len)
         return NULL;
 
-    *o_match_len = best_len;
+    *io_start = start;
+    *io_len = best_len;
 
-    return rule_copy_of_slice(pool, rules, best, slice, best_len);
+    return rule_copy_of_slice(pool, rules, best, &slice[start], best_len);
 }
 
 static RExpr **lhs_of(RExpr *expr) {
@@ -440,30 +483,28 @@ static RExpr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
 
         for (size_t i = 0; i < len;) {
             // try to match rules on this index until none can be matched
-            size_t match_len;
+            size_t match_start = i, match_len = len;
             RExpr *found =
-                try_match(pool, f, rules, &slice[i], len - i, &match_len);
+                try_match(pool, f, rules, slice, &match_start, &match_len);
 
             if (!found) {
                 ++i;
                 continue;
             }
 
+            matched = true;
             found = correct_precedence(lang, found);
 
             // stitch slice
             size_t move_len = match_len - 1;
 
-            for (size_t j = 1; j <= i; ++j)
-                slice[i + move_len - j] = slice[i - j];
+            for (size_t j = 1; j <= match_start; ++j)
+                slice[match_start + move_len - j] = slice[match_start - j];
 
-            slice[i + move_len] = found;
+            slice[match_start + move_len] = found;
 
-            // fix slice ptr + len
             slice += move_len;
             len -= move_len;
-
-            matched = true;
         }
     } while (matched);
 

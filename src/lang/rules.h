@@ -12,11 +12,6 @@
  * RuleTree is for storing rule data throughout AST parsing
  */
 
-/*
- * fill this out in order to define a rule
- * when defined, every rule will also generate its own comptype using the name
- * provided
- */
 typedef struct RuleDef {
     Word name;
     Prec prec;
@@ -33,8 +28,6 @@ typedef struct RuleEntry {
     Type type;
 } RuleEntry;
 
-#define RULENODE_NEXT_LEN 64
-
 typedef struct RuleNode {
     MatchAtom *pred;
     Vec nexts;
@@ -46,14 +39,19 @@ typedef struct RuleNode {
 
 typedef struct RuleBacktrack {
     MatchAtom *pred;
-
-    Vec back_atoms;
-    Vec back_nodes;
+    Vec backs; // points to root nodes in RuleTree
 } RuleBacktrack;
 
+/*
+ * TODO for pattern compiling, Rule types will need to know about each other
+ * before the patterns for rules are actually compiled. this means I will
+ * have to change the rule definition system into two phases, one where
+ * patterns are stored and types are generated and then a second where
+ * patterns are compiled using those types and then the tree is created
+ */
 typedef struct RuleTree {
     Bump pool;
-    Vec entries; // entries[0] represents Scope, nevre contains an actual entry
+    Vec entries; // entries[0] represents Scope, never contains an actual entry
     IdMap by_name;
 
     Vec roots; // Vec<RuleNode *>
@@ -76,6 +74,9 @@ typedef struct RuleTree {
 
 RuleTree RuleTree_new(void);
 void RuleTree_del(RuleTree *);
+
+// ruletree's second phase
+void RuleTree_crystallize(RuleTree *);
 
 Rule Rule_define(RuleTree *, RuleDef *def);
 Rule Rule_by_name(const RuleTree *, const Word *name);

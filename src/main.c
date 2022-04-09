@@ -57,8 +57,8 @@ int main(int argc, char **argv) {
 
     pattern_lang_init();
 
-    Pattern pat = Pattern_from(&pool, "a: Any!_ `+ b: Any!_");
-    (void)pat;
+    Pattern_from(&pool, "a: Any!_ `+ b: Any!_");
+    Pattern_from(&pool, "a: Any!_ `+ b: >>Any|Any!_");
 
     pattern_lang_quit();
 

@@ -35,6 +35,7 @@ RuleTree RuleTree_new(void) {
         .entries = Vec_new(),
         .by_name = IdMap_new(),
         .types = TypeGraph_new(),
+        .backtracks = Vec_new(),
     };
 
     rt.roots = Vec_new();
@@ -72,10 +73,58 @@ void RuleTree_del(RuleTree *rt) {
     for (size_t i = 0; i < rt->roots.len; ++i)
         RuleNode_del(rt->roots.data[i]);
 
+    Vec_del(&rt->backtracks);
     TypeGraph_del(&rt->types);
     IdMap_del(&rt->by_name);
     Vec_del(&rt->entries);
     Bump_del(&rt->pool);
+}
+
+void RuleTree_crystallize(RuleTree *rt) {
+    // generate backtrack parallel vec
+    for (size_t i = 0; i < rt->roots.len; ++i) {
+        const RuleNode *root = rt->roots.data[i];
+
+        RuleBacktrack *bt = RT_alloc(rt, sizeof(*bt));
+
+        *bt = (RuleBacktrack){
+            .pred = root->pred,
+            .backs = Vec_new()
+        };
+
+        Vec_push(&rt->backtracks, bt);
+    }
+
+    // generate backtracks
+    for (size_t i = 0; i < rt->roots.len; ++i) {
+        const RuleNode *root = rt->roots.data[i];
+
+        for (size_t j = 0; j < root->nexts.len; ++j) {
+            const RuleNode *next = root->nexts.data[j];
+
+            // check if next is a root
+            bool is_root = false;
+
+            for (size_t k = 0; k < rt->roots.len; ++k) {
+                if (k == i)
+                    continue;
+
+                const RuleNode *other_root = rt->roots.data[k];
+
+                if (MatchAtom_equals(next->pred, other_root->pred)) {
+                    is_root = true;
+                    break;
+                }
+            }
+
+            // if next is a root, add root as a backtrack for next
+            if (is_root) {
+                RuleBacktrack *bt = rt->backtracks.data[j];
+
+                Vec_push(&bt->backs, root);
+            }
+        }
+    }
 }
 
 Rule Rule_define(RuleTree *rt, RuleDef *def) {
@@ -157,26 +206,26 @@ const RuleEntry *Rule_get(const RuleTree *rt, Rule rule) {
 
 #define INDENT 2
 
+static void MatchAtom_print(const RuleTree *rt, const MatchAtom *pred) {
+    switch (pred->type) {
+    case MATCH_LEXEME:
+        printf("%.*s", (int)pred->lxm->len, pred->lxm->str);
+        break;
+    case MATCH_EXPR:
+        printf(TC_BLUE);
+        TypeExpr_print(&rt->types, pred->rule_expr);
+        printf(TC_RESET);
+        break;
+    }
+}
+
 static void dump_children(const RuleTree *rt, const Vec *children, int level) {
     // print matches
     for (size_t i = 0; i < children->len; ++i) {
         RuleNode *child = children->data[i];
 
-        // next type
-        MatchAtom *pred = child->pred;
-
         printf("%*s", level * INDENT, "");
-
-        switch (pred->type) {
-        case MATCH_LEXEME:
-            printf("%.*s", (int)pred->lxm->len, pred->lxm->str);
-            break;
-        case MATCH_EXPR:
-            printf(TC_BLUE);
-            TypeExpr_print(&rt->types, pred->rule_expr);
-            printf(TC_RESET);
-            break;
-        }
+        MatchAtom_print(rt, child->pred);
 
         // rule (if exists)
         if (child->has_rule) {
@@ -189,11 +238,24 @@ static void dump_children(const RuleTree *rt, const Vec *children, int level) {
         puts("");
 
         dump_children(rt, &child->nexts, level + 1);
+
+        if (level == 0 && rt->backtracks.len > 0) {
+            puts("BACKS:");
+            // print backtracks
+            const RuleBacktrack *bt = rt->backtracks.data[i];
+
+            for (size_t j = 0; j < bt->backs.len; ++j) {
+                printf(TC_DIM " <- " TC_RESET);
+                MatchAtom_print(rt, ((RuleNode *)bt->backs.data[j])->pred);
+                puts("");
+            }
+        }
     }
 }
 
 void RuleTree_dump(const RuleTree *rt) {
     puts(TC_CYAN "RuleTree:" TC_RESET);
     dump_children(rt, &rt->roots, 0);
+
     puts("");
 }
