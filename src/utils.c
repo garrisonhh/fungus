@@ -52,6 +52,10 @@ void fungus_panic(const char *msg, ...) {
     exit(-1);
 }
 
+void fungus_unimpl(void) {
+    ; // do nothing
+}
+
 #define FNV_PRIME 1099511628211ull
 #define FNV_BASIS 14695981039346656037ull
 

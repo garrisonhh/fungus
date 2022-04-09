@@ -66,6 +66,15 @@ extern bool global_error;
 void fungus_error(const char *msg, ...);
 noreturn void fungus_panic(const char *msg, ...);
 
+// used for breakpoints
+void fungus_unimpl(void);
+
+#define UNIMPLEMENTED do {\
+    fungus_unimpl();\
+    fungus_panic("unimplemented in " TC_YELLOW "%s" TC_RESET " at " TC_YELLOW\
+                 "%s:%d" TC_RESET, __func__, __FILE__, __LINE__);\
+} while (0)
+
 // hashing =====================================================================
 
 typedef uint64_t hash_t;

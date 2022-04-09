@@ -24,10 +24,11 @@ static Rule register_entry(RuleTree *rt, RuleEntry *entry) {
 
     Vec_push(&rt->entries, entry);
     IdMap_put(&rt->by_name, entry->name, 0);
-    entry->ty = Type_define(&rt->types, &(TypeDef){ .name = *entry->name });
+    entry->type = Type_define(&rt->types, &(TypeDef){ .name = *entry->name });
 
     return handle;
 }
+
 
 RuleTree RuleTree_new(void) {
     RuleTree rt = {
@@ -47,9 +48,16 @@ RuleTree RuleTree_new(void) {
         .name = Word_copy_of(&name, &rt.pool)
     };
 
-    register_entry(&rt, scope_entry);
+    rt.rule_scope = register_entry(&rt, scope_entry);
+    rt.ty_scope = scope_entry->type;
 
-    rt.ty_scope = scope_entry->ty;
+    // special types
+    TypeGraph *types = &rt.types;
+
+    rt.ty_any = types->ty_any;
+    rt.ty_literal = Type_define(types, &(TypeDef){ .name = WORD("Literal") });
+    rt.ty_lexeme = Type_define(types, &(TypeDef){ .name = WORD("Lexeme") });
+    rt.ty_ident = Type_define(types, &(TypeDef){ .name = WORD("Ident") });
 
     return rt;
 }
@@ -140,6 +148,10 @@ Rule Rule_by_name(const RuleTree *rt, const Word *name) {
     return (Rule){ IdMap_get(&rt->by_name, name) };
 }
 
+Type Rule_typeof(const RuleTree *rt, Rule rule) {
+    return Rule_get(rt, rule)->type;
+}
+
 const RuleEntry *Rule_get(const RuleTree *rt, Rule rule) {
     return rt->entries.data[rule.id];
 }
@@ -149,6 +161,7 @@ const RuleEntry *Rule_get(const RuleTree *rt, Rule rule) {
 static void dump_children(const RuleTree *rt, RuleNode *node, int level) {
     // print matches
     for (size_t i = 0; i < node->next_atoms.len; ++i) {
+        // next type
         MatchAtom *atom = node->next_atoms.data[i];
 
         printf("%*s", level * INDENT, "");
@@ -158,13 +171,25 @@ static void dump_children(const RuleTree *rt, RuleNode *node, int level) {
             printf("%.*s", (int)atom->lxm->len, atom->lxm->str);
             break;
         case MATCH_EXPR:
+            printf(TC_BLUE);
             TypeExpr_print(&rt->types, atom->rule_expr);
+            printf(TC_RESET);
             break;
+        }
+
+        // next rule (if exists)
+        RuleNode *next = node->next_nodes.data[i];
+
+        if (next->has_rule) {
+            const Word *name = Rule_get(rt, next->rule)->name;
+
+            printf(TC_DIM " -> " TC_RED "%.*s" TC_RESET,
+                   (int)name->len, name->str);
         }
 
         puts("");
 
-        dump_children(rt, node->next_nodes.data[i], level + 1);
+        dump_children(rt, next, level + 1);
     }
 }
 

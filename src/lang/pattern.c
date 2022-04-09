@@ -3,6 +3,7 @@
 #include "pattern.h"
 #include "../lang.h"
 #include "../lex.h"
+#include "../parse.h"
 
 Lang pattern_lang;
 
@@ -110,6 +111,24 @@ void pattern_lang_init(void) {
                 .len = 3
             }
         });
+
+        // type or
+        matches = Bump_alloc(p, 3 * sizeof(*matches));
+
+        matches[0] =
+            new_match_expr(p, "lhs", TypeExpr_atom(p, rtg->ty_any), NULL);
+        matches[1] = new_match_lxm(p, "|");
+        matches[2] =
+            new_match_expr(p, "rhs", TypeExpr_atom(p, rtg->ty_any), NULL);
+
+        Lang_legislate(&lang, &(RuleDef){
+            .name = WORD("TypeOr"),
+            .prec = default_prec,
+            .pat = {
+                .matches = matches,
+                .len = 3
+            }
+        });
     }
 
     pattern_lang = lang;
@@ -130,6 +149,11 @@ Pattern Pattern_from(Bump *pool, const char *str) {
 
     // create ast
     TokBuf tokens = lex(&f);
+    RExpr *ast = parse(pool, &pattern_lang, &tokens);
+
+#if 1
+    RExpr_dump(ast, &pattern_lang, &f);
+#endif
 
     TokBuf_del(&tokens);
 

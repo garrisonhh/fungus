@@ -30,7 +30,7 @@ typedef struct RuleEntry {
     const Word *name;
     Pattern pat;
     Prec prec;
-    Type ty;
+    Type type;
 } RuleEntry;
 
 #define RULENODE_NEXT_LEN 64
@@ -51,10 +51,19 @@ typedef struct RuleTree {
     IdMap by_name;
     RuleNode *root; // dummy rulenode, contains no valid type info
 
-    // this is the internal type system for Rules, used for Pattern matching
+    /*
+     * this is the internal type system for Rules, used for Pattern matching
+     * RuleTree's TypeGraph also includes some special types that aren't
+     * associated with a rule, zB literals, lexemes, and idents. this is to
+     * allow RExprs + Pattern TypeExprs to have a universal type system
+     *
+     * TODO should probably move this to Lang
+     */
     TypeGraph types;
 
-    Type ty_scope, ty_any;
+    // 'constants'
+    Rule rule_scope;
+    Type ty_scope, ty_any, ty_literal, ty_lexeme, ty_ident;
 } RuleTree;
 
 RuleTree RuleTree_new(void);

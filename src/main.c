@@ -53,9 +53,16 @@ int main(int argc, char **argv) {
     (void)argv;
 
 #if 1
+    Bump pool = Bump_new();
+
     pattern_lang_init();
 
+    Pattern pat = Pattern_from(&pool, "a: Any!_ `+ b: Any!_");
+    (void)pat;
+
     pattern_lang_quit();
+
+    Bump_del(&pool);
 #else
     pattern_lang_init();
     fungus_lang_init();

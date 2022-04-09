@@ -4,37 +4,37 @@
 #include "lex.h"
 #include "lang.h"
 
-#define EXPR_TYPES\
+#define ATOM_TYPES\
     X(INVALID)\
     \
-    X(SCOPE)\
-    X(RULE)\
-    X(LEXEME)\
-    \
     X(IDENT)\
-    X(LIT_LEXEME)\
-    X(LIT_BOOL)\
-    X(LIT_INT)\
-    X(LIT_FLOAT)\
-    X(LIT_STRING)\
+    X(LEXEME)\
+    X(BOOL)\
+    X(INT)\
+    X(FLOAT)\
+    X(STRING)\
 
-#define X(A) REX_##A,
-typedef enum RawExprType { EXPR_TYPES REX_COUNT } RExprType;
+#define X(A) ATOM_##A,
+typedef enum RawAtomType { ATOM_TYPES ATOM_COUNT } RAtomType;
 #undef X
 
-extern const char *REX_NAME[REX_COUNT];
+extern const char *ATOM_NAME[ATOM_COUNT];
 
-typedef struct RawExpr {
-    RExprType type;
+typedef struct RuleExpr {
+    Type type; // on RuleTree TypeGraph
+    bool is_atom; // TODO can I get rid of this
 
     union {
-        // for non-scopes
-        struct { hsize_t tok_start, tok_len; };
-        // for scopes + rules
-        // TODO should I store scope Lang somehow?
+        // for atoms
+        struct {
+            RAtomType atom_type;
+            hsize_t tok_start, tok_len;
+        };
+
+        // for rules
         struct {
             Rule rule;
-            struct RawExpr **exprs;
+            struct RuleExpr **exprs;
             size_t len;
         };
     };

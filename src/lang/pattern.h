@@ -39,7 +39,7 @@ typedef struct Pattern {
     size_t len;
     const TypeExpr *returns;
 
-    // TODO template (relative variable) stuff
+    // TODO template (relative type) stuff
 } Pattern;
 
 void pattern_lang_init(void);
