@@ -1,117 +1,79 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "fungus.h"
+#include "file.h"
 #include "lex.h"
 #include "parse.h"
-#include "ir.h"
-#include "cgen.h"
+#include "lang/fungus.h"
+#include "lang/pattern.h"
 
-static bool eval(Fungus *fun, const char *text, size_t len) {
-    Fungus_tmp_clear(fun);
+#if 0
+void repl(void) {
+    Lang_dump(&fungus_lang);
 
-    // tokenize
-    RawExprBuf rebuf = tokenize(fun, text, len);
-
-#if 1
-    RawExprBuf_dump(fun, &rebuf);
-#endif
-
-    if (global_error)
-        goto reset_lex;
-
-    // parse
-    Expr *ast = parse(fun, rebuf.exprs, rebuf.len);
-
-    if (global_error)
-        goto reset_parse;
-
-#if 1
-    puts(TC_CYAN "AST:" TC_RESET);
-    Expr_dump(fun, ast);
-#endif
-
-reset_parse:
-reset_lex:
-    RawExprBuf_del(&rebuf);
-
-    bool status = global_error;
-
-    global_error = false;
-
-    return status;
-}
-
-#define REPL_BUF_SIZE 1024
-
-void repl(Fungus *fun) {
     puts(TC_YELLOW "fungus v0 - by garrisonhh" TC_RESET);
 
-    while (true) {
-        char buf[REPL_BUF_SIZE];
+    while (!feof(stdin)) {
+        // read stdin
+        File file = File_read_stdin();
+        if (global_error || feof(stdin)) goto cleanup_read;
 
-        // take input
-        printf(">>> ");
-        fgets(buf, REPL_BUF_SIZE, stdin);
+        // lex
+        TokBuf tokbuf = lex(&file);
+        if (global_error) goto cleanup_lex;
 
-        if (feof(stdin))
-            break;
+        // parse
+#if 0
+        Bump parse_pool = Bump_new();
+        RExpr *raw_ast = parse(&parse_pool, &fungus_lang, &tokbuf);
+        if (global_error) goto cleanup_parse;
 
-        // find length
-        size_t len;
+#if 1
+        puts(TC_CYAN "AST:" TC_RESET);
+        RExpr_dump(raw_ast, &fungus_lang, tokbuf.file);
+#endif
 
-        for (len = 0; buf[len] && buf[len] != '\n'; ++len)
-            ;
 
-        eval(fun, buf, len);
+        // cleanup
+cleanup_parse:
+        Bump_del(&parse_pool);
+#endif
+cleanup_lex:
+        TokBuf_del(&tokbuf);
+cleanup_read:
+        File_del(&file);
+
+        global_error = false;
     }
 }
-
-static char *read_file(const char *filepath, size_t *out_len) {
-    FILE *fp = fopen(filepath, "r");
-
-    if (!fp) {
-        fungus_panic("could not open \"%s\"!", filepath);
-    }
-
-    fseek(fp, 0, SEEK_END);
-
-    size_t len = ftell(fp);
-    char *text = malloc(len + 1);
-
-    text[len] = '\0';
-    rewind(fp);
-    fread(text, 1, len, fp);
-
-    fclose(fp);
-
-    if (out_len)
-        *out_len = len;
-
-    return text;
-}
-
-static void compile(Fungus *fun, const char *filename) {
-    size_t len;
-    const char *text = read_file(filename, &len);
-
-    eval(fun, text, len);
-}
+#endif
 
 int main(int argc, char **argv) {
-    ir_init();
+    (void)argc;
+    (void)argv;
 
-    Fungus fun = Fungus_new();
+#if 1
+    Bump pool = Bump_new();
+
+    pattern_lang_init();
+
+    Pattern pat = Pattern_from(&pool, "a: Any!_ `+ b: Any!_");
+    (void)pat;
+
+    pattern_lang_quit();
+
+    Bump_del(&pool);
+#else
+    pattern_lang_init();
+    fungus_lang_init();
 
     // TODO opt parsing eventually
-    if (argc == 1)
-        repl(&fun);
-    else if (argc == 2)
-        compile(&fun, argv[1]);
-    else
-        fungus_panic("bad number of arguments!");
 
-    Fungus_del(&fun);
+    repl();
+
+    fungus_lang_quit();
+    pattern_lang_quit();
+#endif
 
     return 0;
 }

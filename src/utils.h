@@ -18,6 +18,11 @@
 
 #define ARRAY_SIZE(ARR) (sizeof(ARR) / sizeof(ARR[0]))
 
+#define MIN(A, B) ((A) < (B) ? (A) : (B))
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
+
+#define IN_RANGE(C, A, B) ((C) >= (A) && (C) <= (B))
+
 /*
  * for comparison functions:
  * cmp(a, b) > 0 // a > b
@@ -36,8 +41,11 @@ void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len);
 // term codes ==================================================================
 
 #define TC_RESET   "\x1b[0m"
+#define TC_BOLD    "\x1b[1m"
+#define TC_DIM     "\x1b[2m"
 #define TC_BLINK   "\x1b[5m"
 #define TC_INVERSE "\x1b[7m"
+
 #define TC_BLACK   "\x1b[30m"
 #define TC_RED     "\x1b[31m"
 #define TC_GREEN   "\x1b[32m"
@@ -46,6 +54,8 @@ void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len);
 #define TC_MAGENTA "\x1b[35m"
 #define TC_CYAN    "\x1b[36m"
 #define TC_WHITE   "\x1b[37m"
+
+#define TC_GRAY    "\x1b[90m"
 
 // errors ======================================================================
 
@@ -56,10 +66,23 @@ extern bool global_error;
 void fungus_error(const char *msg, ...);
 noreturn void fungus_panic(const char *msg, ...);
 
+// used for breakpoints
+void fungus_unimpl(void);
+
+#define UNIMPLEMENTED do {\
+    fungus_unimpl();\
+    fungus_panic("unimplemented in " TC_YELLOW "%s" TC_RESET " at " TC_YELLOW\
+                 "%s:%d" TC_RESET, __func__, __FILE__, __LINE__);\
+} while (0)
+
 // hashing =====================================================================
 
 typedef uint64_t hash_t;
 
 hash_t fnv_hash(const char *data, size_t nbytes);
+
+// hash a byte at a time
+hash_t fnv_hash_start(void);
+hash_t fnv_hash_next(hash_t, char byte);
 
 #endif

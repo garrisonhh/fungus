@@ -34,21 +34,56 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             try c_flags.append("-ggdb");
         } else {
             try c_flags.append("-DNDEBUG");
+            try c_flags.append("-O3");
         }
 
         const abs_src_dir = b.pathFromRoot("src");
-        var src_dir = try std.fs.openDirAbsolute(abs_src_dir,
-                                                 .{ .iterate = true });
-        defer src_dir.close();
 
-        var sources = try src_dir.walk(allocator);
-        defer sources.deinit();
+        if (false) {
+            // full source build
+            var src_dir = try std.fs.openDirAbsolute(abs_src_dir,
+                                                     .{ .iterate = true });
+            defer src_dir.close();
 
-        while (try sources.next()) |entry| {
-            const path = b.pathJoin(&.{abs_src_dir, entry.path});
+            var sources = try src_dir.walk(allocator);
+            defer sources.deinit();
 
-            if (mem.endsWith(u8, path, ".c"))
+            while (try sources.next()) |entry| {
+                const path = b.pathJoin(&.{abs_src_dir, entry.path});
+
+                if (mem.endsWith(u8, path, ".c"))
+                    exe.addCSourceFile(path, c_flags.items);
+            }
+        } else {
+            // current rewrite build
+            const sources = [_][]const u8 {
+                "main.c",
+
+                // lexical analysis
+                "lex.c",
+
+                // parsing
+                "parse.c",
+                "lang.c",
+                "lang/rules.c",
+                "lang/precedence.c",
+                "lang/pattern.c",
+                "lang/fungus.c",
+
+                // sema
+                "types.c",
+
+                // utility
+                "file.c",
+                "utils.c",
+                "data.c",
+            };
+
+            for (sources) |source| {
+                const path = b.pathJoin(&.{abs_src_dir, source});
+
                 exe.addCSourceFile(path, c_flags.items);
+            }
         }
     }
 

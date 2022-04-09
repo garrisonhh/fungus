@@ -24,10 +24,11 @@ void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len) {
     }
 }
 
+// TODO deprecate
 void fungus_error(const char *msg, ...) {
     va_list args;
 
-    fprintf(stderr, "[" TC_RED "ERROR" TC_RESET "]: ");
+    fprintf(stderr, "[" TC_RED "ERROR (TODO: USE FILE ERROR)" TC_RESET "]: ");
 
     va_start(args, msg);
     vfprintf(stderr, msg, args);
@@ -51,17 +52,31 @@ void fungus_panic(const char *msg, ...) {
     exit(-1);
 }
 
+void fungus_unimpl(void) {
+    ; // do nothing
+}
+
 #define FNV_PRIME 1099511628211ull
 #define FNV_BASIS 14695981039346656037ull
 
 // fnv-1a
-hash_t fnv_hash(const char *data, size_t nbytes) {
-    hash_t hash = FNV_BASIS;
+hash_t fnv_hash_start(void) {
+    return FNV_BASIS;
+}
 
-    for (size_t i = 0; i < nbytes; ++i) {
-        hash ^= (hash_t)data[i];
-        hash *= FNV_PRIME;
-    }
+hash_t fnv_hash_next(hash_t hash, char byte) {
+    hash ^= (hash_t)byte;
+    hash *= FNV_PRIME;
 
     return hash;
 }
+
+hash_t fnv_hash(const char *data, size_t nbytes) {
+    hash_t hash = fnv_hash_start();
+
+    for (size_t i = 0; i < nbytes; ++i)
+        hash = fnv_hash_next(hash, data[i]);
+
+    return hash;
+}
+

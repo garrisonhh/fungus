@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdalign.h>
@@ -96,6 +97,10 @@ static void new_page(Bump *b) {
     b->bump = 0;
 
     Vec_push(&b->pages, b->page);
+
+#ifdef DEBUG
+    b->allocated += BUMP_PAGE_SIZE;
+#endif
 }
 
 Bump Bump_new(void) {
@@ -110,11 +115,20 @@ Bump Bump_new(void) {
 }
 
 void Bump_del(Bump *b) {
+#ifdef DEBUG
+    char buf[256];
+    sprintf(buf, "%zu/%zu", b->total, b->allocated);
+    printf("deleting bump: %10s\n", buf);
+#endif
+
     for (size_t i = 0; i < b->pages.len; ++i)
         free(b->pages.data[i]);
 
     for (size_t i = 0; i < b->lost_n_found.len; ++i)
         free(b->lost_n_found.data[i]);
+
+    Vec_del(&b->pages);
+    Vec_del(&b->lost_n_found);
 }
 
 void *Bump_alloc(Bump *b, size_t nbytes) {
@@ -130,6 +144,10 @@ void *Bump_alloc(Bump *b, size_t nbytes) {
 
         Vec_push(&b->lost_n_found, mem);
 
+#ifdef DEBUG
+        b->allocated += nbytes;
+#endif
+
         return mem;
     } else if (nbytes + b->bump > BUMP_PAGE_SIZE) {
         // page would overflow if allocating this memory, need a new one
@@ -140,6 +158,10 @@ void *Bump_alloc(Bump *b, size_t nbytes) {
     void *ptr = &b->page[b->bump];
 
     b->bump += nbytes;
+
+#ifdef DEBUG
+    b->total += nbytes;
+#endif
 
     return ptr;
 }
@@ -155,9 +177,21 @@ void Bump_clear(Bump *b) {
     // reset bump
     b->page = b->pages.data[0];
     b->bump = 0;
+
+#ifdef DEBUG
+    b->total = 0;
+#endif
 }
 
 // views + words ===============================================================
+
+bool View_eq(const View *a, const View *b) {\
+    return a->len == b->len && !strncmp(a->str, b->str, a->len);
+}
+
+char View_get(const View *v, size_t index) {
+    return index < v->len ? v->str[index] : '\0';
+}
 
 Word Word_new(const char *str, size_t len) {
     return (Word){
@@ -183,9 +217,7 @@ bool Word_eq(const Word *a, const Word *b) {
 }
 
 bool Word_eq_view(const Word *a, const View *b) {
-    Word bw = Word_new(b->str, b->len);
-
-    return Word_eq(a, &bw);
+    return a->len == b->len && !strncmp(a->str, b->str, a->len);
 }
 
 // idmap =======================================================================
@@ -198,6 +230,17 @@ IdMap IdMap_new(void) {
 }
 
 void IdMap_del(IdMap *map) {
+    for (size_t i = 0; i < map->cap; ++i) {
+        IdMapNode *trav = map->nodes[i];
+
+        while (trav) {
+            IdMapNode *next = trav->next;
+
+            free(trav);
+            trav = next;
+        }
+    }
+
     free(map->nodes);
 }
 
@@ -245,7 +288,7 @@ void IdMap_put(IdMap *map, const Word *name, unsigned id) {
     ++map->size;
 }
 
-bool IdMap_get_checked(IdMap *map, const Word *name, unsigned *out_id) {
+bool IdMap_get_checked(const IdMap *map, const Word *name, unsigned *out_id) {
     IdMapNode *trav = map->nodes[name->hash % map->cap];
 
     for (; trav; trav = trav->next) {
@@ -259,7 +302,7 @@ bool IdMap_get_checked(IdMap *map, const Word *name, unsigned *out_id) {
     return false;
 }
 
-unsigned IdMap_get(IdMap *map, const Word *name) {
+unsigned IdMap_get(const IdMap *map, const Word *name) {
     unsigned id;
 
     if (IdMap_get_checked(map, name, &id))
@@ -334,6 +377,8 @@ static void IdSet_resize(IdSet *set, size_t new_cap) {
 }
 
 void IdSet_add_superset(IdSet *set, IdSet *super) {
+    assert(set != super);
+
     Vec_push(&set->supersets, super);
 
     for (size_t i = 0; i < set->cap; ++i)
@@ -367,4 +412,166 @@ bool IdSet_has(IdSet *set, unsigned id) {
     }
 
     return false;
+}
+
+// put-only pash map + set =====================================================
+
+static HashMap HashMap_new_lower(bool is_set) {
+    return (HashMap){
+        .keys = calloc(DATA_INIT_CAP, sizeof(Word)),
+        .values = is_set ? NULL : malloc(DATA_INIT_CAP * sizeof(void *)),
+        .cap = DATA_INIT_CAP,
+
+        .is_set = is_set
+    };
+}
+
+HashMap HashMap_new(void) {
+    return HashMap_new_lower(false);
+}
+
+void HashMap_del(HashMap *map) {
+    free(map->keys);
+    free(map->values);
+}
+
+static void HashMap_put_lower(HashMap *map, const Word *key, void *value) {
+    size_t index = key->hash % map->cap;
+
+    while (map->keys[index].str)
+        index = (index + 1) % map->cap;
+
+    map->keys[index] = *key;
+
+    if (!map->is_set)
+        map->values[index] = value;
+}
+
+static void HashMap_resize(HashMap *map, size_t new_cap) {
+    size_t old_cap = map->cap;
+    Word *old_keys = map->keys;
+    void **old_values = map->values;
+
+    map->cap = new_cap;
+    map->keys = calloc(map->cap, sizeof(*map->keys));
+
+    if (!map->is_set)
+        map->values = calloc(map->cap, sizeof(*map->values));
+
+    for (size_t i = 0; i < old_cap; ++i) {
+        if (old_keys[i].str) {
+            HashMap_put_lower(map, &old_keys[i],
+                              map->is_set ? NULL : old_values[i]);
+        }
+    }
+
+    free(old_keys);
+    free(old_values);
+}
+
+void HashMap_put(HashMap *map, const Word *key, void *value) {
+    if (map->size * 2 > map->cap)
+        HashMap_resize(map, map->cap * 2);
+
+    HashMap_put_lower(map, key, value);
+
+    ++map->size;
+}
+
+bool HashMap_get_checked(const HashMap *map, const Word *key, void **o_value) {
+    size_t index = key->hash % map->cap;
+
+    while (map->keys[index].str) {
+        if (Word_eq(&map->keys[index], key)) {
+            if (!map->is_set)
+                *o_value = map->values[index];
+
+            return true;
+        }
+
+        index = (index + 1) % map->cap;
+    }
+
+    return false;
+}
+
+void *HashMap_get(const HashMap *map, const Word *key) {
+    void *value;
+
+    if (HashMap_get_checked(map, key, &value))
+        return value;
+
+    fungus_panic("HashMap failed to retrieve '%.*s'!\n",
+                 (int)key->len, key->str);
+}
+
+size_t HashMap_get_longest(const HashMap *map, const View *key, void **o_val) {
+    hash_t hash = fnv_hash_start();
+    size_t matched = 0;
+    void *best = NULL;
+
+    for (size_t i = 0; i < key->len; ++i) {
+        hash = fnv_hash_next(hash, key->str[i]);
+
+        Word slice = {
+            .str = key->str,
+            .len = i + 1,
+            .hash = hash
+        };
+
+#ifdef DEBUG
+        Word test = Word_new(slice.str, slice.len);
+
+        assert(Word_eq(&slice, &test));
+#endif
+
+        void *value = NULL;
+
+        if (HashMap_get_checked(map, &slice, &value)) {
+            best = value;
+            matched = slice.len;
+        }
+    }
+
+    if (o_val)
+        *o_val = best;
+
+    return matched;
+}
+
+HashSet HashSet_new(void) {
+    return (HashSet){ HashMap_new_lower(true) };
+}
+
+void HashSet_del(HashSet *set) {
+    HashMap_del(&set->map);
+}
+
+void HashSet_put(HashSet *set, const Word *word) {
+    HashMap_put(&set->map, word, NULL);
+}
+
+bool HashSet_has(const HashSet *set, const Word *word) {
+    return HashMap_get_checked(&set->map, word, NULL);
+}
+
+size_t HashSet_longest(const HashSet *set, const View *word) {
+    return HashMap_get_longest(&set->map, word, NULL);
+}
+
+void HashSet_print(const HashSet *set) {
+    bool first = true;
+
+    for (size_t i = 0; i < set->map.cap; ++i) {
+        const Word *key = &set->map.keys[i];
+
+        if (key->str) {
+            if (first)
+                first = false;
+            else
+                printf(" ");
+
+            printf("%.*s", (int)key->len, key->str);
+        }
+    }
 }
