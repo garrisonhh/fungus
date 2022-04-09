@@ -541,6 +541,10 @@ static size_t ast_used_memory(RExpr *expr) {
 }
 
 RExpr *parse(Bump *pool, const Lang *lang, const TokBuf *tb) {
+#ifdef DEBUG
+    double start = time_now();
+#endif
+
     RExpr *ast = parse_scope(pool, tb->file, lang,
                              gen_scope_tree(pool, &lang->rules, tb));
 
@@ -552,6 +556,10 @@ RExpr *parse(Bump *pool, const Lang *lang, const TokBuf *tb) {
         printf("ast used/total allocated memory: %zu/%zu\n",
                ast_used_memory(ast), pool->total);
     }
+
+    double duration = time_now() - start;
+
+    printf("parsing took %.6fs.\n", duration);
 #endif
 
     return ast;

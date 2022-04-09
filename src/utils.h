@@ -57,6 +57,21 @@ void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len);
 
 #define TC_GRAY    "\x1b[90m"
 
+// time ========================================================================
+
+#if defined(DEBUG) && defined(__linux__)
+#include <sys/time.h>
+
+static inline double time_now(void) {
+    struct timeval t;
+    gettimeofday(&t, NULL);
+
+    return (double)t.tv_sec + (double)t.tv_usec * 0.000001;
+}
+#else
+#define time_now() (0.0lf)
+#endif
+
 // errors ======================================================================
 
 // set to true if error has happened
