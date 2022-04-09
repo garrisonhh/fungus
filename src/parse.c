@@ -118,6 +118,7 @@ static void gen_flat_list(Vec *list, Bump *pool, const RuleTree *rules,
                                            start + last_split,
                                            len - last_split);
 
+
                     Vec_push(list, expr);
                 }
             }
@@ -287,9 +288,6 @@ static bool translate_scope(Bump *pool, const File *f, const Lang *lang,
 // tries to match and collapse a rule on a slice, returns NULL if no match found
 static RExpr *try_match(Bump *pool, const File *f, const RuleTree *rules,
                         RExpr **slice, size_t len, size_t *o_match_len) {
-    UNIMPLEMENTED;
-
-#if 0
     // match a rule
     RuleNode *trav = rules->root;
     Rule best;
@@ -300,19 +298,30 @@ static RExpr *try_match(Bump *pool, const File *f, const RuleTree *rules,
         RExpr *expr = slice[i];
         RuleNode *next = NULL;
 
-        if (expr->type == REX_LEXEME) {
+        if (expr->type.id == rules->ty_lexeme.id) {
             // match lexeme
             View token = { &f->text.str[expr->tok_start], expr->tok_len };
 
-            for (size_t j = 0; j < trav->num_next_lxms; ++j) {
-                if (Word_eq_view(trav->next_lxm_type[j], &token)) {
-                    next = trav->next_lxm[j];
+            for (size_t j = 0; j < trav->next_atoms.len; ++j) {
+                const MatchAtom *match = trav->next_atoms.data[j];
+
+                if (match->type == MATCH_LEXEME
+                 && Word_eq_view(match->lxm, &token)) {
+                    next = trav->next_nodes.data[j];
                     break;
                 }
             }
         } else {
-            // match anything
-            next = trav->next_expr;
+            // match a rule typeexpr
+            for (size_t j = 0; j < trav->next_atoms.len; ++j) {
+                const MatchAtom *match = trav->next_atoms.data[j];
+
+                if (match->type == MATCH_EXPR
+                 && Type_matches(&rules->types, expr->type, match->rule_expr)) {
+                    next = trav->next_nodes.data[j];
+                    break;
+                }
+            }
         }
 
         // no nodes matched
@@ -320,7 +329,7 @@ static RExpr *try_match(Bump *pool, const File *f, const RuleTree *rules,
             break;
 
         // nodes matched
-        if (Rule_is_valid(next->rule)) {
+        if (next->has_rule) {
             best = next->rule;
             best_len = i + 1;
         }
@@ -334,8 +343,7 @@ static RExpr *try_match(Bump *pool, const File *f, const RuleTree *rules,
 
     *o_match_len = best_len;
 
-    return rule_copy_of_slice(pool, best, slice, best_len);
-#endif
+    return rule_copy_of_slice(pool, rules, best, slice, best_len);
 }
 
 static RExpr **lhs_of(RExpr *expr) {
@@ -466,11 +474,11 @@ static RExpr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
  * given a raw scope, parse it using a lang
  */
 RExpr *parse_scope(Bump *pool, const File *f, const Lang *lang, RExpr *expr) {
-    puts("scope:");
-    RExpr_dump(expr, lang, f);
-
     if (!translate_scope(pool, f, lang, expr))
         return NULL;
+
+    puts("scope:");
+    RExpr_dump(expr, lang, f);
 
     expr->exprs = collapse_rules(pool, f, lang, expr->exprs, &expr->len);
 
@@ -539,9 +547,6 @@ void RExpr_error_from(const File *f, const RExpr *expr, const char *fmt, ...) {
 }
 
 void RExpr_dump(const RExpr *expr, const Lang *lang, const File *file) {
-    UNIMPLEMENTED;
-
-#if 0
     const char *text = file->text.str;
     const RExpr *scopes[MAX_SCOPE_STACK];
     size_t indices[MAX_SCOPE_STACK];
@@ -569,26 +574,25 @@ void RExpr_dump(const RExpr *expr, const Lang *lang, const File *file) {
 
         printf(TC_RESET);
 
-        if (expr->type == REX_RULE) {
+        // print name
+        if (!expr->is_atom) {
             const Word *name = Rule_get(&lang->rules, expr->rule)->name;
 
             printf(TC_RED "%.*s" TC_RESET, (int)name->len, name->str);
-        } else if (expr->type == REX_SCOPE) {
-            printf(TC_RED "scope" TC_RESET);
         }
 
         // print expr
-        if (expr->type == REX_SCOPE || expr->type == REX_RULE) {
+        if (!expr->is_atom) {
             scopes[size] = expr;
             indices[size] = 0;
             ++size;
-        } else if (expr->type == REX_LEXEME || expr->type == REX_LIT_LEXEME) {
+        } else if (expr->atom_type == ATOM_LEXEME) {
             printf("%.*s", (int)expr->tok_len, &text[expr->tok_start]);
         } else {
-            switch (expr->type) {
-            case REX_IDENT:      printf(TC_BLUE);    break;
-            case REX_LIT_STRING: printf(TC_GREEN);   break;
-            default:             printf(TC_MAGENTA); break;
+            switch (expr->atom_type) {
+            case ATOM_IDENT:  printf(TC_BLUE);    break;
+            case ATOM_STRING: printf(TC_GREEN);   break;
+            default:          printf(TC_MAGENTA); break;
             }
 
             printf("%.*s" TC_RESET, (int)expr->tok_len, &text[expr->tok_start]);
@@ -605,5 +609,4 @@ void RExpr_dump(const RExpr *expr, const Lang *lang, const File *file) {
 
         expr = scopes[size - 1]->exprs[indices[size - 1]++];
     }
-#endif
 }
