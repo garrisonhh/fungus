@@ -6,12 +6,12 @@ static void *RT_alloc(RuleTree *rt, size_t n_bytes) {
     return Bump_alloc(&rt->pool, n_bytes);
 }
 
-static RuleNode *RT_new_node(RuleTree *rt) {
+static RuleNode *RT_new_node(RuleTree *rt, MatchAtom *pred) {
     RuleNode *node = RT_alloc(rt, sizeof(*node));
 
     *node = (RuleNode){
-        .next_atoms = Vec_new(),
-        .next_nodes = Vec_new()
+        .pred = pred,
+        .nexts = Vec_new()
     };
 
     return node;
@@ -29,7 +29,6 @@ static Rule register_entry(RuleTree *rt, RuleEntry *entry) {
     return handle;
 }
 
-
 RuleTree RuleTree_new(void) {
     RuleTree rt = {
         .pool = Bump_new(),
@@ -38,7 +37,7 @@ RuleTree RuleTree_new(void) {
         .types = TypeGraph_new(),
     };
 
-    rt.root = RT_new_node(&rt);
+    rt.roots = Vec_new();
 
     // Scope rule
     RuleEntry *scope_entry = RT_alloc(&rt, sizeof(*scope_entry));
@@ -63,15 +62,15 @@ RuleTree RuleTree_new(void) {
 }
 
 static void RuleNode_del(RuleNode *node) {
-    for (size_t i = 0; i < node->next_nodes.len; ++i)
-        RuleNode_del(node->next_nodes.data[i]);
+    for (size_t i = 0; i < node->nexts.len; ++i)
+        RuleNode_del(node->nexts.data[i]);
 
-    Vec_del(&node->next_nodes);
-    Vec_del(&node->next_atoms);
+    Vec_del(&node->nexts);
 }
 
 void RuleTree_del(RuleTree *rt) {
-    RuleNode_del(rt->root);
+    for (size_t i = 0; i < rt->roots.len; ++i)
+        RuleNode_del(rt->roots.data[i]);
 
     TypeGraph_del(&rt->types);
     IdMap_del(&rt->by_name);
@@ -95,51 +94,51 @@ Rule Rule_define(RuleTree *rt, RuleDef *def) {
 
     // place entry
     Pattern *pat = &def->pat;
-    RuleNode *trav = rt->root;
+    RuleNode *node;
+    Vec *nexts = &rt->roots;
 
     for (size_t i = 0; i < pat->len; ++i) {
-        MatchAtom *atom = &pat->matches[i];
-        RuleNode *next = NULL;
+        MatchAtom *pred = &pat->matches[i];
+        node = NULL;
 
-        // check for equivalent MatchAtom
-        for (size_t j = 0; j < trav->next_atoms.len; ++j) {
-            MatchAtom *next_atom = trav->next_atoms.data[j];
+        // check for equivalent predicate
+        for (size_t j = 0; j < nexts->len; ++j) {
+            RuleNode *next = nexts->data[j];
             bool matching = false;
 
-            if (atom->type == next_atom->type) {
-                switch (atom->type) {
+            if (pred->type == next->pred->type) {
+                switch (pred->type) {
                 case MATCH_LEXEME:
-                    matching = Word_eq(atom->lxm, next_atom->lxm);
+                    matching = Word_eq(pred->lxm, next->pred->lxm);
                     break;
                 case MATCH_EXPR:
                     matching =
-                        TypeExpr_equals(atom->rule_expr, next_atom->rule_expr);
+                        TypeExpr_equals(pred->rule_expr, next->pred->rule_expr);
                     break;
                 }
             }
 
             if (matching) {
-                next = trav->next_nodes.data[j];
+                node = next;
                 break;
             }
         }
 
         // no match found, create a new node
-        if (!next) {
-            next = RT_new_node(rt);
-            Vec_push(&trav->next_nodes, next);
-            Vec_push(&trav->next_atoms, atom); // TODO should I copy here?
+        if (!node) {
+            node = RT_new_node(rt, pred);
+            Vec_push(nexts, node); // TODO should I copy predicate here?
         }
 
-        trav = next;
+        nexts = &node->nexts;
     }
 
     // check if valid, if so place and return
-    if (trav->has_rule)
+    if (node->has_rule)
         fungus_panic("duplicate rules"); // TODO don't panic
 
-    trav->rule = handle;
-    trav->has_rule = true;
+    node->rule = handle;
+    node->has_rule = true;
 
     return handle;
 }
@@ -158,30 +157,30 @@ const RuleEntry *Rule_get(const RuleTree *rt, Rule rule) {
 
 #define INDENT 2
 
-static void dump_children(const RuleTree *rt, RuleNode *node, int level) {
+static void dump_children(const RuleTree *rt, const Vec *children, int level) {
     // print matches
-    for (size_t i = 0; i < node->next_atoms.len; ++i) {
+    for (size_t i = 0; i < children->len; ++i) {
+        RuleNode *child = children->data[i];
+
         // next type
-        MatchAtom *atom = node->next_atoms.data[i];
+        MatchAtom *pred = child->pred;
 
         printf("%*s", level * INDENT, "");
 
-        switch (atom->type) {
+        switch (pred->type) {
         case MATCH_LEXEME:
-            printf("%.*s", (int)atom->lxm->len, atom->lxm->str);
+            printf("%.*s", (int)pred->lxm->len, pred->lxm->str);
             break;
         case MATCH_EXPR:
             printf(TC_BLUE);
-            TypeExpr_print(&rt->types, atom->rule_expr);
+            TypeExpr_print(&rt->types, pred->rule_expr);
             printf(TC_RESET);
             break;
         }
 
-        // next rule (if exists)
-        RuleNode *next = node->next_nodes.data[i];
-
-        if (next->has_rule) {
-            const Word *name = Rule_get(rt, next->rule)->name;
+        // rule (if exists)
+        if (child->has_rule) {
+            const Word *name = Rule_get(rt, child->rule)->name;
 
             printf(TC_DIM " -> " TC_RED "%.*s" TC_RESET,
                    (int)name->len, name->str);
@@ -189,12 +188,12 @@ static void dump_children(const RuleTree *rt, RuleNode *node, int level) {
 
         puts("");
 
-        dump_children(rt, next, level + 1);
+        dump_children(rt, &child->nexts, level + 1);
     }
 }
 
 void RuleTree_dump(const RuleTree *rt) {
     puts(TC_CYAN "RuleTree:" TC_RESET);
-    dump_children(rt, rt->root, 0);
+    dump_children(rt, &rt->roots, 0);
     puts("");
 }

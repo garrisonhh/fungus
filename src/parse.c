@@ -288,8 +288,10 @@ static bool translate_scope(Bump *pool, const File *f, const Lang *lang,
 // tries to match and collapse a rule on a slice, returns NULL if no match found
 static RExpr *try_match(Bump *pool, const File *f, const RuleTree *rules,
                         RExpr **slice, size_t len, size_t *o_match_len) {
+    // TODO backtracking
+
     // match a rule
-    RuleNode *trav = rules->root;
+    const Vec *nexts = &rules->roots;
     Rule best;
     size_t best_len = 0;
 
@@ -302,23 +304,23 @@ static RExpr *try_match(Bump *pool, const File *f, const RuleTree *rules,
             // match lexeme
             View token = { &f->text.str[expr->tok_start], expr->tok_len };
 
-            for (size_t j = 0; j < trav->next_atoms.len; ++j) {
-                const MatchAtom *match = trav->next_atoms.data[j];
+            for (size_t j = 0; j < nexts->len; ++j) {
+                const MatchAtom *pred = ((RuleNode *)nexts->data[j])->pred;
 
-                if (match->type == MATCH_LEXEME
-                 && Word_eq_view(match->lxm, &token)) {
-                    next = trav->next_nodes.data[j];
+                if (pred->type == MATCH_LEXEME
+                 && Word_eq_view(pred->lxm, &token)) {
+                    next = nexts->data[j];
                     break;
                 }
             }
         } else {
             // match a rule typeexpr
-            for (size_t j = 0; j < trav->next_atoms.len; ++j) {
-                const MatchAtom *match = trav->next_atoms.data[j];
+            for (size_t j = 0; j < nexts->len; ++j) {
+                const MatchAtom *pred = ((RuleNode *)nexts->data[j])->pred;
 
-                if (match->type == MATCH_EXPR
-                 && Type_matches(&rules->types, expr->type, match->rule_expr)) {
-                    next = trav->next_nodes.data[j];
+                if (pred->type == MATCH_EXPR
+                 && Type_matches(&rules->types, expr->type, pred->rule_expr)) {
+                    next = nexts->data[j];
                     break;
                 }
             }
@@ -334,7 +336,7 @@ static RExpr *try_match(Bump *pool, const File *f, const RuleTree *rules,
             best_len = i + 1;
         }
 
-        trav = next;
+        nexts = &next->nexts;
     }
 
     // return match if found
@@ -426,7 +428,7 @@ static RExpr *correct_precedence(const Lang *lang, RExpr *expr) {
  * modified to reflect this
  */
 static RExpr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
-                             RExpr **slice, size_t *io_len) {
+                              RExpr **slice, size_t *io_len) {
     const RuleTree *rules = &lang->rules;
     size_t len = *io_len;
 

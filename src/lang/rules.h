@@ -36,20 +36,28 @@ typedef struct RuleEntry {
 #define RULENODE_NEXT_LEN 64
 
 typedef struct RuleNode {
-    // parallel vecs
-    Vec next_atoms; // MatchAtom predicates
-    Vec next_nodes; // RuleNodes associated with a MatchAtom
+    MatchAtom *pred;
+    Vec nexts;
 
     // rule
     Rule rule;
     unsigned has_rule: 1;
 } RuleNode;
 
+typedef struct RuleBacktrack {
+    MatchAtom *pred;
+
+    Vec back_atoms;
+    Vec back_nodes;
+} RuleBacktrack;
+
 typedef struct RuleTree {
     Bump pool;
     Vec entries; // entries[0] represents Scope, nevre contains an actual entry
     IdMap by_name;
-    RuleNode *root; // dummy rulenode, contains no valid type info
+
+    Vec roots; // Vec<RuleNode *>
+    Vec backtracks; // Vec<RuleBackTrack *>
 
     /*
      * this is the internal type system for Rules, used for Pattern matching
