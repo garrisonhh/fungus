@@ -477,9 +477,6 @@ RExpr *parse_scope(Bump *pool, const File *f, const Lang *lang, RExpr *expr) {
     if (!translate_scope(pool, f, lang, expr))
         return NULL;
 
-    puts("scope:");
-    RExpr_dump(expr, lang, f);
-
     expr->exprs = collapse_rules(pool, f, lang, expr->exprs, &expr->len);
 
     return expr;
@@ -506,9 +503,12 @@ RExpr *parse(Bump *pool, const Lang *lang, const TokBuf *tb) {
 
     if (!ast)
         global_error = true;
+
 #ifdef DEBUG
-    else
-        printf("parse generated ast of size %zu.\n", ast_used_memory(ast));
+    if (ast) {
+        printf("ast used/total allocated memory: %zu/%zu\n",
+               ast_used_memory(ast), pool->total);
+    }
 #endif
 
     return ast;
@@ -563,7 +563,7 @@ void RExpr_dump(const RExpr *expr, const Lang *lang, const File *file) {
                 if (indices[i] == scopes[i]->len)
                     c = " ";
 
-                printf("%s   ", c);
+                printf("%s  ", c);
             }
 
             const char *c = indices[size - 1] == scopes[size - 1]->len
@@ -586,12 +586,18 @@ void RExpr_dump(const RExpr *expr, const Lang *lang, const File *file) {
             scopes[size] = expr;
             indices[size] = 0;
             ++size;
-        } else if (expr->atom_type == ATOM_LEXEME) {
+        } else if (expr->type.id == lang->rules.ty_lexeme.id
+                && expr->atom_type == ATOM_LEXEME) {
+            // lexeme
             printf("%.*s", (int)expr->tok_len, &text[expr->tok_start]);
+        } else if (expr->type.id == lang->rules.ty_literal.id
+                && expr->atom_type == ATOM_LEXEME) {
+            // lexeme literal
+            printf("`" TC_GREEN "%.*s" TC_RESET,
+                   (int)expr->tok_len - 1, &text[expr->tok_start + 1]);
         } else {
             switch (expr->atom_type) {
             case ATOM_IDENT:  printf(TC_BLUE);    break;
-            case ATOM_STRING: printf(TC_GREEN);   break;
             default:          printf(TC_MAGENTA); break;
             }
 

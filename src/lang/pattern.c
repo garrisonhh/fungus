@@ -9,7 +9,9 @@ Lang pattern_lang;
 
 #define PRECS\
     PREC("Lowest",  LEFT)\
-    PREC("Default", LEFT)\
+    PREC("Default",  LEFT)\
+    PREC("Bang", LEFT)\
+    PREC("Or", LEFT)\
     PREC("Highest", LEFT)
 
 static MatchAtom new_match_expr(Bump *pool, const char *name,
@@ -73,8 +75,18 @@ void pattern_lang_init(void) {
         Bump *p = &rules->pool;
         MatchAtom *matches;
 
-        Word default_word = WORD("Default");
-        Prec default_prec = Prec_by_name(&lang.precs, &default_word);
+#define GET_PREC(VAR, NAME)\
+    Prec VAR;\
+    {\
+        Word word = WORD(NAME);\
+        VAR = Prec_by_name(&lang.precs, &word);\
+    }\
+
+        GET_PREC(default_prec, "Default");
+        GET_PREC(bang_prec, "Bang");
+        GET_PREC(or_prec, "Or");
+
+#undef GET_PREC
 
         // match expr
         matches = Bump_alloc(p, 3 * sizeof(*matches));
@@ -104,8 +116,8 @@ void pattern_lang_init(void) {
             new_match_expr(p, "rhs", TypeExpr_atom(p, rtg->ty_any), NULL);
 
         Lang_legislate(&lang, &(RuleDef){
-            .name = WORD("TypeBang"),
-            .prec = default_prec,
+            .name = WORD("Bang"),
+            .prec = bang_prec,
             .pat = {
                 .matches = matches,
                 .len = 3
@@ -123,7 +135,7 @@ void pattern_lang_init(void) {
 
         Lang_legislate(&lang, &(RuleDef){
             .name = WORD("TypeOr"),
-            .prec = default_prec,
+            .prec = or_prec,
             .pat = {
                 .matches = matches,
                 .len = 3
