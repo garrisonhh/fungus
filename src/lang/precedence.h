@@ -5,7 +5,7 @@
  * precedence is represented by a directed acyclic graph, allowing for intuitive
  * and symbolic runtime definition of precedences.
  *
- * TODO simplifying this seems like a good idea
+ * TODO simplify this to a linked list type of deal, I think
  */
 
 #include "../data.h"
@@ -27,6 +27,10 @@ typedef struct PrecEntry {
     Associativity assoc;
 } PrecEntry;
 
+/*
+ * TODO PrecGraph_crystallize, flattening graph by assigning a number to each
+ * precedence for O(1) comparison
+ */
 typedef struct PrecGraph {
     Bump pool;
     Vec entries; // entries indexed by id

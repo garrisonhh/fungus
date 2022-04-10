@@ -5,9 +5,15 @@
 #include "lang.h"
 #include "lang/ast_expr.h"
 
+typedef struct AstCtx {
+    Bump *pool;
+    const File *file;
+    const Lang *lang;
+} AstCtx;
+
 // parses scope from raw tokens
-AstExpr *parse(Bump *, const Lang *, const TokBuf *);
-// parses an expr scope given a language, returns NULL on failure
-AstExpr *parse_scope(Bump *, const File *, const Lang *, AstExpr *);
+AstExpr *parse(AstCtx *, const TokBuf *);
+// parses a processed scope
+AstExpr *parse_scope(AstCtx *, AstExpr *);
 
 #endif

@@ -11,7 +11,6 @@ Lang pattern_lang;
     PREC("Lowest",  LEFT)\
     PREC("Pattern", RIGHT)\
     PREC("Default", LEFT)\
-    PREC("Bang",    LEFT)\
     PREC("Or",      LEFT)\
     PREC("Highest", LEFT)
 
@@ -80,7 +79,6 @@ void pattern_lang_init(void) {
 
         GET_PREC(pattern_prec, "Pattern");
         GET_PREC(default_prec, "Default");
-        GET_PREC(bang_prec, "Bang");
         GET_PREC(or_prec, "Or");
 
 #undef GET_PREC
@@ -88,7 +86,6 @@ void pattern_lang_init(void) {
 #define IMM_TYPE(VAR, NAME) Type VAR = Rule_immediate_type(rules, WORD(NAME))
 
         IMM_TYPE(ty_match_expr, "MatchExpr");
-        IMM_TYPE(ty_bang, "Bang");
         IMM_TYPE(ty_or, "Or");
         IMM_TYPE(ty_returns, "Returns");
         IMM_TYPE(ty_pattern, "Pattern");
@@ -104,23 +101,15 @@ void pattern_lang_init(void) {
         size_t len;
 
         // match expr
-        len = 3;
+        len = 5;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_expr(p, TypeExpr_atom(p, rules->ty_ident), NULL);
         matches[1] = new_match_lxm(p, ":");
-        matches[2] = new_match_expr(p, TypeExpr_atom(p, ty_bang), NULL);
+        matches[2] = new_match_expr(p, any_rule_type, NULL);
+        matches[3] = new_match_lxm(p, "!");
+        matches[4] = new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL);
 
         Lang_immediate_legislate(&lang, ty_match_expr, default_prec,
-                                 (Pattern){ .matches = matches, .len = len });
-
-        // type bang
-        len = 3;
-        matches = Bump_alloc(p, len * sizeof(*matches));
-        matches[0] = new_match_expr(p, any_rule_type, NULL);
-        matches[1] = new_match_lxm(p, "!");
-        matches[2] = new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL);
-
-        Lang_immediate_legislate(&lang, ty_bang, bang_prec,
                                  (Pattern){ .matches = matches, .len = len });
 
         // type or
@@ -197,7 +186,11 @@ AstExpr *precompile_pattern(Bump *pool, const char *str) {
 
     // create ast
     TokBuf tokens = lex(&f);
-    AstExpr *ast = parse(pool, &pattern_lang, &tokens);
+    AstExpr *ast = parse(&(AstCtx){
+        .pool = pool,
+        .file = &f,
+        .lang = &pattern_lang
+    }, &tokens);
 
 #if 1
     puts(TC_CYAN "precompiled pattern:" TC_RESET);
