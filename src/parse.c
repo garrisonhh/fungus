@@ -469,7 +469,7 @@ static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
 
     memcpy(parsed, buf, buf_len * sizeof(*parsed));
 
-    // cleanup and return TODO use a custom arena allocator
+    // cleanup and return TODO custom arena allocators
     free(matches);
     free(dbuf);
     free(buf);
