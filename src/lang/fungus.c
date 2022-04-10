@@ -59,11 +59,9 @@ void fungus_lang_init(void) {
     // rules
 #define RULE(NAME, PREC, PAT) do {\
         Word prec_name = WORD(PREC);\
-        Lang_legislate(&fun, &(RuleDef){\
-            .name = WORD(NAME),\
-            .prec = Prec_by_name(&fun.precs, &prec_name),\
-            .pat = Pattern_from(&fun.rules.pool, PAT)\
-        });\
+        Prec prec = Prec_by_name(&fun.precs, &prec_name);\
+        AstExpr *pre_pat = precompile_pattern(&fun.rules.pool, PAT);\
+        Lang_legislate(&fun, WORD(NAME), prec, pre_pat);\
     } while (0);
 
     RULES

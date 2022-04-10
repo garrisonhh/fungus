@@ -69,6 +69,7 @@ pub fn build(b: *std.build.Builder) anyerror!void {
                 "lang/precedence.c",
                 "lang/pattern.c",
                 "lang/fungus.c",
+                "lang/ast_expr.c",
 
                 // sema
                 "types.c",

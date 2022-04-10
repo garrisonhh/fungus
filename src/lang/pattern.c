@@ -97,14 +97,8 @@ void pattern_lang_init(void) {
         matches[2] =
             new_match_expr(p, "type", TypeExpr_atom(p, rtg->ty_any), NULL);
 
-        Lang_legislate(&lang, &(RuleDef){
-            .name = WORD("MatchExpr"),
-            .prec = default_prec,
-            .pat = {
-                .matches = matches,
-                .len = 3
-            }
-        });
+        Lang_immediate_legislate(&lang, WORD("MatchExpr"), default_prec,
+                                 (Pattern){ .matches = matches, .len = 3 });
 
         // type bang
         matches = Bump_alloc(p, 3 * sizeof(*matches));
@@ -115,14 +109,8 @@ void pattern_lang_init(void) {
         matches[2] =
             new_match_expr(p, "rhs", TypeExpr_atom(p, rtg->ty_any), NULL);
 
-        Lang_legislate(&lang, &(RuleDef){
-            .name = WORD("Bang"),
-            .prec = bang_prec,
-            .pat = {
-                .matches = matches,
-                .len = 3
-            }
-        });
+        Lang_immediate_legislate(&lang, WORD("Bang"), bang_prec,
+                                 (Pattern){ .matches = matches, .len = 3 });
 
         // type or
         matches = Bump_alloc(p, 3 * sizeof(*matches));
@@ -133,36 +121,9 @@ void pattern_lang_init(void) {
         matches[2] =
             new_match_expr(p, "rhs", TypeExpr_atom(p, rtg->ty_any), NULL);
 
-        Lang_legislate(&lang, &(RuleDef){
-            .name = WORD("TypeOr"),
-            .prec = or_prec,
-            .pat = {
-                .matches = matches,
-                .len = 3
-            }
-        });
-
-#if 1
-        // testing
-        matches = Bump_alloc(p, 4 * sizeof(*matches));
-
-        matches[0] = new_match_lxm(p, ">>");
-        matches[1] =
-            new_match_expr(p, "lhs", TypeExpr_atom(p, rtg->ty_any), NULL);
-        matches[2] = new_match_lxm(p, "!");
-        matches[3] =
-            new_match_expr(p, "rhs", TypeExpr_atom(p, rtg->ty_any), NULL);
-
-        Lang_legislate(&lang, &(RuleDef){
-            .name = WORD("BangTest"),
-            .prec = bang_prec,
-            .pat = {
-                .matches = matches,
-                .len = 4
-            }
-        });
+        Lang_immediate_legislate(&lang, WORD("Or"), or_prec,
+                                 (Pattern){ .matches = matches, .len = 3 });
     }
-#endif
 
     RuleTree_crystallize(&lang.rules);
 
@@ -192,25 +153,21 @@ bool MatchAtom_equals(const MatchAtom *a, const MatchAtom *b) {
 
 // assumes pattern is correct since this is not user-facing
 // lol this is a mess and will be replaced.
-Pattern Pattern_from(Bump *pool, const char *str) {
+AstExpr *precompile_pattern(Bump *pool, const char *str) {
     File f = File_from_str("pattern", str, strlen(str));
 
     // create ast
     TokBuf tokens = lex(&f);
-    RExpr *ast = parse(pool, &pattern_lang, &tokens);
+    AstExpr *ast = parse(pool, &pattern_lang, &tokens);
 
 #if 1
-    RExpr_dump(ast, &pattern_lang, &f);
+    puts(TC_CYAN "precompiled pattern:" TC_RESET);
+    AstExpr_dump(ast, &pattern_lang, &f);
 #endif
 
     TokBuf_del(&tokens);
 
-    // create pat
-    Pattern pat = {0};
-
-    File_del(&f);
-
-    return pat;
+    return ast;
 }
 
 void Pattern_print(const Pattern *pat, const TypeGraph *rule_types,

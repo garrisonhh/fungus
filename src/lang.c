@@ -27,14 +27,25 @@ void Lang_del(Lang *lang) {
     free((char *)lang->name.str);
 }
 
-Rule Lang_legislate(Lang *lang, RuleDef *rule_def) {
-    Rule rule = Rule_define(&lang->rules, rule_def);
+// searches for lexeme literals recursively and defines any
+static void define_ast_lexemes(Lang *lang, AstExpr *expr) {
+    UNIMPLEMENTED;
+}
+
+Rule Lang_legislate(Lang *lang, Word word, Prec prec, AstExpr *pat_ast) {
+    Rule rule = Rule_define(&lang->rules, word, prec, pat_ast);
+
+    define_ast_lexemes(lang, pat_ast);
+
+    return rule;
+}
+
+Rule Lang_immediate_legislate(Lang *lang, Word word, Prec prec, Pattern pat) {
+    Rule rule = Rule_immediate_define(&lang->rules, word, prec, pat);
 
     // define symbols + words in hashsets
-    Pattern *pat = &rule_def->pat;
-
-    for (size_t i = 0; i < pat->len; ++i) {
-        MatchAtom *atom = &pat->matches[i];
+    for (size_t i = 0; i < pat.len; ++i) {
+        MatchAtom *atom = &pat.matches[i];
 
         if (atom->type == MATCH_LEXEME) {
             HashSet *set =

@@ -80,6 +80,74 @@ void RuleTree_del(RuleTree *rt) {
     Bump_del(&rt->pool);
 }
 
+static void place_rule(RuleTree *rt, const Pattern *pat, Rule rule) {
+    RuleNode *node;
+    Vec *nexts = &rt->roots;
+
+    for (size_t i = 0; i < pat->len; ++i) {
+        MatchAtom *pred = &pat->matches[i];
+        node = NULL;
+
+        // check for equivalent predicate
+        for (size_t j = 0; j < nexts->len; ++j) {
+            RuleNode *next = nexts->data[j];
+            bool matching = false;
+
+            if (pred->type == next->pred->type) {
+                switch (pred->type) {
+                case MATCH_LEXEME:
+                    matching = Word_eq(pred->lxm, next->pred->lxm);
+                    break;
+                case MATCH_EXPR:
+                    matching =
+                        TypeExpr_equals(pred->rule_expr, next->pred->rule_expr);
+                    break;
+                }
+            }
+
+            if (matching) {
+                node = next;
+                break;
+            }
+        }
+
+        // no match found, create a new node
+        if (!node) {
+            node = RT_new_node(rt, pred);
+            Vec_push(nexts, node); // TODO should I copy predicate here?
+        }
+
+        nexts = &node->nexts;
+    }
+
+    // check if valid, if so place and return
+    if (node->has_rule)
+        fungus_panic("duplicate rules"); // TODO don't panic
+
+    node->rule = rule;
+    node->has_rule = true;
+}
+
+Rule Rule_immediate_define(RuleTree *rt, Word name, Prec prec, Pattern pat) {
+    RuleEntry *entry = RT_alloc(rt, sizeof(*entry));
+
+    *entry = (RuleEntry){
+        .name = Word_copy_of(&name, &rt->pool),
+        .pat = pat,
+        .prec = prec
+    };
+
+    Rule handle = register_entry(rt, entry);
+
+    place_rule(rt, &pat, handle);
+
+    return handle;
+}
+
+Rule Rule_define(RuleTree *rt, Word name, Prec prec, AstExpr *pat_ast) {
+    UNIMPLEMENTED;
+}
+
 void RuleTree_crystallize(RuleTree *rt) {
     // generate backtrack parallel vec
     for (size_t i = 0; i < rt->roots.len; ++i) {
@@ -125,82 +193,29 @@ void RuleTree_crystallize(RuleTree *rt) {
             }
         }
     }
-}
 
-Rule Rule_define(RuleTree *rt, RuleDef *def) {
-    assert(def->pat.len > 0);
-
-    // create entry
-    RuleEntry *entry = RT_alloc(rt, sizeof(*entry));
-
-    *entry = (RuleEntry){
-        .name = Word_copy_of(&def->name, &rt->pool),
-        .pat = def->pat,
-        .prec = def->prec
-    };
-
-    Rule handle = register_entry(rt, entry);
-
-    // place entry
-    Pattern *pat = &def->pat;
-    RuleNode *node;
-    Vec *nexts = &rt->roots;
-
-    for (size_t i = 0; i < pat->len; ++i) {
-        MatchAtom *pred = &pat->matches[i];
-        node = NULL;
-
-        // check for equivalent predicate
-        for (size_t j = 0; j < nexts->len; ++j) {
-            RuleNode *next = nexts->data[j];
-            bool matching = false;
-
-            if (pred->type == next->pred->type) {
-                switch (pred->type) {
-                case MATCH_LEXEME:
-                    matching = Word_eq(pred->lxm, next->pred->lxm);
-                    break;
-                case MATCH_EXPR:
-                    matching =
-                        TypeExpr_equals(pred->rule_expr, next->pred->rule_expr);
-                    break;
-                }
-            }
-
-            if (matching) {
-                node = next;
-                break;
-            }
-        }
-
-        // no match found, create a new node
-        if (!node) {
-            node = RT_new_node(rt, pred);
-            Vec_push(nexts, node); // TODO should I copy predicate here?
-        }
-
-        nexts = &node->nexts;
-    }
-
-    // check if valid, if so place and return
-    if (node->has_rule)
-        fungus_panic("duplicate rules"); // TODO don't panic
-
-    node->rule = handle;
-    node->has_rule = true;
-
-    return handle;
-}
-
-Rule Rule_by_name(const RuleTree *rt, const Word *name) {
-    return (Rule){ IdMap_get(&rt->by_name, name) };
+#ifdef DEBUG
+    rt->crystallized = true;
+#endif
 }
 
 Type Rule_typeof(const RuleTree *rt, Rule rule) {
     return Rule_get(rt, rule)->type;
 }
 
+Rule Rule_by_name(const RuleTree *rt, const Word *name) {
+#ifdef DEBUG
+    assert(rt->crystallized);
+#endif
+
+    return (Rule){ IdMap_get(&rt->by_name, name) };
+}
+
 const RuleEntry *Rule_get(const RuleTree *rt, Rule rule) {
+#ifdef DEBUG
+    assert(rt->crystallized);
+#endif
+
     return rt->entries.data[rule.id];
 }
 
@@ -240,7 +255,6 @@ static void dump_children(const RuleTree *rt, const Vec *children, int level) {
         dump_children(rt, &child->nexts, level + 1);
 
         if (level == 0 && rt->backtracks.len > 0) {
-            puts("BACKS:");
             // print backtracks
             const RuleBacktrack *bt = rt->backtracks.data[i];
 

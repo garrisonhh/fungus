@@ -4,6 +4,8 @@
 #include "../data.h"
 #include "../types.h"
 
+typedef struct AstExpr AstExpr;
+
 /*
  * TODO:
  * - match should be able to differentiate lexemes, scopes, rules, and other
@@ -47,12 +49,7 @@ void pattern_lang_quit(void);
 
 bool MatchAtom_equals(const MatchAtom *, const MatchAtom *);
 
-/*
- * Patterns dogfood the lexer + parser.
- *
- * TODO describe the pattern DSL
- */
-Pattern Pattern_from(Bump *, const char *str);
+AstExpr *precompile_pattern(Bump *, const char *str);
 
 void Pattern_print(const Pattern *, const TypeGraph *rule_types,
                    const TypeGraph *types);
