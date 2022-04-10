@@ -94,15 +94,16 @@ static void gen_flat_list(Vec *list, Bump *pool, const RuleTree *rules,
                     if (text[i] == '{' || text[i] == '}') {
                         if (i > last_split) {
                             AstExpr *expr = new_atom(pool, rules->ty_lexeme,
-                                                   ATOM_LEXEME,
-                                                   start + last_split,
-                                                   i - last_split);
+                                                     ATOM_LEXEME,
+                                                     start + last_split,
+                                                     i - last_split);
 
                             Vec_push(list, expr);
                         }
 
-                        AstExpr *expr = new_atom(pool, rules->ty_lexeme, ATOM_LEXEME,
-                                               start + i, 1);
+                        AstExpr *expr = new_atom(pool, rules->ty_lexeme,
+                                                 ATOM_LEXEME,
+                                                 start + i, 1);
 
                         Vec_push(list, expr);
 
@@ -111,9 +112,10 @@ static void gen_flat_list(Vec *list, Bump *pool, const RuleTree *rules,
                 }
 
                 if (last_split < len) {
-                    AstExpr *expr = new_atom(pool, rules->ty_lexeme, ATOM_LEXEME,
-                                           start + last_split,
-                                           len - last_split);
+                    AstExpr *expr = new_atom(pool, rules->ty_lexeme,
+                                             ATOM_LEXEME,
+                                             start + last_split,
+                                             len - last_split);
 
 
                     Vec_push(list, expr);
@@ -192,7 +194,8 @@ static AstExpr *unflatten_list(Bump *pool, const RuleTree *rules,
     }
 
     AstExpr *tree = rule_copy_of_slice(pool, rules, rules->rule_scope,
-                                     (AstExpr **)levels[0].data, levels[0].len);
+                                       (AstExpr **)levels[0].data,
+                                       levels[0].len);
 
     Vec_del(&levels[0]);
 
@@ -282,9 +285,28 @@ static bool translate_scope(Bump *pool, const File *f, const Lang *lang,
     return true;
 }
 
+static bool expr_matches(const File *f, const RuleTree *rules,
+                         const AstExpr *expr, const MatchAtom *pred) {
+    bool matches = false;
+
+    if (expr->type.id == rules->ty_lexeme.id) {
+        // lexeme
+        View token = { &f->text.str[expr->tok_start], expr->tok_len };
+
+        matches = pred->type == MATCH_LEXEME && Word_eq_view(pred->lxm, &token);
+    } else {
+        // expr
+        matches = pred->type == MATCH_EXPR
+               && Type_matches(&rules->types, expr->type, pred->rule_expr);
+    }
+
+    return matches;
+}
+
 // find index of first match within a Vec<RuleNode *>
 static bool expr_match_of(const File *f, const RuleTree *rules,
-                          const AstExpr *expr, const Vec *nodes, size_t *o_idx) {
+                          const AstExpr *expr, const Vec *nodes,
+                          size_t *o_idx) {
     if (expr->type.id == rules->ty_lexeme.id) {
         // match lexeme
         View token = { &f->text.str[expr->tok_start], expr->tok_len };
@@ -316,76 +338,111 @@ static bool expr_match_of(const File *f, const RuleTree *rules,
     return false;
 }
 
+static AstExpr *try_match(Bump *, const File *, const RuleTree *, AstExpr **,
+                          size_t *, size_t *);
+
+static AstExpr *try_backtrack(Bump *pool, const File *f, const RuleTree *rules,
+                              AstExpr **slice, size_t *io_start,
+                              size_t *io_len) {
+    size_t start = *io_start, len = *io_len;
+    AstExpr *first = slice[start];
+
+    // find backtrack
+    size_t idx;
+
+    if (!expr_match_of(f, rules, first, &rules->roots, &idx))
+        return NULL;
+
+    RuleBacktrack *bt = rules->backtracks.data[idx];
+    AstExpr *prev = slice[start - 1];
+
+    if (!expr_match_of(f, rules, prev, &bt->backs, &idx))
+        return NULL;
+
+    // backtrack possible, try to match on it
+    size_t prev_start = start - 1, prev_len = len + 1;
+    AstExpr *prev_match = try_match(pool, f, rules, slice,
+                                  &prev_start, &prev_len);
+
+    if (prev_match) {
+        // found a previous match!
+        *io_start = prev_start;
+        *io_len = prev_len;
+
+        return prev_match;
+    }
+
+    return NULL;
+}
+
+// call with depth = 0 && *io_max_depth = 0
+// if io_max_depth is still 0 once called, the Rule will not be valid
+static Rule try_match_r(const File *f, const RuleTree *rules, const Vec *nexts,
+                        AstExpr **slice, size_t len, size_t depth,
+                        size_t *io_max_depth) {
+    Rule best = {0};
+
+    if (len == 0)
+        return best;
+
+    const AstExpr *expr = slice[0];
+
+    for (size_t i = 0; i < nexts->len; ++i) {
+        RuleNode *node = nexts->data[i];
+
+        if (expr_matches(f, rules, expr, node->pred)) {
+            // check if this is the best match yet
+            if (node->has_rule && depth > *io_max_depth) {
+                *io_max_depth = depth;
+                best = node->rule;
+            }
+
+            // match on node's children
+            size_t next_depth = *io_max_depth;
+            Rule next_best = try_match_r(f, rules, &node->nexts, slice + 1,
+                                         len - 1, depth + 1, &next_depth);
+
+            if (next_depth > *io_max_depth) {
+                *io_max_depth = next_depth;
+                best = next_best;
+            }
+        }
+    }
+
+    return best;
+}
+
 // tries to match and collapse a rule on a slice, returns NULL if no match found
 static AstExpr *try_match(Bump *pool, const File *f, const RuleTree *rules,
-                        AstExpr **slice, size_t *io_start, size_t *io_len) {
+                          AstExpr **slice, size_t *io_start, size_t *io_len) {
     size_t start = *io_start, len = *io_len;
 
     // check backtracking
     if (start > 0) {
-        AstExpr *first = slice[start];
+        AstExpr *match = try_backtrack(pool, f, rules, slice, &start, &len);
 
-        // find backtrack
-        size_t idx;
+        if (match) {
+            *io_start = start;
+            *io_len = len;
 
-        if (!expr_match_of(f, rules, first, &rules->roots, &idx))
-            goto no_backtrack;
-
-        RuleBacktrack *bt = rules->backtracks.data[idx];
-        AstExpr *prev = slice[start - 1];
-
-        if (!expr_match_of(f, rules, prev, &bt->backs, &idx))
-            goto no_backtrack;
-
-        // backtrack possible, try to match on it
-        size_t prev_start = start - 1, prev_len = len + 1;
-        AstExpr *prev_match = try_match(pool, f, rules, slice,
-                                      &prev_start, &prev_len);
-
-        if (prev_match) {
-            // found a previous match!
-            *io_start = prev_start;
-            *io_len = prev_len;
-
-            return prev_match;
+            return match;
         }
-
-no_backtrack:;
     }
 
     // match a rule
-    const Vec *nexts = &rules->roots;
-    Rule best;
-    size_t best_len = 0;
-
-    for (size_t i = 0; i < len - start; ++i) {
-        const RuleNode *next = NULL;
-        size_t idx;
-
-        if (expr_match_of(f, rules, slice[start + i], nexts, &idx)) {
-            next = nexts->data[idx];
-        } else {
-            // no nodes matched
-            break;
-        }
-
-        // nodes matched
-        if (next->has_rule) {
-            best = next->rule;
-            best_len = i + 1;
-        }
-
-        nexts = &next->nexts;
-    }
+    size_t best_depth = 0;
+    Rule best_rule = try_match_r(f, rules, &rules->roots, &slice[start],
+                                 len - start, 0, &best_depth);
 
     // return match if found
-    if (!best_len)
+    if (!best_depth)
         return NULL;
 
     *io_start = start;
-    *io_len = best_len;
+    *io_len = best_depth + 1;
 
-    return rule_copy_of_slice(pool, rules, best, &slice[start], best_len);
+    return rule_copy_of_slice(pool, rules, best_rule, &slice[start],
+                              best_depth + 1);
 }
 
 static AstExpr **lhs_of(AstExpr *expr) {
@@ -502,6 +559,12 @@ static AstExpr **collapse_rules(Bump *pool, const File *f, const Lang *lang,
 
             slice += move_len;
             len -= move_len;
+
+#ifdef DEBUG
+            puts("AFTER MATCH");
+            for (size_t j = 0; j < len; ++j)
+                AstExpr_dump(slice[j], lang, f);
+#endif
         }
     } while (matched);
 

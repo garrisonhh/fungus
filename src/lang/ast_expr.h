@@ -29,12 +29,12 @@ extern const char *ATOM_NAME[ATOM_COUNT];
 
 typedef struct AstExpr {
     Type type; // on RuleTree TypeGraph
-    bool is_atom; // TODO can I get rid of this
+    bool is_atom;
 
     union {
         // for atoms
         struct {
-            AstAtomType atom_type;
+            AstAtomType atom_type; // TODO use type system instead?
             hsize_t tok_start, tok_len;
         };
 

@@ -5,6 +5,7 @@
 #include "../types.h"
 
 typedef struct AstExpr AstExpr;
+typedef struct Lang Lang;
 
 /*
  * TODO:
@@ -26,7 +27,6 @@ typedef struct MatchAtom {
     union {
         // expr
         struct {
-            const Word *name;
             const TypeExpr *rule_expr; // RuleTree Type typeexpr (maybe NULL)
             const TypeExpr *type_expr; // Type typeexpr (maybe NULL)
         };
@@ -50,7 +50,10 @@ void pattern_lang_quit(void);
 bool MatchAtom_equals(const MatchAtom *, const MatchAtom *);
 
 AstExpr *precompile_pattern(Bump *, const char *str);
+Pattern compile_pattern(Bump *, const Lang *lang, AstExpr *ast);
 
+void MatchAtom_print(const MatchAtom *, const TypeGraph *rule_types,
+                     const TypeGraph *types);
 void Pattern_print(const Pattern *, const TypeGraph *rule_types,
                    const TypeGraph *types);
 

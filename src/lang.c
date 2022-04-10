@@ -40,8 +40,8 @@ Rule Lang_legislate(Lang *lang, Word word, Prec prec, AstExpr *pat_ast) {
     return rule;
 }
 
-Rule Lang_immediate_legislate(Lang *lang, Word word, Prec prec, Pattern pat) {
-    Rule rule = Rule_immediate_define(&lang->rules, word, prec, pat);
+Rule Lang_immediate_legislate(Lang *lang, Type type, Prec prec, Pattern pat) {
+    Rule rule = Rule_immediate_define(&lang->rules, type, prec, pat);
 
     // define symbols + words in hashsets
     for (size_t i = 0; i < pat.len; ++i) {

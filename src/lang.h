@@ -20,7 +20,7 @@ Lang Lang_new(Word name);
 void Lang_del(Lang *);
 
 Rule Lang_legislate(Lang *, Word word, Prec prec, AstExpr *pat_ast);
-Rule Lang_immediate_legislate(Lang *, Word word, Prec prec, Pattern pat);
+Rule Lang_immediate_legislate(Lang *, Type type, Prec prec, Pattern pat);
 Prec Lang_make_prec(Lang *, PrecDef *);
 
 void Lang_dump(const Lang *);

@@ -32,6 +32,9 @@ pub fn build(b: *std.build.Builder) anyerror!void {
         if (mode == std.builtin.Mode.Debug) {
             try c_flags.append("-DDEBUG");
             try c_flags.append("-ggdb");
+            try c_flags.append("-O0");
+            // ubsan makes it hard to debug segfaults
+            try c_flags.append("-fno-sanitize=undefined");
         } else {
             try c_flags.append("-DNDEBUG");
             try c_flags.append("-O3");

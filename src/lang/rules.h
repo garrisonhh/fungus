@@ -40,13 +40,6 @@ typedef struct RuleBacktrack {
     Vec backs; // points to root nodes in RuleTree
 } RuleBacktrack;
 
-/*
- * TODO for pattern compiling, Rule types will need to know about each other
- * before the patterns for rules are actually compiled. this means I will
- * have to change the rule definition system into two phases, one where
- * patterns are stored and types are generated and then a second where
- * patterns are compiled using those types and then the tree is created
- */
 typedef struct RuleTree {
     Bump pool;
     Vec entries; // entries[0] represents Scope, never contains an actual entry
@@ -65,7 +58,7 @@ typedef struct RuleTree {
      */
     TypeGraph types;
 
-    // 'constants'
+    // 'constants'; available for every Lang
     Rule rule_scope;
     Type ty_scope, ty_any, ty_literal, ty_lexeme, ty_ident;
 
@@ -77,9 +70,10 @@ typedef struct RuleTree {
 RuleTree RuleTree_new(void);
 void RuleTree_del(RuleTree *);
 
-// used by PatternLang exclusively, skips the pattern compilation step and
-// places rule in tree. crystallize is still necessary for backtracking.
-Rule Rule_immediate_define(RuleTree *, Word name, Prec prec, Pattern pattern);
+// these are used by PatternLang exclusively in order to skip pattern compiling
+// (it can't compile itself, lol)
+Type Rule_immediate_type(RuleTree *, Word name);
+Rule Rule_immediate_define(RuleTree *, Type type, Prec prec, Pattern pattern);
 
 // first phase: queue rule definitions
 Rule Rule_define(RuleTree *, Word name, Prec prec, AstExpr *pat_ast);

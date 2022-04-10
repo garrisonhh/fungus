@@ -17,14 +17,12 @@ static RuleNode *RT_new_node(RuleTree *rt, MatchAtom *pred) {
     return node;
 }
 
-// places RuleEntry in various data structures, does NOT update node tree (this
-// is done in Rule_define)
+// places RuleEntry in entries and idmap
 static Rule register_entry(RuleTree *rt, RuleEntry *entry) {
     Rule handle = { rt->entries.len };
 
     Vec_push(&rt->entries, entry);
-    IdMap_put(&rt->by_name, entry->name, 0);
-    entry->type = Type_define(&rt->types, &(TypeDef){ .name = *entry->name });
+    IdMap_put(&rt->by_name, entry->name, handle.id);
 
     return handle;
 }
@@ -81,6 +79,8 @@ void RuleTree_del(RuleTree *rt) {
 }
 
 static void place_rule(RuleTree *rt, const Pattern *pat, Rule rule) {
+    assert(pat->len > 0);
+
     RuleNode *node;
     Vec *nexts = &rt->roots;
 
@@ -128,13 +128,20 @@ static void place_rule(RuleTree *rt, const Pattern *pat, Rule rule) {
     node->has_rule = true;
 }
 
-Rule Rule_immediate_define(RuleTree *rt, Word name, Prec prec, Pattern pat) {
+Type Rule_immediate_type(RuleTree *rt, Word name) {
+    return Type_define(&rt->types, &(TypeDef){ .name = name });
+}
+
+Rule Rule_immediate_define(RuleTree *rt, Type type, Prec prec, Pattern pat) {
+    assert(Type_is_in(&rt->types, type));
+
     RuleEntry *entry = RT_alloc(rt, sizeof(*entry));
 
     *entry = (RuleEntry){
-        .name = Word_copy_of(&name, &rt->pool),
+        .name = Word_copy_of(Type_get(&rt->types, type)->name, &rt->pool),
         .pat = pat,
-        .prec = prec
+        .prec = prec,
+        .type = type
     };
 
     Rule handle = register_entry(rt, entry);
@@ -149,6 +156,8 @@ Rule Rule_define(RuleTree *rt, Word name, Prec prec, AstExpr *pat_ast) {
 }
 
 void RuleTree_crystallize(RuleTree *rt) {
+    // TODO compile patterns
+
     // generate backtrack parallel vec
     for (size_t i = 0; i < rt->roots.len; ++i) {
         const RuleNode *root = rt->roots.data[i];
@@ -221,26 +230,13 @@ const RuleEntry *Rule_get(const RuleTree *rt, Rule rule) {
 
 #define INDENT 2
 
-static void MatchAtom_print(const RuleTree *rt, const MatchAtom *pred) {
-    switch (pred->type) {
-    case MATCH_LEXEME:
-        printf("%.*s", (int)pred->lxm->len, pred->lxm->str);
-        break;
-    case MATCH_EXPR:
-        printf(TC_BLUE);
-        TypeExpr_print(&rt->types, pred->rule_expr);
-        printf(TC_RESET);
-        break;
-    }
-}
-
 static void dump_children(const RuleTree *rt, const Vec *children, int level) {
     // print matches
     for (size_t i = 0; i < children->len; ++i) {
         RuleNode *child = children->data[i];
 
         printf("%*s", level * INDENT, "");
-        MatchAtom_print(rt, child->pred);
+        MatchAtom_print(child->pred, &rt->types, NULL);
 
         // rule (if exists)
         if (child->has_rule) {
@@ -260,7 +256,8 @@ static void dump_children(const RuleTree *rt, const Vec *children, int level) {
 
             for (size_t j = 0; j < bt->backs.len; ++j) {
                 printf(TC_DIM " <- " TC_RESET);
-                MatchAtom_print(rt, ((RuleNode *)bt->backs.data[j])->pred);
+                MatchAtom_print(((RuleNode *)bt->backs.data[j])->pred,
+                                &rt->types, NULL);
                 puts("");
             }
         }

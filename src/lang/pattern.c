@@ -9,19 +9,16 @@ Lang pattern_lang;
 
 #define PRECS\
     PREC("Lowest",  LEFT)\
-    PREC("Default",  LEFT)\
-    PREC("Bang", LEFT)\
-    PREC("Or", LEFT)\
+    PREC("Pattern", RIGHT)\
+    PREC("Default", LEFT)\
+    PREC("Bang",    LEFT)\
+    PREC("Or",      LEFT)\
     PREC("Highest", LEFT)
 
-static MatchAtom new_match_expr(Bump *pool, const char *name,
-                                 const TypeExpr *rule_expr,
-                                 const TypeExpr *type_expr) {
-    Word name_word = WORD(name);
-
+static MatchAtom new_match_expr(Bump *pool, const TypeExpr *rule_expr,
+                                const TypeExpr *type_expr) {
     return (MatchAtom){
         .type = MATCH_EXPR,
-        .name = Word_copy_of(&name_word, pool),
         .rule_expr = rule_expr,
         .type_expr = type_expr
     };
@@ -32,7 +29,7 @@ static MatchAtom new_match_lxm(Bump *pool, const char *lxm) {
 
     return (MatchAtom){
         .type = MATCH_LEXEME,
-        .name = Word_copy_of(&lxm_word, pool)
+        .lxm = Word_copy_of(&lxm_word, pool)
     };
 }
 
@@ -73,7 +70,6 @@ void pattern_lang_init(void) {
         RuleTree *rules = &lang.rules;
         TypeGraph *rtg = &rules->types;
         Bump *p = &rules->pool;
-        MatchAtom *matches;
 
 #define GET_PREC(VAR, NAME)\
     Prec VAR;\
@@ -82,47 +78,90 @@ void pattern_lang_init(void) {
         VAR = Prec_by_name(&lang.precs, &word);\
     }\
 
+        GET_PREC(pattern_prec, "Pattern");
         GET_PREC(default_prec, "Default");
         GET_PREC(bang_prec, "Bang");
         GET_PREC(or_prec, "Or");
 
 #undef GET_PREC
 
+#define IMM_TYPE(VAR, NAME) Type VAR = Rule_immediate_type(rules, WORD(NAME))
+
+        IMM_TYPE(ty_match_expr, "MatchExpr");
+        IMM_TYPE(ty_bang, "Bang");
+        IMM_TYPE(ty_or, "Or");
+        IMM_TYPE(ty_returns, "Returns");
+        IMM_TYPE(ty_pattern, "Pattern");
+
+#undef IMM_TYPE
+
+        const TypeExpr *any_rule_type =
+            TypeExpr_sum(p, 2,
+                         TypeExpr_atom(p, ty_or),
+                         TypeExpr_atom(p, rules->ty_ident));
+
+        MatchAtom *matches;
+        size_t len;
+
         // match expr
-        matches = Bump_alloc(p, 3 * sizeof(*matches));
-
-        matches[0] =
-            new_match_expr(p, "ident", TypeExpr_atom(p, rtg->ty_any), NULL);
+        len = 3;
+        matches = Bump_alloc(p, len * sizeof(*matches));
+        matches[0] = new_match_expr(p, TypeExpr_atom(p, rules->ty_ident), NULL);
         matches[1] = new_match_lxm(p, ":");
-        matches[2] =
-            new_match_expr(p, "type", TypeExpr_atom(p, rtg->ty_any), NULL);
+        matches[2] = new_match_expr(p, TypeExpr_atom(p, ty_bang), NULL);
 
-        Lang_immediate_legislate(&lang, WORD("MatchExpr"), default_prec,
-                                 (Pattern){ .matches = matches, .len = 3 });
+        Lang_immediate_legislate(&lang, ty_match_expr, default_prec,
+                                 (Pattern){ .matches = matches, .len = len });
 
         // type bang
-        matches = Bump_alloc(p, 3 * sizeof(*matches));
-
-        matches[0] =
-            new_match_expr(p, "lhs", TypeExpr_atom(p, rtg->ty_any), NULL);
+        len = 3;
+        matches = Bump_alloc(p, len * sizeof(*matches));
+        matches[0] = new_match_expr(p, any_rule_type, NULL);
         matches[1] = new_match_lxm(p, "!");
-        matches[2] =
-            new_match_expr(p, "rhs", TypeExpr_atom(p, rtg->ty_any), NULL);
+        matches[2] = new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL);
 
-        Lang_immediate_legislate(&lang, WORD("Bang"), bang_prec,
-                                 (Pattern){ .matches = matches, .len = 3 });
+        Lang_immediate_legislate(&lang, ty_bang, bang_prec,
+                                 (Pattern){ .matches = matches, .len = len });
 
         // type or
-        matches = Bump_alloc(p, 3 * sizeof(*matches));
-
-        matches[0] =
-            new_match_expr(p, "lhs", TypeExpr_atom(p, rtg->ty_any), NULL);
+        len = 3;
+        matches = Bump_alloc(p, len * sizeof(*matches));
+        matches[0] = new_match_expr(p, any_rule_type, NULL);
         matches[1] = new_match_lxm(p, "|");
-        matches[2] =
-            new_match_expr(p, "rhs", TypeExpr_atom(p, rtg->ty_any), NULL);
+        matches[2] = new_match_expr(p, any_rule_type, NULL);
 
-        Lang_immediate_legislate(&lang, WORD("Or"), or_prec,
-                                 (Pattern){ .matches = matches, .len = 3 });
+        Lang_immediate_legislate(&lang, ty_or, or_prec,
+                                 (Pattern){ .matches = matches, .len = len });
+
+        // return type
+        len = 2;
+        matches = Bump_alloc(p, len * sizeof(*matches));
+        matches[0] = new_match_lxm(p, "->");
+        matches[1] = new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL);
+
+        Lang_immediate_legislate(&lang, ty_returns, default_prec,
+                                 (Pattern){ .matches = matches, .len = len });
+
+        // pattern
+        len = 2;
+        matches = Bump_alloc(p, len * sizeof(*matches));
+
+        // TODO match specifically literal lexemes?
+        const TypeExpr *expr_or_lxm =
+            TypeExpr_sum(p, 2,
+                         TypeExpr_atom(p, ty_match_expr),
+                         TypeExpr_atom(p, rules->ty_literal));
+
+        const TypeExpr *until_returns =
+            TypeExpr_sum(p, 2,
+                         TypeExpr_atom(p, ty_pattern),
+                         TypeExpr_atom(p, ty_returns));
+
+        matches[0] = new_match_expr(p, expr_or_lxm, NULL);
+        matches[1] = new_match_expr(p, until_returns, NULL);
+
+        Lang_immediate_legislate(&lang, ty_pattern, pattern_prec,
+                                 (Pattern){ .matches = matches, .len = len });
     }
 
     RuleTree_crystallize(&lang.rules);
@@ -170,36 +209,42 @@ AstExpr *precompile_pattern(Bump *pool, const char *str) {
     return ast;
 }
 
+Pattern compile_pattern(Bump *pool, const Lang *lang, AstExpr *ast) {
+    UNIMPLEMENTED;
+}
+
+void MatchAtom_print(const MatchAtom *atom, const TypeGraph *rule_types,
+                     const TypeGraph *types) {
+    switch (atom->type) {
+    case MATCH_EXPR: {
+        if (atom->rule_expr)
+            TypeExpr_print(rule_types, atom->rule_expr);
+        else
+            printf("_");
+
+        printf("!");
+
+        if (atom->type_expr)
+            TypeExpr_print(types, atom->type_expr);
+        else
+            printf("_");
+
+        break;
+    }
+    case MATCH_LEXEME: {
+        const Word *lxm = atom->lxm;
+
+        printf("`%.*s", (int)lxm->len, lxm->str);
+
+        break;
+    }
+    }
+}
+
 void Pattern_print(const Pattern *pat, const TypeGraph *rule_types,
                    const TypeGraph *types) {
     for (size_t i = 0; i < pat->len; ++i) {
         if (i) printf(" ");
-
-        MatchAtom *atom = &pat->matches[i];
-
-        switch (atom->type) {
-        case MATCH_EXPR: {
-            const Word *name = atom->name;
-
-            printf("%.*s: ", (int)name->len, name->str);
-
-            if (atom->rule_expr)
-                TypeExpr_print(rule_types, atom->rule_expr);
-
-            printf("!");
-
-            if (atom->type_expr)
-                TypeExpr_print(types, atom->type_expr);
-
-            break;
-        }
-        case MATCH_LEXEME: {
-            const Word *lxm = atom->lxm;
-
-            printf("`%.*s", (int)lxm->len, lxm->str);
-
-            break;
-        }
-        }
+        MatchAtom_print(&pat->matches[i], rule_types, types);
     }
 }

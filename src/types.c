@@ -204,7 +204,7 @@ bool TypeExpr_is(const TypeGraph *tg, const TypeExpr *expr, Type of) {
 
 bool Type_matches(const TypeGraph *tg, Type ty, const TypeExpr *pat) {
     switch (pat->type) {
-    case TET_ATOM:
+    case TET_ATOM:;
         // whether atom is the other atom
         return Type_is(tg, ty, pat->atom);
     case TET_PRODUCT:

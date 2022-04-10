@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
 
     pattern_lang_init();
 
-    precompile_pattern(&pool, "a: Any!_ `+ b: Any!_");
+    precompile_pattern(&pool, "a: Any!Any `+ b: Any!Any -> Any");
 
     pattern_lang_quit();
 
