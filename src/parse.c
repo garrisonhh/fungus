@@ -487,10 +487,6 @@ AstExpr *parse_scope(AstCtx *ctx, AstExpr *expr) {
     size_t len;
     AstExpr **slice = parse_slice(ctx, expr->exprs, expr->len, &len);
 
-    puts(TC_CYAN "parsed scope:" TC_RESET);
-    for (size_t i = 0; i < len; ++i)
-        AstExpr_dump(slice[i], ctx->lang, ctx->file);
-
     expr->exprs = slice;
     expr->len = len;
 

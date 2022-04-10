@@ -55,9 +55,12 @@ void AstExpr_dump(const AstExpr *expr, const Lang *lang, const File *file) {
             }
 
             const char *c = indices[size - 1] == scopes[size - 1]->len
-                ? "*" : "|";
+                ? "└" : "├";
 
-            printf("%s── ", c);
+            const char *c2 = expr->is_atom
+                ? "─" : "┬";
+
+            printf("%s──%s ", c, c2);
         }
 
         printf(TC_RESET);
