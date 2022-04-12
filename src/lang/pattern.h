@@ -32,7 +32,7 @@ typedef struct MatchAtom {
 
             // flags (used for tree generation, have no direct behavior)
             unsigned repeating: 1;
-            // unsigned optional: 1;
+            unsigned optional: 1;
             unsigned: 0;
         };
 

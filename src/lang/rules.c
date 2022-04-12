@@ -82,63 +82,72 @@ void RuleTree_del(RuleTree *rt) {
     Bump_del(&rt->pool);
 }
 
-static void place_rule(RuleTree *rt, const Pattern *pat, Rule rule) {
-    assert(pat->len > 0);
+static void place_rule_r(RuleTree *rt, RuleNode *node, Vec *nexts,
+                         const Pattern *pat, size_t index, Rule rule) {
+    assert(index <= pat->len);
 
-    RuleNode *node;
-    Vec *nexts = &rt->roots;
+    // place rule at end of pattern
+    if (index == pat->len) {
+        assert(node != NULL);
 
-    for (size_t i = 0; i < pat->len; ++i) {
-        MatchAtom *pred = &pat->matches[i];
-        node = NULL;
+        node->rule = rule;
+        node->has_rule = true;
 
-        // check for equivalent predicate
-        for (size_t j = 0; j < nexts->len; ++j) {
-            RuleNode *next = nexts->data[j];
-            bool matching = false;
+        return;
+    }
 
-            if (pred->type == next->pred->type) {
-                switch (pred->type) {
-                case MATCH_LEXEME:
-                    matching = Word_eq(pred->lxm, next->pred->lxm);
-                    break;
-                case MATCH_EXPR:
-                    matching =
-                        TypeExpr_equals(pred->rule_expr, next->pred->rule_expr);
-                    break;
-                }
-            }
+    // check for equivalent predicate within nexts
+    MatchAtom *pred = &pat->matches[index];
+    RuleNode *place = NULL;
 
-            if (matching) {
-                node = next;
+    // place on optional, if set
+    printf("PLACING: ");
+    MatchAtom_print(pred, &rt->types, NULL);
+    puts("");
+
+    if (pred->type == MATCH_EXPR && pred->optional) {
+        puts(TC_YELLOW "placing on opt!" TC_RESET);
+        place_rule_r(rt, node, nexts, pat, index + 1, rule);
+    }
+
+    for (size_t i = 0; i < nexts->len; ++i) {
+        RuleNode *next = nexts->data[i];
+        bool matching = false;
+
+        if (pred->type == next->pred->type) {
+            switch (pred->type) {
+            case MATCH_LEXEME:
+                matching = Word_eq(pred->lxm, next->pred->lxm);
+                break;
+            case MATCH_EXPR:
+                matching =
+                    TypeExpr_equals(pred->rule_expr, next->pred->rule_expr);
                 break;
             }
         }
 
-        // no match found, create a new node
-        if (!node) {
-            node = RT_new_node(rt, pred);
-            Vec_push(nexts, node); // TODO should I copy predicate here?
-
-            // apply node flags
-            if (pred->type == MATCH_EXPR && pred->repeating) {
-                printf("DEF REPEATING: ");
-                MatchAtom_print(pred, &rt->types, NULL);
-                puts("");
-
-                Vec_push(&node->nexts, node);
-            }
+        if (matching) {
+            place = next;
+            break;
         }
-
-        nexts = &node->nexts;
     }
 
-    // check if valid, if so place and return
-    if (node->has_rule)
-        fungus_panic("duplicate rules"); // TODO don't panic
+    // no match found, create a new node
+    if (!place) {
+        place = RT_new_node(rt, pred);
+        Vec_push(nexts, place); // TODO copy predicate here to ruletree pool
 
-    node->rule = rule;
-    node->has_rule = true;
+        // apply repeating flag, if set
+        if (pred->type == MATCH_EXPR && pred->repeating)
+            Vec_push(&place->nexts, place);
+    }
+
+    // recur
+    place_rule_r(rt, place, &place->nexts, pat, index + 1, rule);
+}
+
+static void place_rule(RuleTree *rt, const Pattern *pat, Rule rule) {
+    place_rule_r(rt, NULL, &rt->roots, pat, 0, rule);
 }
 
 Type Rule_immediate_type(RuleTree *rt, Word name) {
@@ -282,14 +291,11 @@ static void dump_children(const RuleTree *rt, const Vec *children,
 }
 
 void RuleTree_dump(const RuleTree *rt) {
-    puts(TC_CYAN "RuleTree:" TC_RESET);
-
 #ifdef DEBUG
-    if (!rt->crystallized)
-        puts(TC_YELLOW "WARNING: UNCRYSTALLIZED" TC_RESET);
+    assert(rt->crystallized);
 #endif
 
+    puts(TC_CYAN "RuleTree:" TC_RESET);
     dump_children(rt, &rt->roots, NULL, 0);
-
     puts("");
 }

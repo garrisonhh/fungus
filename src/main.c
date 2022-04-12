@@ -58,7 +58,10 @@ int main(int argc, char **argv) {
     pattern_lang_init();
 
     precompile_pattern(&pool,
-        "a: Literal|Rule!Number `+ b: Literal|Rule!Number -> Any");
+        "a: Literal | Rule ! T `+ b: Literal | Rule ! T -> T\n"
+        "where T is Number\n");
+    precompile_pattern(&pool,
+        "`++ expr: Ident ! Number -> Number\n");
 
     pattern_lang_quit();
 
