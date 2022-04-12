@@ -33,7 +33,6 @@ RuleTree RuleTree_new(void) {
         .entries = Vec_new(),
         .by_name = IdMap_new(),
         .types = TypeGraph_new(),
-        .backtracks = Vec_new(),
     };
 
     rt.roots = Vec_new();
@@ -75,7 +74,6 @@ void RuleTree_del(RuleTree *rt) {
     for (size_t i = 0; i < rt->roots.len; ++i)
         RuleNode_del(rt->roots.data[i]);
 
-    Vec_del(&rt->backtracks);
     TypeGraph_del(&rt->types);
     IdMap_del(&rt->by_name);
     Vec_del(&rt->entries);
@@ -101,14 +99,8 @@ static void place_rule_r(RuleTree *rt, RuleNode *node, Vec *nexts,
     RuleNode *place = NULL;
 
     // place on optional, if set
-    printf("PLACING: ");
-    MatchAtom_print(pred, &rt->types, NULL);
-    puts("");
-
-    if (pred->type == MATCH_EXPR && pred->optional) {
-        puts(TC_YELLOW "placing on opt!" TC_RESET);
+    if (pred->type == MATCH_EXPR && pred->optional)
         place_rule_r(rt, node, nexts, pat, index + 1, rule);
-    }
 
     for (size_t i = 0; i < nexts->len; ++i) {
         RuleNode *next = nexts->data[i];
@@ -180,51 +172,6 @@ Rule Rule_define(RuleTree *rt, Word name, Prec prec, AstExpr *pat_ast) {
 void RuleTree_crystallize(RuleTree *rt) {
     // TODO compile patterns
 
-    // generate backtrack parallel vec
-    for (size_t i = 0; i < rt->roots.len; ++i) {
-        const RuleNode *root = rt->roots.data[i];
-
-        RuleBacktrack *bt = RT_alloc(rt, sizeof(*bt));
-
-        *bt = (RuleBacktrack){
-            .pred = root->pred,
-            .backs = Vec_new()
-        };
-
-        Vec_push(&rt->backtracks, bt);
-    }
-
-    // generate backtracks
-    for (size_t i = 0; i < rt->roots.len; ++i) {
-        const RuleNode *root = rt->roots.data[i];
-
-        for (size_t j = 0; j < root->nexts.len; ++j) {
-            const RuleNode *next = root->nexts.data[j];
-
-            // check if next is a root
-            bool is_root = false;
-
-            for (size_t k = 0; k < rt->roots.len; ++k) {
-                if (k == i)
-                    continue;
-
-                const RuleNode *other_root = rt->roots.data[k];
-
-                if (MatchAtom_equals(next->pred, other_root->pred)) {
-                    is_root = true;
-                    break;
-                }
-            }
-
-            // if next is a root, add root as a backtrack for next
-            if (is_root) {
-                RuleBacktrack *bt = rt->backtracks.data[j];
-
-                Vec_push(&bt->backs, root);
-            }
-        }
-    }
-
 #ifdef DEBUG
     rt->crystallized = true;
 #endif
@@ -275,18 +222,6 @@ static void dump_children(const RuleTree *rt, const Vec *children,
         puts("");
 
         dump_children(rt, &child->nexts, child, level + 1);
-
-        if (level == 0 && rt->backtracks.len > 0) {
-            // print backtracks
-            const RuleBacktrack *bt = rt->backtracks.data[i];
-
-            for (size_t j = 0; j < bt->backs.len; ++j) {
-                printf(TC_DIM " <- " TC_RESET);
-                MatchAtom_print(((RuleNode *)bt->backs.data[j])->pred,
-                                &rt->types, NULL);
-                puts("");
-            }
-        }
     }
 }
 

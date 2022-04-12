@@ -190,12 +190,6 @@ void pattern_lang_init(void) {
         matches[2] = new_match_expr(p, TypeExpr_atom(p, ty_where), NULL,
                                     OPTIONAL);
 
-        Pattern pat = (Pattern){ .matches = matches, .len = len };
-
-        printf("yellow: ");
-        Pattern_print(&pat, rtg, NULL);
-        puts("");
-
         Lang_immediate_legislate(&lang, ty_pattern, pattern_prec,
                                  (Pattern){ .matches = matches, .len = len });
     }

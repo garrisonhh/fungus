@@ -44,9 +44,7 @@ typedef struct RuleTree {
     Bump pool;
     Vec entries; // entries[0] represents Scope, never contains an actual entry
     IdMap by_name;
-
     Vec roots; // Vec<RuleNode *>
-    Vec backtracks; // Vec<RuleBackTrack *>
 
     /*
      * this is the internal type system for Rules, used for Pattern matching
