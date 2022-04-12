@@ -61,8 +61,12 @@ RuleTree RuleTree_new(void) {
 }
 
 static void RuleNode_del(RuleNode *node) {
-    for (size_t i = 0; i < node->nexts.len; ++i)
-        RuleNode_del(node->nexts.data[i]);
+    for (size_t i = 0; i < node->nexts.len; ++i) {
+        RuleNode *child = node->nexts.data[i];
+
+        if (child != node)
+            RuleNode_del(child);
+    }
 
     Vec_del(&node->nexts);
 }
@@ -115,6 +119,15 @@ static void place_rule(RuleTree *rt, const Pattern *pat, Rule rule) {
         if (!node) {
             node = RT_new_node(rt, pred);
             Vec_push(nexts, node); // TODO should I copy predicate here?
+
+            // apply node flags
+            if (pred->type == MATCH_EXPR && pred->repeating) {
+                printf("DEF REPEATING: ");
+                MatchAtom_print(pred, &rt->types, NULL);
+                puts("");
+
+                Vec_push(&node->nexts, node);
+            }
         }
 
         nexts = &node->nexts;
@@ -230,10 +243,14 @@ const RuleEntry *Rule_get(const RuleTree *rt, Rule rule) {
 
 #define INDENT 2
 
-static void dump_children(const RuleTree *rt, const Vec *children, int level) {
+static void dump_children(const RuleTree *rt, const Vec *children,
+                          const RuleNode *exclude, int level) {
     // print matches
     for (size_t i = 0; i < children->len; ++i) {
-        RuleNode *child = children->data[i];
+        const RuleNode *child = children->data[i];
+
+        if (child == exclude)
+            continue;
 
         printf("%*s", level * INDENT, "");
         MatchAtom_print(child->pred, &rt->types, NULL);
@@ -248,7 +265,7 @@ static void dump_children(const RuleTree *rt, const Vec *children, int level) {
 
         puts("");
 
-        dump_children(rt, &child->nexts, level + 1);
+        dump_children(rt, &child->nexts, child, level + 1);
 
         if (level == 0 && rt->backtracks.len > 0) {
             // print backtracks
@@ -266,7 +283,13 @@ static void dump_children(const RuleTree *rt, const Vec *children, int level) {
 
 void RuleTree_dump(const RuleTree *rt) {
     puts(TC_CYAN "RuleTree:" TC_RESET);
-    dump_children(rt, &rt->roots, 0);
+
+#ifdef DEBUG
+    if (!rt->crystallized)
+        puts(TC_YELLOW "WARNING: UNCRYSTALLIZED" TC_RESET);
+#endif
+
+    dump_children(rt, &rt->roots, NULL, 0);
 
     puts("");
 }

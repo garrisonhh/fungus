@@ -345,7 +345,9 @@ TypeExpr *TypeExpr_product(Bump *pool, size_t n, ...) {
 void TypeExpr_print(const TypeGraph *tg, const TypeExpr *expr) {
     switch (expr->type) {
     case TET_ATOM:
+        printf(TC_BLUE);
         Type_print(tg, expr->atom);
+        printf(TC_RESET);
         break;
     case TET_SUM:
         for (size_t i = 0; i < expr->len; ++i) {

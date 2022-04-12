@@ -29,6 +29,11 @@ typedef struct MatchAtom {
         struct {
             const TypeExpr *rule_expr; // RuleTree Type typeexpr (maybe NULL)
             const TypeExpr *type_expr; // Type typeexpr (maybe NULL)
+
+            // flags (used for tree generation, have no direct behavior)
+            unsigned repeating: 1;
+            // unsigned optional: 1;
+            unsigned: 0;
         };
 
         // lexeme

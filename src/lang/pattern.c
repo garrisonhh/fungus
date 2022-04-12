@@ -16,11 +16,12 @@ Lang pattern_lang;
     PREC("Highest", LEFT)
 
 static MatchAtom new_match_expr(Bump *pool, const TypeExpr *rule_expr,
-                                const TypeExpr *type_expr) {
+                                const TypeExpr *type_expr, bool repeating) {
     return (MatchAtom){
         .type = MATCH_EXPR,
         .rule_expr = rule_expr,
-        .type_expr = type_expr
+        .type_expr = type_expr,
+        .repeating = repeating
     };
 }
 
@@ -106,9 +107,10 @@ void pattern_lang_init(void) {
         // match expr
         len = 3;
         matches = Bump_alloc(p, len * sizeof(*matches));
-        matches[0] = new_match_expr(p, TypeExpr_atom(p, rules->ty_ident), NULL);
+        matches[0] =
+            new_match_expr(p, TypeExpr_atom(p, rules->ty_ident), NULL, false);
         matches[1] = new_match_lxm(p, ":");
-        matches[2] = new_match_expr(p, TypeExpr_atom(p, ty_bang), NULL);
+        matches[2] = new_match_expr(p, TypeExpr_atom(p, ty_bang), NULL, false);
 
         Lang_immediate_legislate(&lang, ty_match_expr, default_prec,
                                  (Pattern){ .matches = matches, .len = len });
@@ -116,9 +118,9 @@ void pattern_lang_init(void) {
         // type or
         len = 3;
         matches = Bump_alloc(p, len * sizeof(*matches));
-        matches[0] = new_match_expr(p, any_rule_type, NULL);
+        matches[0] = new_match_expr(p, any_rule_type, NULL, false);
         matches[1] = new_match_lxm(p, "|");
-        matches[2] = new_match_expr(p, any_rule_type, NULL);
+        matches[2] = new_match_expr(p, any_rule_type, NULL, false);
 
         Lang_immediate_legislate(&lang, ty_or, or_prec,
                                  (Pattern){ .matches = matches, .len = len });
@@ -126,9 +128,10 @@ void pattern_lang_init(void) {
         // type sep (bang)
         len = 3;
         matches = Bump_alloc(p, len * sizeof(*matches));
-        matches[0] = new_match_expr(p, any_rule_type, NULL);
+        matches[0] = new_match_expr(p, any_rule_type, NULL, false);
         matches[1] = new_match_lxm(p, "!");
-        matches[2] = new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL);
+        matches[2] =
+            new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL, false);
 
         Lang_immediate_legislate(&lang, ty_bang, bang_prec,
                                  (Pattern){ .matches = matches, .len = len });
@@ -137,7 +140,8 @@ void pattern_lang_init(void) {
         len = 2;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_lxm(p, "->");
-        matches[1] = new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL);
+        matches[1] =
+            new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL, false);
 
         Lang_immediate_legislate(&lang, ty_returns, default_prec,
                                  (Pattern){ .matches = matches, .len = len });
@@ -147,19 +151,16 @@ void pattern_lang_init(void) {
         matches = Bump_alloc(p, len * sizeof(*matches));
 
         // TODO match specifically literal lexemes? could be a sema problem
-        // exclusively? can I just run sema on patterns?
+        // exclusively? can I just run sema on patterns? or should Literal types
+        // be extended to LiteralBool, LiteralInt, LiteralLexeme, etc.?
         const TypeExpr *expr_or_lxm =
             TypeExpr_sum(p, 2,
                          TypeExpr_atom(p, ty_match_expr),
                          TypeExpr_atom(p, rules->ty_literal));
 
-        const TypeExpr *until_returns =
-            TypeExpr_sum(p, 2,
-                         TypeExpr_atom(p, ty_pattern),
-                         TypeExpr_atom(p, ty_returns));
-
-        matches[0] = new_match_expr(p, expr_or_lxm, NULL);
-        matches[1] = new_match_expr(p, until_returns, NULL);
+        matches[0] = new_match_expr(p, expr_or_lxm, NULL, true);
+        matches[1] =
+            new_match_expr(p, TypeExpr_atom(p, ty_returns), NULL, false);
 
         Lang_immediate_legislate(&lang, ty_pattern, pattern_prec,
                                  (Pattern){ .matches = matches, .len = len });
@@ -178,13 +179,22 @@ void pattern_lang_quit(void) {
     Lang_del(&pattern_lang);
 }
 
+// used to determined what RuleNodes can work with each other
 bool MatchAtom_equals(const MatchAtom *a, const MatchAtom *b) {
     if (a->type == b->type) {
         switch (a->type) {
         case MATCH_LEXEME:
             return Word_eq(a->lxm, b->lxm);
-        case MATCH_EXPR:
-            return TypeExpr_equals(a->rule_expr, b->rule_expr);
+        case MATCH_EXPR: {
+            bool flags_equal = a->repeating == b->repeating;
+                    // TODO && a->optional == b->optional;
+            bool ruleexprs_equal = TypeExpr_equals(a->rule_expr, b->rule_expr);
+            bool typeexprs_equal = a->type_expr
+                ? TypeExpr_equals(a->type_expr, b->type_expr)
+                : !b->type_expr;
+
+            return flags_equal && ruleexprs_equal && typeexprs_equal;
+        }
         }
     }
 
@@ -221,25 +231,29 @@ Pattern compile_pattern(Bump *pool, const Lang *lang, AstExpr *ast) {
 void MatchAtom_print(const MatchAtom *atom, const TypeGraph *rule_types,
                      const TypeGraph *types) {
     switch (atom->type) {
-    case MATCH_EXPR: {
+    case MATCH_EXPR:
+        if (atom->repeating)
+            printf("repeating ");
+
         if (atom->rule_expr)
             TypeExpr_print(rule_types, atom->rule_expr);
         else
-            printf("_");
+            printf(TC_BLUE "_" TC_RESET);
 
-        printf("!");
+        printf(" ! ");
 
         if (atom->type_expr)
             TypeExpr_print(types, atom->type_expr);
         else
-            printf("_");
+            printf(TC_BLUE "_" TC_RESET);
+
+        printf(TC_RESET);
 
         break;
-    }
     case MATCH_LEXEME: {
         const Word *lxm = atom->lxm;
 
-        printf("`%.*s", (int)lxm->len, lxm->str);
+        printf("`" TC_GREEN "%.*s" TC_RESET, (int)lxm->len, lxm->str);
 
         break;
     }

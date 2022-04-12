@@ -305,44 +305,47 @@ static bool expr_matches(AstCtx *ctx, const AstExpr *expr,
 }
 
 static size_t try_match_r(AstCtx *ctx, const Vec *nexts, AstExpr **slice,
-                          size_t len, Rule *o_rule) {
+                          size_t len, size_t depth, Rule *o_rule) {
     if (len == 0)
         return 0;
 
-    size_t best_len = 0;
+    size_t best_depth = 0;
     Rule rule = {0};
 
     for (size_t i = 0; i < nexts->len; ++i) {
         const RuleNode *node = nexts->data[i];
 
         if (expr_matches(ctx, slice[0], node->pred)) {
-            // match node children;
+            // match node children
             Rule child_rule;
-            size_t child_len = try_match_r(ctx, &node->nexts, slice + 1,len - 1,
-                                           &child_rule);
+            size_t child_depth = try_match_r(ctx, &node->nexts, slice + 1,
+                                             len - 1, depth + 1, &child_rule);
 
-            if (child_len > best_len) {
+            if (child_depth > best_depth) {
                 rule = child_rule;
-                best_len = child_len + 1;
+                best_depth = child_depth;
             }
 
             // match node
-            if (node->has_rule && best_len < 1) {
+            if (node->has_rule && best_depth < depth) {
                 rule = node->rule;
-                best_len = 1;
+                best_depth = depth;
             }
         }
     }
 
     *o_rule = rule;
 
-    return best_len;
+    return best_depth;
 }
 
 // tries to match a rule on a slice, returns length of rule matched
 static size_t try_match(AstCtx *ctx, AstExpr **slice, size_t len,
                         Rule *o_rule) {
-    return try_match_r(ctx, &ctx->lang->rules.roots, slice, len, o_rule);
+    size_t match_len =
+        try_match_r(ctx, &ctx->lang->rules.roots, slice, len, 1, o_rule);
+
+    return match_len;
 }
 
 typedef struct MatchSlice {
@@ -491,9 +494,19 @@ static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
             if (match_len > 0) {
                 Prec rule_prec = Rule_get(rules, matched)->prec;
 
+                // if this is now the highest precedence, reset match list
                 if (!num_matches || Prec_cmp(precs, rule_prec, highest) > 0) {
                     highest = rule_prec;
                     num_matches = 0;
+                }
+
+                // if this match is contained by a greedy previous match, ignore
+                // it. this can happen with `repeating` rules
+                const MatchSlice *prev = &matches[num_matches - 1];
+
+                if (num_matches > 0 && prev->rule.id == matched.id
+                 && prev->start + prev->len >= i + match_len) {
+                    continue;
                 }
 
                 matches[num_matches++] = (MatchSlice){
