@@ -14,13 +14,13 @@ TypeGraph fungus_types;
 
 // table of name, prec, pattern
 #define RULES\
-    RULE("Parens",    "Highest",    "`( expr: T `) -> T")\
+    RULE("Parens",    "Highest",    "`( expr: Any!T `) -> T")\
     \
-    RULE("Add",       "AddSub",     "a: T `+ b: T -> T")\
-    RULE("Subtract",  "AddSub",     "a: T `- b: T -> T")\
-    RULE("Multiply",  "MulDiv",     "a: T `* b: T -> T")\
-    RULE("Divide",    "MulDiv",     "a: T `/ b: T -> T")\
-    RULE("Modulo",    "MulDiv",     "a: T `% b: T -> T")\
+    RULE("Add",       "AddSub",     "a: Any!T `+ b: Any!T -> T")\
+    RULE("Subtract",  "AddSub",     "a: Any!T `- b: Any!T -> T")\
+    RULE("Multiply",  "MulDiv",     "a: Any!T `* b: Any!T -> T")\
+    RULE("Divide",    "MulDiv",     "a: Any!T `/ b: Any!T -> T")\
+    RULE("Modulo",    "MulDiv",     "a: Any!T `% b: Any!T -> T")\
     \
     // RULE("Assign",    "Assignment", "name: Ident `= rvalue: T -> T")\
     // RULE("ConstDecl", "Assignment", "`const assign: Assign")\

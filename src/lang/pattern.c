@@ -11,6 +11,7 @@ Lang pattern_lang;
     PREC("Lowest",  LEFT)\
     PREC("Pattern", RIGHT)\
     PREC("Default", LEFT)\
+    PREC("Bang",    LEFT)\
     PREC("Or",      LEFT)\
     PREC("Highest", LEFT)
 
@@ -80,13 +81,15 @@ void pattern_lang_init(void) {
         GET_PREC(pattern_prec, "Pattern");
         GET_PREC(default_prec, "Default");
         GET_PREC(or_prec, "Or");
+        GET_PREC(bang_prec, "Or");
 
 #undef GET_PREC
 
 #define IMM_TYPE(VAR, NAME) Type VAR = Rule_immediate_type(rules, WORD(NAME))
 
         IMM_TYPE(ty_match_expr, "MatchExpr");
-        IMM_TYPE(ty_or, "Or");
+        IMM_TYPE(ty_or, "TypeOr");
+        IMM_TYPE(ty_bang, "TypeBang");
         IMM_TYPE(ty_returns, "Returns");
         IMM_TYPE(ty_pattern, "Pattern");
 
@@ -101,13 +104,11 @@ void pattern_lang_init(void) {
         size_t len;
 
         // match expr
-        len = 5;
+        len = 3;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_expr(p, TypeExpr_atom(p, rules->ty_ident), NULL);
         matches[1] = new_match_lxm(p, ":");
-        matches[2] = new_match_expr(p, any_rule_type, NULL);
-        matches[3] = new_match_lxm(p, "!");
-        matches[4] = new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL);
+        matches[2] = new_match_expr(p, TypeExpr_atom(p, ty_bang), NULL);
 
         Lang_immediate_legislate(&lang, ty_match_expr, default_prec,
                                  (Pattern){ .matches = matches, .len = len });
@@ -120,6 +121,16 @@ void pattern_lang_init(void) {
         matches[2] = new_match_expr(p, any_rule_type, NULL);
 
         Lang_immediate_legislate(&lang, ty_or, or_prec,
+                                 (Pattern){ .matches = matches, .len = len });
+
+        // type sep (bang)
+        len = 3;
+        matches = Bump_alloc(p, len * sizeof(*matches));
+        matches[0] = new_match_expr(p, any_rule_type, NULL);
+        matches[1] = new_match_lxm(p, "!");
+        matches[2] = new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL);
+
+        Lang_immediate_legislate(&lang, ty_bang, bang_prec,
                                  (Pattern){ .matches = matches, .len = len });
 
         // return type
@@ -135,7 +146,8 @@ void pattern_lang_init(void) {
         len = 2;
         matches = Bump_alloc(p, len * sizeof(*matches));
 
-        // TODO match specifically literal lexemes?
+        // TODO match specifically literal lexemes? could be a sema problem
+        // exclusively? can I just run sema on patterns?
         const TypeExpr *expr_or_lxm =
             TypeExpr_sum(p, 2,
                          TypeExpr_atom(p, ty_match_expr),

@@ -36,21 +36,27 @@ typedef struct MatchAtom {
     };
 } MatchAtom;
 
+typedef struct WhereClause {
+    const Word *name;
+    const TypeExpr *type_expr;
+} WhereClause;
+
 typedef struct Pattern {
     MatchAtom *matches;
     size_t len;
     const TypeExpr *returns;
 
-    // TODO template (relative type) stuff
+    const WhereClause *wheres;
+    size_t wheres_len;
 } Pattern;
 
 void pattern_lang_init(void);
 void pattern_lang_quit(void);
 
-bool MatchAtom_equals(const MatchAtom *, const MatchAtom *);
-
 AstExpr *precompile_pattern(Bump *, const char *str);
 Pattern compile_pattern(Bump *, const Lang *lang, AstExpr *ast);
+
+bool MatchAtom_equals(const MatchAtom *, const MatchAtom *);
 
 void MatchAtom_print(const MatchAtom *, const TypeGraph *rule_types,
                      const TypeGraph *types);

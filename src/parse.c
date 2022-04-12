@@ -91,24 +91,24 @@ static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
                 // split symbols on `{` and `}`
                 hsize_t last_split = 0;
 
-                for (hsize_t i = 0; i < len; ++i) {
-                    if (text[i] == '{' || text[i] == '}') {
-                        if (i > last_split) {
+                for (hsize_t j = 0; j < len; ++j) {
+                    if (text[j] == '{' || text[j] == '}') {
+                        if (j > last_split) {
                             AstExpr *expr = new_atom(ctx->pool,
                                                      rules->ty_lexeme,
                                                      ATOM_LEXEME,
                                                      start + last_split,
-                                                     i - last_split);
+                                                     j - last_split);
 
                             Vec_push(list, expr);
                         }
 
                         AstExpr *expr = new_atom(ctx->pool, rules->ty_lexeme,
-                                                 ATOM_LEXEME, start + i, 1);
+                                                 ATOM_LEXEME, start + j, 1);
 
                         Vec_push(list, expr);
 
-                        last_split = i + 1;
+                        last_split = j + 1;
                     }
                 }
 
@@ -350,6 +350,106 @@ typedef struct MatchSlice {
     Rule rule;
 } MatchSlice;
 
+// collapses matches of slice to left, modifies len to reflect collapse
+static void collapse_left(AstCtx *ctx, AstExpr **slice, size_t *io_len,
+                          const MatchSlice *matches, size_t num_matches) {
+    const RuleTree *rules = &ctx->lang->rules;
+
+    size_t buf_len = *io_len, new_len = 0;
+    size_t shrinkage = 0, consumed = 0;
+
+    for (size_t i = 0; i < num_matches; ++i) {
+        const MatchSlice *match = &matches[i], *prev = &matches[i - 1];
+
+        while (consumed < match->start + match->len)
+            slice[new_len++] = slice[consumed++];
+
+        // guard against match slice conflicts
+        size_t shrunk_start = match->start - shrinkage;
+
+        if (i > 0 && prev->start + prev->len > match->start) {
+            Rule rematch;
+            size_t rematch_len =
+                try_match(ctx, &slice[shrunk_start], match->len, &rematch);
+
+            if (rematch_len != match->len || rematch.id != match->rule.id) {
+                // this rule has been made invalid by last collapse
+                continue;
+            }
+        }
+
+        // collapse
+        slice[shrunk_start] =
+            rule_copy_of_slice(ctx->pool, rules, match->rule,
+                               &slice[shrunk_start], match->len);
+
+        size_t len_diff = match->len - 1;
+
+        shrinkage += len_diff;
+        new_len -= len_diff;
+    }
+
+    // consume to end of slice
+    while (consumed < buf_len)
+        slice[new_len++] = slice[consumed++];
+
+    *io_len = new_len;
+}
+
+// collapses left matches of slice to right, modifies len to reflect collapse
+static void collapse_right(AstCtx *ctx, AstExpr **slice, size_t *io_len,
+                           const MatchSlice *matches, size_t num_matches) {
+    const RuleTree *rules = &ctx->lang->rules;
+
+    size_t buf_len = *io_len;
+    size_t unconsumed = buf_len;
+
+    AstExpr **stack = slice + buf_len;
+    size_t new_len = 0;
+
+    for (size_t i = 0; i < num_matches; ++i) {
+        const MatchSlice *match = &matches[num_matches - i - 1];
+        const MatchSlice *prev = &matches[num_matches - i];
+
+        while (unconsumed > match->start) {
+            *--stack = slice[--unconsumed];
+            ++new_len;
+        }
+
+        // guard against match slice conflicts
+        if (i > 0 && prev->start < match->start + match->len) {
+            Rule rematch;
+            size_t rematch_len =
+                try_match(ctx, stack, match->len, &rematch);
+
+            if (rematch_len != match->len || rematch.id != match->rule.id) {
+                // rule was made invalid by last collapse
+                continue;
+            }
+        }
+
+        // collapse
+        size_t len_diff = match->len - 1;
+
+        stack[len_diff] = rule_copy_of_slice(ctx->pool, rules, match->rule, stack,
+                                             match->len);
+
+        stack += len_diff;
+        new_len -= len_diff;
+    }
+
+    // consume to end of slice
+    while (unconsumed > 0) {
+        *--stack = slice[--unconsumed];
+        ++new_len;
+    }
+
+    // memmove from end of buf to start of buf
+    memmove(slice, stack, new_len * sizeof(*slice));
+
+    *io_len = new_len;
+}
+
 /*
  * the parsing algorithm is dumb simple:
  *
@@ -360,10 +460,8 @@ typedef struct MatchSlice {
  * 3. otherwise, return the slice
  *
  * this algorithm removes all need for messing with precedence, edge cases with
- * rule type checking, etc.
- *
- * in order to avoid as much memory movement as possible, a double-buffered
- * memory situation is used.
+ * rule type checking, etc. though it's probably a lot less efficient than
+ * algorithms which do that
  */
 static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
                              size_t *o_len) {
@@ -372,7 +470,6 @@ static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
 
     // construct buffers for slice matching
     AstExpr **buf = malloc(len * sizeof(*slice));
-    AstExpr **dbuf = malloc(len * sizeof(*slice));
     size_t buf_len = len;
 
     memcpy(buf, slice, len * sizeof(*buf));
@@ -394,8 +491,10 @@ static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
             if (match_len > 0) {
                 Prec rule_prec = Rule_get(rules, matched)->prec;
 
-                if (!num_matches || Prec_cmp(precs, rule_prec, highest) > 0)
+                if (!num_matches || Prec_cmp(precs, rule_prec, highest) > 0) {
+                    highest = rule_prec;
                     num_matches = 0;
+                }
 
                 matches[num_matches++] = (MatchSlice){
                     .start = i,
@@ -409,59 +508,11 @@ static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
         if (!num_matches)
             break;
 
-        // collapse all matches, re-checking any rules which may have collided
-        size_t dbuf_len = 0;
-
-        if (Prec_assoc(precs, highest) == ASSOC_RIGHT) {
-            puts(TC_RED "reached right precedence" TC_RESET);
-            break;
-        } else {
-            size_t consumed = 0;
-
-            for (size_t i = 0; i < num_matches; ++i) {
-                const MatchSlice *match = &matches[i];
-
-                if (match->start < consumed) {
-                    // overlapping match, could be invalidated; must rematch
-                    while (consumed < match->start + match->len)
-                        dbuf[dbuf_len++] = buf[consumed++];
-
-                    AstExpr **re_slice = &dbuf[dbuf_len - match->len];
-                    Rule re_rule;
-                    size_t match_len =
-                        try_match(ctx, re_slice, match->len, &re_rule);
-
-                    if (match_len && re_rule.id == match->rule.id) {
-                        AstExpr *collapsed =
-                            rule_copy_of_slice(ctx->pool, rules, match->rule,
-                                               re_slice, match->len);
-
-                        dbuf_len -= match->len;
-                        dbuf[dbuf_len++] = collapsed;
-                    }
-                } else {
-                    // match without overlap
-                    while (consumed < match->start)
-                        dbuf[dbuf_len++] = buf[consumed++];
-
-                    dbuf[dbuf_len++] =
-                        rule_copy_of_slice(ctx->pool, rules, match->rule,
-                                           &buf[match->start], match->len);
-
-                    consumed += match->len;
-                }
-            }
-
-            while (consumed < buf_len)
-                dbuf[dbuf_len++] = buf[consumed++];
-        }
-
-        // swap buffers
-        AstExpr **swap = buf;
-
-        buf = dbuf;
-        dbuf = swap;
-        buf_len = dbuf_len;
+        // collapse all matches
+        if (Prec_assoc(precs, highest) == ASSOC_RIGHT)
+            collapse_right(ctx, buf, &buf_len, matches, num_matches);
+        else
+            collapse_left(ctx, buf, &buf_len, matches, num_matches);
     }
 
     // copy parsed buffer to bump-allocated slice
@@ -471,7 +522,6 @@ static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
 
     // cleanup and return TODO custom arena allocators
     free(matches);
-    free(dbuf);
     free(buf);
 
     *o_len = buf_len;
