@@ -3,7 +3,7 @@
 
 #include "rules.h"
 #include "../fun_types.h"
-#include "../types.h"
+#include "../sema/types.h"
 
 typedef struct File File;
 typedef struct Lang Lang;

@@ -2,7 +2,7 @@
 #define FUNGUS_H
 
 #include "../lang.h"
-#include "../types.h"
+#include "../sema/types.h"
 
 // table of enum, name, abstractness, ... (is)
 #define BASE_TYPES\

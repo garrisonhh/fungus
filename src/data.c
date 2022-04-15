@@ -1,6 +1,4 @@
 #include <assert.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <stdalign.h>
 
 #include "data.h"

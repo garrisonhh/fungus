@@ -11,8 +11,10 @@
 // TODO could unify allocators into one Bump?
 typedef struct Lang {
     Word name;
+
     RuleTree rules;
     PrecGraph precs;
+
     HashSet words, syms;
 } Lang;
 

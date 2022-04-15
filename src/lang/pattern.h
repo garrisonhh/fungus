@@ -2,7 +2,7 @@
 #define PATTERN_H
 
 #include "../data.h"
-#include "../types.h"
+#include "../sema/types.h"
 
 typedef struct AstExpr AstExpr;
 typedef struct Lang Lang;
@@ -27,6 +27,7 @@ typedef struct MatchAtom {
     union {
         // expr
         struct {
+            // TODO these should not really be nullable
             const TypeExpr *rule_expr; // RuleTree Type typeexpr (maybe NULL)
             const TypeExpr *type_expr; // Type typeexpr (maybe NULL)
 
@@ -47,6 +48,8 @@ typedef struct WhereClause {
 } WhereClause;
 
 typedef struct Pattern {
+    // TODO should probably store names for bindings?
+
     MatchAtom *matches;
     size_t len;
     const TypeExpr *returns;

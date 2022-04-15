@@ -3,10 +3,12 @@
 
 #include <stdint.h>
 
-#include "data.h"
+#include "../data.h"
 
 /*
  * TypeGraph is how fungus stores types within scopes.
+ *
+ * TODO deprecate in favor of NameTable
  */
 
 typedef struct TypeHandle { uint32_t id; } Type;
@@ -32,7 +34,7 @@ typedef struct TypeExpr {
             size_t len;
         };
 
-        // TODO hashing TypeExprs + TypeSet for sum types
+        // TODO hashing TypeExprs? and TypeSet for sum types
     };
 } TypeExpr;
 

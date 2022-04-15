@@ -2,7 +2,14 @@
 #define SEMA_H
 
 #include "parse.h"
+#include "sema/names.h"
 
-Expr *sema(Bump *, const Lang *, Expr *);
+typedef struct SemaCtx {
+    Bump *pool;
+    const Lang *lang;
+    const NameTable *names;
+} SemaCtx;
+
+void sema(SemaCtx *, AstExpr *ast);
 
 #endif
