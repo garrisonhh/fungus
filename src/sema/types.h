@@ -83,8 +83,8 @@ bool Type_is_in(const TypeGraph *, Type ty);
 TypeEntry *Type_get(const TypeGraph *, Type ty);
 const Word *Type_name(const TypeGraph *, Type ty);
 
-TypeExpr *TypeExpr_deepcopy(Bump *pool, TypeExpr *expr);
-bool TypeExpr_deepequals(TypeExpr *expr, TypeExpr *other);
+TypeExpr *TypeExpr_deepcopy(Bump *pool, const TypeExpr *expr);
+bool TypeExpr_deepequals(const TypeExpr *expr, const TypeExpr *other);
 
 bool Type_is(const TypeGraph *, Type ty, Type of);
 bool TypeExpr_is(const TypeGraph *, const TypeExpr *expr, Type of);

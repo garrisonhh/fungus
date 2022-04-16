@@ -1,17 +1,14 @@
-#ifndef NAME_TABLE_H
-#define NAME_TABLE_H
+#ifndef NAMES_H
+#define NAMES_H
 
 #include "../data.h"
 #include "types.h"
 
 /*
- * a symbol table suitable for typing the AST + mapping variable references
- * within scopes
+ * this is a symbol table implementation for use in typing + typechecking the
+ * AST in sema.
  *
- * names exist ephemerally (when a scope is left, they are removed from the
- * table)
- *
- * TODO SOA-able eventually
+ * there are two ways sym
  */
 
 #define NAMED_TYPES\
@@ -19,24 +16,50 @@
     \
     X(VARIABLE)\
     X(TYPE)\
-    X(LANG)\
-    X(PREC)\
+    // TODO X(PREC)\
+    // TODO X(LANG)
 
 #define X(NAME) NAMED_##NAME,
 typedef enum NamedType { NAMED_TYPES NAMED_COUNT } NamedType;
 #undef X
 
 typedef struct NameEntry {
+    const Word *name;
+
     NamedType type;
-    Word name;
+    union {
+        // vars | types
+        const TypeExpr *type_expr;
+    };
 } NameEntry;
 
-typedef struct NameTable {
+/*
+ * trivially optimizable into a hashmap eventually
+ *
+ * scopes[0] isn't really used; at level 0 entries go into a global symbol table
+ */
+typedef struct Names {
+    Bump pool;
+
     NameEntry *entries;
     size_t len, cap;
-} NameTable;
 
-NameTable NameTable_new(void);
-void NameTable_del(NameTable *);
+    size_t *scopes;
+    size_t level, scope_cap;
+} Names;
+
+void names_init(void);
+void names_quit(void);
+
+Names Names_new(void);
+void Names_del(Names *);
+
+void Names_push_scope(Names *);
+void Names_drop_scope(Names *);
+
+void Names_define_type(Names *, const Word *name, const TypeExpr *type_expr);
+void Names_define_var(Names *, const Word *name, const TypeExpr *type_expr);
+
+const NameEntry *name_lookup(const Names *, const Word *name);
 
 #endif

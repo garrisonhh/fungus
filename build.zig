@@ -16,7 +16,6 @@ pub fn build(b: *std.build.Builder) anyerror!void {
     exe.setOutputDir(b.pathFromRoot("."));
     exe.linkLibC();
 
-    // walk all C sources and add to exe
     {
         var c_flags = std.ArrayList([]const u8).init(allocator);
         defer c_flags.deinit();

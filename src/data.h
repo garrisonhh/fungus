@@ -4,7 +4,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h>
-#include <utils.h>
+
+#include "utils.h"
 
 // dyn array ===================================================================
 

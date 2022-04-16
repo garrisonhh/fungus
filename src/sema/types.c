@@ -72,7 +72,7 @@ static bool validate_def(TypeGraph *tg, TypeDef *def) {
     return abstracts_are_abstract;
 }
 
-TypeExpr *TypeExpr_deepcopy(Bump *pool, TypeExpr *expr) {
+TypeExpr *TypeExpr_deepcopy(Bump *pool, const TypeExpr *expr) {
     TypeExpr *copy = Bump_alloc(pool, sizeof(*copy));
 
     copy->type = expr->type;
@@ -158,7 +158,7 @@ const Word *Type_name(const TypeGraph *tg, Type ty) {
     return Type_get(tg, ty)->name;
 }
 
-bool TypeExpr_deepequals(TypeExpr *expr, TypeExpr *other) {
+bool TypeExpr_deepequals(const TypeExpr *expr, const TypeExpr *other) {
     if (expr->type != other->type)
         return false;
 
