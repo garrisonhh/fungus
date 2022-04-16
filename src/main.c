@@ -1,11 +1,12 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "file.h"
+// lexing
 #include "lex.h"
+// parsing
 #include "parse.h"
-#include "lang/fungus.h"
-#include "lang/pattern.h"
+// sema
+#include "sema.h"
 
 #if 0
 void repl(void) {
@@ -55,15 +56,17 @@ int main(int argc, char **argv) {
 #if 1
     Bump pool = Bump_new();
 
+    names_init();
     pattern_lang_init();
 
     precompile_pattern(&pool,
         "a: Literal | Rule ! T `+ b: Literal | Rule ! T -> T\n"
-        "where T is Number\n");
+        "    where T is Number\n");
     precompile_pattern(&pool,
         "`++ expr: Ident ! T -> T where T is Number\n");
 
     pattern_lang_quit();
+    names_quit();
 
     Bump_del(&pool);
 #else

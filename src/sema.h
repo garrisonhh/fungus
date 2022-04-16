@@ -7,7 +7,7 @@
 typedef struct SemaCtx {
     Bump *pool;
     const Lang *lang;
-    const NameTable *names;
+    const Names *names;
 } SemaCtx;
 
 void sema(SemaCtx *, AstExpr *ast);

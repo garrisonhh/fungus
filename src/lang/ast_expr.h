@@ -2,7 +2,7 @@
 #define AST_EXPR_H
 
 #include "rules.h"
-#include "../fun_types.h"
+#include "../fungus.h"
 #include "../sema/types.h"
 
 typedef struct File File;

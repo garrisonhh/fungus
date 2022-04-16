@@ -1,8 +1,17 @@
 #ifndef FUNGUS_H
 #define FUNGUS_H
 
-#include "../lang.h"
-#include "../sema/types.h"
+#include "lang.h"
+#include "sema/types.h"
+
+#include <stddef.h>
+#include <stdint.h>
+
+typedef uint32_t hsize_t;
+
+typedef _Bool           fun_bool;
+typedef long long int   fun_int;
+typedef long double     fun_float;
 
 // table of enum, name, abstractness, ... (is)
 #define BASE_TYPES\

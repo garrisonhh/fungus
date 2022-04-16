@@ -1,7 +1,7 @@
 #ifndef FILE_H
 #define FILE_H
 
-#include "fun_types.h"
+#include "fungus.h"
 #include "utils.h"
 #include "data.h"
 
