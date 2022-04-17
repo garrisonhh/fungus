@@ -56,8 +56,13 @@ int main(int argc, char **argv) {
 #if 1
     Bump pool = Bump_new();
 
+    types_init();
     names_init();
-    pattern_lang_init();
+
+    Names name_table = Names_new();
+
+    fungus_define_base(&name_table);
+    pattern_lang_init(&name_table);
 
     precompile_pattern(&pool,
         "a: Literal | Rule ! T `+ b: Literal | Rule ! T -> T\n"
@@ -66,7 +71,11 @@ int main(int argc, char **argv) {
         "`++ expr: Ident ! T -> T where T is Number\n");
 
     pattern_lang_quit();
+
+    Names_del(&name_table);
+
     names_quit();
+    types_quit();
 
     Bump_del(&pool);
 #else

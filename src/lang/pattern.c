@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include "pattern.h"
+#include "../fungus.h"
 #include "../lang.h"
 #include "../lex.h"
 #include "../parse.h"
@@ -40,7 +41,7 @@ static MatchAtom new_match_lxm(Bump *pool, const char *lxm) {
     };
 }
 
-void pattern_lang_init(void) {
+void pattern_lang_init(Names *names) {
     Lang lang = Lang_new(WORD("PatternLang"));
 
     // precedences
@@ -75,7 +76,6 @@ void pattern_lang_init(void) {
     // rules (pattern lang does not use sema for type checking, you can ignore)
     {
         RuleTree *rules = &lang.rules;
-        TypeGraph *rtg = &rules->types;
         Bump *p = &rules->pool;
 
 #define GET_PREC(VAR, NAME)\
@@ -92,7 +92,7 @@ void pattern_lang_init(void) {
 
 #undef GET_PREC
 
-#define IMM_TYPE(VAR, NAME) Type VAR = Rule_immediate_type(rules, WORD(NAME))
+#define IMM_TYPE(VAR, NAME) Type VAR = Rule_immediate_type(names, WORD(NAME))
 
         IMM_TYPE(ty_match_expr, "MatchExpr");
         IMM_TYPE(ty_or, "TypeOr");
@@ -107,7 +107,7 @@ void pattern_lang_init(void) {
         const TypeExpr *any_rule_type =
             TypeExpr_sum(p, 2,
                          TypeExpr_atom(p, ty_or),
-                         TypeExpr_atom(p, rules->ty_ident));
+                         TypeExpr_atom(p, fun_ident));
 
         MatchAtom *matches;
         size_t len;
@@ -116,7 +116,7 @@ void pattern_lang_init(void) {
         len = 3;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] =
-            new_match_expr(p, TypeExpr_atom(p, rules->ty_ident), NULL, 0);
+            new_match_expr(p, TypeExpr_atom(p, fun_ident), NULL, 0);
         matches[1] = new_match_lxm(p, ":");
         matches[2] = new_match_expr(p, TypeExpr_atom(p, ty_bang), NULL, 0);
 
@@ -138,7 +138,7 @@ void pattern_lang_init(void) {
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_expr(p, any_rule_type, NULL, 0);
         matches[1] = new_match_lxm(p, "!");
-        matches[2] = new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL, 0);
+        matches[2] = new_match_expr(p, TypeExpr_atom(p, fun_any), NULL, 0);
 
         Lang_immediate_legislate(&lang, ty_bang, bang_prec,
                                  (Pattern){ .matches = matches, .len = len });
@@ -147,7 +147,7 @@ void pattern_lang_init(void) {
         len = 2;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_lxm(p, "->");
-        matches[1] = new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL, 0);
+        matches[1] = new_match_expr(p, TypeExpr_atom(p, fun_any), NULL, 0);
 
         Lang_immediate_legislate(&lang, ty_returns, default_prec,
                                  (Pattern){ .matches = matches, .len = len });
@@ -156,9 +156,9 @@ void pattern_lang_init(void) {
         len = 3;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] =
-            new_match_expr(p, TypeExpr_atom(p, rules->ty_ident), NULL, 0);
+            new_match_expr(p, TypeExpr_atom(p, fun_ident), NULL, 0);
         matches[1] = new_match_lxm(p, "is");
-        matches[2] = new_match_expr(p, TypeExpr_atom(p, rtg->ty_any), NULL, 0);
+        matches[2] = new_match_expr(p, TypeExpr_atom(p, fun_any), NULL, 0);
 
         Lang_immediate_legislate(&lang, ty_where_clause, default_prec,
                                  (Pattern){ .matches = matches, .len = len });
@@ -183,7 +183,7 @@ void pattern_lang_init(void) {
         const TypeExpr *expr_or_lxm =
             TypeExpr_sum(p, 2,
                          TypeExpr_atom(p, ty_match_expr),
-                         TypeExpr_atom(p, rules->ty_literal));
+                         TypeExpr_atom(p, fun_literal));
 
         matches[0] = new_match_expr(p, expr_or_lxm, NULL, REPEATING);
         matches[1] = new_match_expr(p, TypeExpr_atom(p, ty_returns), NULL, 0);
@@ -256,8 +256,7 @@ Pattern compile_pattern(Bump *pool, const Lang *lang, AstExpr *ast) {
     UNIMPLEMENTED;
 }
 
-void MatchAtom_print(const MatchAtom *atom, const TypeGraph *rule_types,
-                     const TypeGraph *types) {
+void MatchAtom_print(const MatchAtom *atom) {
     switch (atom->type) {
     case MATCH_EXPR:
         if (atom->optional)
@@ -266,14 +265,14 @@ void MatchAtom_print(const MatchAtom *atom, const TypeGraph *rule_types,
             printf("repeating ");
 
         if (atom->rule_expr)
-            TypeExpr_print(rule_types, atom->rule_expr);
+            TypeExpr_print(atom->rule_expr);
         else
             printf(TC_BLUE "_" TC_RESET);
 
         printf(" ! ");
 
         if (atom->type_expr)
-            TypeExpr_print(types, atom->type_expr);
+            TypeExpr_print(atom->type_expr);
         else
             printf(TC_BLUE "_" TC_RESET);
 
@@ -290,10 +289,9 @@ void MatchAtom_print(const MatchAtom *atom, const TypeGraph *rule_types,
     }
 }
 
-void Pattern_print(const Pattern *pat, const TypeGraph *rule_types,
-                   const TypeGraph *types) {
+void Pattern_print(const Pattern *pat) {
     for (size_t i = 0; i < pat->len; ++i) {
         if (i) printf(TC_DIM " -> " TC_RESET);
-        MatchAtom_print(&pat->matches[i], rule_types, types);
+        MatchAtom_print(&pat->matches[i]);
     }
 }

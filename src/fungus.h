@@ -3,39 +3,37 @@
 
 #include "lang.h"
 #include "sema/types.h"
+#include "sema/names.h"
 
 #include <stddef.h>
 #include <stdint.h>
 
 typedef uint32_t hsize_t;
 
-typedef _Bool           fun_bool;
-typedef long long int   fun_int;
-typedef long double     fun_float;
-
-// table of enum, name, abstractness, ... (is)
+// TODO actually impl abstract types like Any
 #define BASE_TYPES\
-    TYPE(NONE,      "NONE",      1, 0, {0})\
-    \
-    TYPE(PRIMITIVE, "Primitive", 1, 0, {0})\
-    TYPE(NUMBER,    "Number",    1, 1, {{TY_PRIMITIVE}})\
-    \
-    TYPE(BOOL,      "bool",      0, 1, {{TY_PRIMITIVE}})\
-    TYPE(STRING,    "string",    0, 1, {{TY_PRIMITIVE}})\
-    TYPE(INT,       "int",       0, 1, {{TY_NUMBER}})\
-    TYPE(FLOAT,     "float",     0, 1, {{TY_NUMBER}})\
+    X(any,     "Any")\
+    /* primitives */\
+    X(bool,    "bool")\
+    X(string,  "string")\
+    X(int,     "int")\
+    X(float,   "float")\
+    /* rules */\
+    X(scope,   "Scope")\
+    X(lexeme,  "Lexeme")\
+    X(literal, "Literal")\
+    X(ident,   "Ident")\
 
-#define TYPE(A, ...) TY_##A,
-typedef enum BaseType { BASE_TYPES TY_COUNT } BaseType;
-#undef TYPE
+// define fun_X global vars that are defined in fungus_define_base
+#define X(NAME, STR) extern Type fun_##NAME;
+BASE_TYPES
+#undef X
 
 extern Lang fungus_lang;
-extern TypeGraph fungus_types;
+
+void fungus_define_base(Names *);
 
 void fungus_lang_init(void);
 void fungus_lang_quit(void);
-
-void fungus_types_init(void);
-void fungus_types_quit(void);
 
 #endif

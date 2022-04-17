@@ -3,7 +3,22 @@
 #include "fungus.h"
 
 Lang fungus_lang;
-TypeGraph fungus_types;
+
+#define X(NAME, STR) Type fun_##NAME;
+BASE_TYPES
+#undef X
+
+void fungus_define_base(Names *names) {
+#define X(NAME, STR) WORD(STR),
+    Word base_names[] = { BASE_TYPES };
+#undef X
+#define X(NAME, STR) &fun_##NAME,
+    Type *base_vars[] = { BASE_TYPES };
+#undef X
+
+    for (size_t i = 0; i < ARRAY_SIZE(base_vars); ++i)
+        *base_vars[i] = Type_define(names, base_names[i]);
+}
 
 #define PRECS\
     PREC("Lowest",     LEFT)\
@@ -14,13 +29,13 @@ TypeGraph fungus_types;
 
 // table of name, prec, pattern
 #define RULES\
-    RULE("Parens",    "Highest",    "`( expr: Any!T `) -> T")\
+    RULE("Parens",   "Highest", "`( expr: Any!T `) -> T")\
     \
-    RULE("Add",       "AddSub",     "a: Any!T `+ b: Any!T -> T")\
-    RULE("Subtract",  "AddSub",     "a: Any!T `- b: Any!T -> T")\
-    RULE("Multiply",  "MulDiv",     "a: Any!T `* b: Any!T -> T")\
-    RULE("Divide",    "MulDiv",     "a: Any!T `/ b: Any!T -> T")\
-    RULE("Modulo",    "MulDiv",     "a: Any!T `% b: Any!T -> T")\
+    RULE("Add",      "AddSub",  "a: Any!T `+ b: Any!T -> T")\
+    RULE("Subtract", "AddSub",  "a: Any!T `- b: Any!T -> T")\
+    RULE("Multiply", "MulDiv",  "a: Any!T `* b: Any!T -> T")\
+    RULE("Divide",   "MulDiv",  "a: Any!T `/ b: Any!T -> T")\
+    RULE("Modulo",   "MulDiv",  "a: Any!T `% b: Any!T -> T")\
     \
     // RULE("Assign",    "Assignment", "name: Ident `= rvalue: T -> T")\
     // RULE("ConstDecl", "Assignment", "`const assign: Assign")\
@@ -72,37 +87,4 @@ void fungus_lang_init(void) {
 
 void fungus_lang_quit(void) {
     Lang_del(&fungus_lang);
-}
-
-void fungus_types_init(void) {
-    TypeGraph types = TypeGraph_new();
-
-#ifdef DEBUG
-#define TYPE(A, ...) TY_##A,
-    BaseType base_types[] = { BASE_TYPES };
-#undef TYPE
-#endif
-
-#define TYPE(ENUM, NAME, ABSTRACT, IS_LEN, IS) {\
-    .name = WORD(NAME),\
-    .type = ABSTRACT ? TTY_ABSTRACT : TTY_CONCRETE,\
-    .is = (Type[])IS,\
-    .is_len = IS_LEN\
-},
-    TypeDef base_defs[] = { BASE_TYPES };
-#undef TYPE
-
-    for (size_t i = 0; i < TY_COUNT; ++i) {
-        Type ty = Type_define(&types, &base_defs[i]);
-
-#ifdef DEBUG
-        assert(ty.id == base_types[i]);
-#endif
-    }
-
-    fungus_types = types;
-}
-
-void fungus_types_quit(void) {
-    TypeGraph_del(&fungus_types);
 }

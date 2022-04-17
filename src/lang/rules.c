@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include "rules.h"
+#include "../fungus.h"
 
 static void *RT_alloc(RuleTree *rt, size_t n_bytes) {
     return Bump_alloc(&rt->pool, n_bytes);
@@ -32,7 +33,6 @@ RuleTree RuleTree_new(void) {
         .pool = Bump_new(),
         .entries = Vec_new(),
         .by_name = IdMap_new(),
-        .types = TypeGraph_new(),
     };
 
     rt.roots = Vec_new();
@@ -42,19 +42,11 @@ RuleTree RuleTree_new(void) {
     Word name = WORD("Scope");
 
     *scope_entry = (RuleEntry){
-        .name = Word_copy_of(&name, &rt.pool)
+        .name = Word_copy_of(&name, &rt.pool),
+        .type = fun_scope
     };
 
     rt.rule_scope = register_entry(&rt, scope_entry);
-    rt.ty_scope = scope_entry->type;
-
-    // special types
-    TypeGraph *types = &rt.types;
-
-    rt.ty_any = types->ty_any;
-    rt.ty_literal = Type_define(types, &(TypeDef){ .name = WORD("Literal") });
-    rt.ty_lexeme = Type_define(types, &(TypeDef){ .name = WORD("Lexeme") });
-    rt.ty_ident = Type_define(types, &(TypeDef){ .name = WORD("Ident") });
 
     return rt;
 }
@@ -74,7 +66,6 @@ void RuleTree_del(RuleTree *rt) {
     for (size_t i = 0; i < rt->roots.len; ++i)
         RuleNode_del(rt->roots.data[i]);
 
-    TypeGraph_del(&rt->types);
     IdMap_del(&rt->by_name);
     Vec_del(&rt->entries);
     Bump_del(&rt->pool);
@@ -142,17 +133,16 @@ static void place_rule(RuleTree *rt, const Pattern *pat, Rule rule) {
     place_rule_r(rt, NULL, &rt->roots, pat, 0, rule);
 }
 
-Type Rule_immediate_type(RuleTree *rt, Word name) {
-    return Type_define(&rt->types, &(TypeDef){ .name = name });
+Type Rule_immediate_type(Names *names, Word name) {
+    // TODO add to a Rule abstract type?
+    return Type_define(names, name);
 }
 
 Rule Rule_immediate_define(RuleTree *rt, Type type, Prec prec, Pattern pat) {
-    assert(Type_is_in(&rt->types, type));
-
     RuleEntry *entry = RT_alloc(rt, sizeof(*entry));
 
     *entry = (RuleEntry){
-        .name = Word_copy_of(Type_get(&rt->types, type)->name, &rt->pool),
+        .name = Word_copy_of(Type_name(type), &rt->pool),
         .pat = pat,
         .prec = prec,
         .type = type
@@ -209,7 +199,7 @@ static void dump_children(const RuleTree *rt, const Vec *children,
             continue;
 
         printf("%*s", level * INDENT, "");
-        MatchAtom_print(child->pred, &rt->types, NULL);
+        MatchAtom_print(child->pred);
 
         // rule (if exists)
         if (child->has_rule) {

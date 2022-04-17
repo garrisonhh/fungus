@@ -46,19 +46,9 @@ typedef struct RuleTree {
     IdMap by_name;
     Vec roots; // Vec<RuleNode *>
 
-    /*
-     * this is the internal type system for Rules, used for Pattern matching
-     * RuleTree's TypeGraph also includes some special types that aren't
-     * associated with a rule, zB literals, lexemes, and idents. this is to
-     * allow AstExprs + Pattern TypeExprs to have a universal type system
-     *
-     * TODO should probably move this to Lang
-     */
-    TypeGraph types;
-
     // 'constants'; available for every Lang
     Rule rule_scope;
-    Type ty_scope, ty_any, ty_literal, ty_lexeme, ty_ident;
+    // Type ty_scope, ty_any, ty_literal, ty_lexeme, ty_ident;
 
 #ifdef DEBUG
     unsigned crystallized: 1;
@@ -70,7 +60,7 @@ void RuleTree_del(RuleTree *);
 
 // these are used by PatternLang exclusively in order to skip pattern compiling
 // (it can't compile itself, lol)
-Type Rule_immediate_type(RuleTree *, Word name);
+Type Rule_immediate_type(Names *, Word name);
 Rule Rule_immediate_define(RuleTree *, Type type, Prec prec, Pattern pattern);
 
 // first phase: queue rule definitions

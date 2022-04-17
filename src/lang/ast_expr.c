@@ -77,11 +77,11 @@ void AstExpr_dump(const AstExpr *expr, const Lang *lang, const File *file) {
             scopes[size] = expr;
             indices[size] = 0;
             ++size;
-        } else if (expr->type.id == lang->rules.ty_lexeme.id
+        } else if (expr->type.id == fun_lexeme.id
                 && expr->atom_type == ATOM_LEXEME) {
             // lexeme
             printf("%.*s", (int)expr->tok_len, &text[expr->tok_start]);
-        } else if (expr->type.id == lang->rules.ty_literal.id
+        } else if (expr->type.id == fun_literal.id
                 && expr->atom_type == ATOM_LEXEME) {
             // lexeme literal
             printf("`" TC_GREEN "%.*s" TC_RESET,

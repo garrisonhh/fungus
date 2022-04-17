@@ -58,7 +58,7 @@ typedef struct Pattern {
     size_t wheres_len;
 } Pattern;
 
-void pattern_lang_init(void);
+void pattern_lang_init(Names *);
 void pattern_lang_quit(void);
 
 AstExpr *precompile_pattern(Bump *, const char *str);
@@ -66,9 +66,7 @@ Pattern compile_pattern(Bump *, const Lang *lang, AstExpr *ast);
 
 bool MatchAtom_equals(const MatchAtom *, const MatchAtom *);
 
-void MatchAtom_print(const MatchAtom *, const TypeGraph *rule_types,
-                     const TypeGraph *types);
-void Pattern_print(const Pattern *, const TypeGraph *rule_types,
-                   const TypeGraph *types);
+void MatchAtom_print(const MatchAtom *);
+void Pattern_print(const Pattern *);
 
 #endif

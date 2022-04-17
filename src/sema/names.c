@@ -21,6 +21,8 @@ void names_quit(void) {
 
 Names Names_new(void) {
     return (Names){
+        .pool = Bump_new(),
+
         .cap = TABLE_MIN_CAP,
         .entries = malloc(TABLE_MIN_CAP * sizeof(NameEntry)),
 
@@ -32,6 +34,7 @@ Names Names_new(void) {
 void Names_del(Names *names) {
     free(names->entries);
     free(names->scopes);
+    Bump_del(&names->pool);
 }
 
 void Names_push_scope(Names *names) {
@@ -69,7 +72,7 @@ static void copy_entry_to(Bump *pool, NameEntry *dst, const NameEntry *entry) {
 
 // copies an entry into either global or local space
 static void put_entry(Names *names, const NameEntry *entry) {
-    if (!names->level) {
+    if (!names || !names->level) {
         // put globally
         NameEntry *copy = Bump_alloc(&globals_pool, sizeof(*copy));
         copy_entry_to(&globals_pool, copy, entry);
