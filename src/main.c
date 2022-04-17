@@ -64,6 +64,8 @@ int main(int argc, char **argv) {
     fungus_define_base(&name_table);
     pattern_lang_init(&name_table);
 
+    types_dump();
+
     precompile_pattern(&pool,
         "a: Literal | Rule ! T `+ b: Literal | Rule ! T -> T\n"
         "    where T is Number\n");

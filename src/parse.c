@@ -15,18 +15,13 @@
 
 // stage 1: scope tree =========================================================
 
-#define X(A) #A,
-const char *ATOM_NAME[ATOM_COUNT] = { ATOM_TYPES };
-#undef X
-
-static AstExpr *new_atom(Bump *pool, Type type, AstAtomType atom_type,
+static AstExpr *new_atom(Bump *pool, Type type, Type evaltype,
                          hsize_t start, hsize_t len) {
     AstExpr *expr = Bump_alloc(pool, sizeof(*expr));
 
     *expr = (AstExpr){
         .type = type,
-        .is_atom = true,
-        .atom_type = atom_type,
+        .evaltype = evaltype,
         .tok_start = start,
         .tok_len = len
     };
@@ -40,6 +35,7 @@ static AstExpr *new_rule(Bump *pool, const RuleTree *rt, Rule rule,
 
     *expr = (AstExpr){
         .type = Rule_typeof(rt, rule),
+        .evaltype = fun_unknown,
         .rule = rule,
         .exprs = exprs,
         .len = len
@@ -49,7 +45,7 @@ static AstExpr *new_rule(Bump *pool, const RuleTree *rt, Rule rule,
 }
 
 static AstExpr *rule_copy_of_slice(Bump *pool, const RuleTree *rt, Rule rule,
-                                 AstExpr **slice, size_t len) {
+                                   AstExpr **slice, size_t len) {
     AstExpr **exprs = Bump_alloc(pool, len * sizeof(*exprs));
 
     for (size_t j = 0; j < len; ++j)
@@ -61,11 +57,11 @@ static AstExpr *rule_copy_of_slice(Bump *pool, const RuleTree *rt, Rule rule,
 // turns tokens -> list of exprs, separating `{` and `}` as symbols but not
 // creating the tree yet
 static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
-    AstAtomType atomtype_of_lit[TOK_COUNT] = {
-        [TOK_BOOL] = ATOM_BOOL,
-        [TOK_INT] = ATOM_INT,
-        [TOK_FLOAT] = ATOM_FLOAT,
-        [TOK_STRING] = ATOM_STRING,
+    Type evaltype_of_lit[TOK_COUNT] = {
+        [TOK_BOOL] = fun_bool,
+        [TOK_INT] = fun_int,
+        [TOK_FLOAT] = fun_float,
+        [TOK_STRING] = fun_string,
     };
 
     for (size_t i = 0; i < tb->len; ++i) {
@@ -83,7 +79,7 @@ static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
                     File_error_at(tb->file, start, len, "bare lexeme escape.");
 
                 AstExpr *expr =
-                    new_atom(ctx->pool, fun_literal, ATOM_LEXEME, start, len);
+                    new_atom(ctx->pool, fun_literal, fun_lexeme, start, len);
 
                 Vec_push(list, expr);
             } else {
@@ -94,7 +90,7 @@ static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
                     if (text[j] == '{' || text[j] == '}') {
                         if (j > last_split) {
                             AstExpr *expr = new_atom(ctx->pool, fun_lexeme,
-                                                     ATOM_LEXEME,
+                                                     fun_lexeme,
                                                      start + last_split,
                                                      j - last_split);
 
@@ -102,7 +98,7 @@ static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
                         }
 
                         AstExpr *expr = new_atom(ctx->pool, fun_lexeme,
-                                                 ATOM_LEXEME, start + j, 1);
+                                                 fun_lexeme, start + j, 1);
 
                         Vec_push(list, expr);
 
@@ -111,7 +107,7 @@ static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
                 }
 
                 if (last_split < len) {
-                    AstExpr *expr = new_atom(ctx->pool, fun_lexeme, ATOM_LEXEME,
+                    AstExpr *expr = new_atom(ctx->pool, fun_lexeme, fun_lexeme,
                                              start + last_split,
                                              len - last_split);
 
@@ -120,13 +116,13 @@ static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
             }
         } else if (toktype == TOK_WORD) {
             AstExpr *expr =
-                new_atom(ctx->pool, fun_lexeme, ATOM_LEXEME, start, len);
+                new_atom(ctx->pool, fun_lexeme, fun_lexeme, start, len);
 
             Vec_push(list, expr);
         } else {
             // direct token -> expr translation
             AstExpr *expr = new_atom(ctx->pool, fun_literal,
-                                     atomtype_of_lit[toktype], start, len);
+                                     evaltype_of_lit[toktype], start, len);
 
             Vec_push(list, expr);
         }
@@ -170,8 +166,7 @@ static AstExpr *unflatten_list(AstCtx *ctx, const Vec *list) {
     for (size_t i = 0; i < list->len; ++i) {
         AstExpr *expr = list->data[i];
 
-        if (expr->type.id == fun_lexeme.id
-         && expr->atom_type == ATOM_LEXEME) {
+        if (expr->type.id == fun_lexeme.id) {
             if (text[expr->tok_start] == '{') {
                 // create new scope vec
                 levels[level++] = Vec_new();
@@ -239,7 +234,7 @@ static bool translate_scope(AstCtx *ctx, AstExpr *scope) {
                 while (tok.len > 0
                     && (match_len = HashSet_longest(&lang->syms, &tok))) {
                     AstExpr *sym = new_atom(ctx->pool, fun_lexeme,
-                                            ATOM_LEXEME, sym_start, match_len);
+                                            fun_lexeme, sym_start, match_len);
 
                     Vec_push(&list, sym);
 
@@ -258,7 +253,7 @@ static bool translate_scope(AstCtx *ctx, AstExpr *scope) {
 
                 if (!HashSet_has(&lang->words, &word)) {
                     expr->type = fun_ident;
-                    expr->atom_type = ATOM_IDENT;
+                    expr->evaltype = fun_unknown;
                 }
 
                 Vec_push(&list, expr);
@@ -556,7 +551,7 @@ AstExpr *parse_scope(AstCtx *ctx, AstExpr *expr) {
 static size_t ast_used_memory(AstExpr *expr) {
     size_t used = sizeof(*expr);
 
-    if (!expr->is_atom) {
+    if (!AstExpr_is_atom(expr)) {
         used += expr->len * sizeof(*expr->exprs);
 
         for (size_t i = 0; i < expr->len; ++i)

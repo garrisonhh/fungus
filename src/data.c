@@ -399,7 +399,7 @@ void IdSet_put(IdSet *set, unsigned id) {
         IdSet_put(set->supersets.data[i], id);
 }
 
-bool IdSet_has(IdSet *set, unsigned id) {
+bool IdSet_has(const IdSet *set, unsigned id) {
     size_t idx = fnv_hash((const char *)&id, sizeof(id)) % set->cap;
 
     while (set->filled[idx]) {

@@ -43,8 +43,9 @@ typedef struct TypeExpr {
 void types_init(void);
 void types_quit(void);
 
-Type Type_define(Names *, Word name, Type *supers, size_t num_supers);
+void types_dump(void);
 
+Type Type_define(Names *, Word name, Type *supers, size_t num_supers);
 const Word *Type_name(Type);
 
 TypeExpr *TypeExpr_deepcopy(Bump *pool, const TypeExpr *expr);

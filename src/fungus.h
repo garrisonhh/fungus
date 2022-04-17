@@ -12,14 +12,18 @@ typedef uint32_t hsize_t;
 
 // table of (name, fun name, num supers, super list)
 #define BASE_TYPES\
-    X(any,       "Any",       0, {0}) /* any runtime value */\
-    X(any_expr,  "AnyExpr",   0, {0}) /* any AST expr */\
+    /* special */\
+    X(unknown,   "Unknown",   0, {0}) /* placeholder for parsing */\
+    X(any,       "Any",       0, {0}) /* truly any valid type */\
+    X(any_val,   "AnyValue",  1, { fun_any }) /* any runtime value */\
+    X(any_expr,  "AnyExpr",   1, { fun_any }) /* any AST expr */\
     /* primitives */\
-    X(primitive, "Primitive", 1, { fun_any })\
+    X(primitive, "Primitive", 1, { fun_any_val })\
     X(bool,      "bool",      1, { fun_primitive })\
     X(string,    "string",    1, { fun_primitive })\
-    X(int,       "int",       1, { fun_primitive })\
-    X(float,     "float",     1, { fun_primitive })\
+    X(number,    "Number",    1, { fun_primitive })\
+    X(int,       "int",       1, { fun_number })\
+    X(float,     "float",     1, { fun_number })\
     /* rules */\
     X(rule,      "Rule",      1, { fun_any_expr })\
     X(scope,     "Scope",     1, { fun_rule })\

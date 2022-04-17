@@ -8,7 +8,7 @@ typedef struct TypeEntry {
     const Word *name;
 
     // Type ids for the types that this type implements
-    IdSet supers;
+    IdSet impls;
 } TypeEntry;
 
 Bump type_pool;
@@ -21,10 +21,39 @@ void types_init(void) {
 
 void types_quit(void) {
     for (size_t i = 0; i < type_entries.len; ++i)
-        IdSet_del(&((TypeEntry *)type_entries.data[i])->supers);
+        IdSet_del(&((TypeEntry *)type_entries.data[i])->impls);
 
     Vec_del(&type_entries);
     Bump_del(&type_pool);
+}
+
+void types_dump(void) {
+    puts(TC_CYAN "Types:" TC_RESET);
+
+    for (size_t i = 0; i < type_entries.len; ++i) {
+        const TypeEntry *entry = type_entries.data[i];
+
+        printf("%.*s", (int)entry->name->len, entry->name->str);
+
+        if (entry->impls.size > 0) {
+            printf(" ::");
+
+            for (size_t j = 0; j < type_entries.len; ++j) {
+                if (j == i)
+                    continue;
+
+                if (IdSet_has(&entry->impls, j)) {
+                    const Word *name = Type_name((Type){ j });
+
+                    printf(" %.*s", (int)name->len, name->str);
+                }
+            }
+        }
+
+        puts("");
+    }
+
+    puts("");
 }
 
 static TypeEntry *Type_get(Type ty) {
@@ -41,11 +70,13 @@ Type Type_define(Names *names, Word name, Type *supers, size_t num_supers) {
 
     *entry = (TypeEntry){
         .name = Word_copy_of(&name, &type_pool),
-        .supers = IdSet_new()
+        .impls = IdSet_new()
     };
 
-    for (size_t i = 0; i < num_supers; ++i)
-        IdSet_put(&entry->supers, supers[i].id);
+    for (size_t i = 0; i < num_supers; ++i) {
+        IdSet_add_superset(&Type_get(supers[i])->impls, &entry->impls);
+        IdSet_put(&entry->impls, supers[i].id);
+    }
 
     Vec_push(&type_entries, entry);
     Names_define_type(names, &name, TypeExpr_atom(&names->pool, handle));
@@ -104,7 +135,7 @@ bool TypeExpr_deepequals(const TypeExpr *expr, const TypeExpr *other) {
 
 bool Type_is(Type ty, Type of) {
     // either types are equivalent, or `ty` subtypes `of`
-    return ty.id == of.id || IdSet_has(&Type_get(ty)->supers, of.id);
+    return ty.id == of.id || IdSet_has(&Type_get(ty)->impls, of.id);
 }
 
 bool TypeExpr_is(const TypeExpr *expr, Type of) {

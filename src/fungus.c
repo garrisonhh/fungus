@@ -9,30 +9,12 @@ BASE_TYPES
 #undef X
 
 void fungus_define_base(Names *names) {
-    typedef struct BaseTypeDef {
-        Type *output;
-        Word name;
-        size_t num_supers;
-        Type *supers;
-    } BaseTypeDef;
-
 #define X(NAME, STR, NUM_SUPERS, SUPERS) {\
-    .output = &fun_##NAME,\
-    .name = WORD(STR),\
-    .num_supers = NUM_SUPERS,\
-    .supers = (Type[])SUPERS\
-},
-
-    BaseTypeDef base_types[] = { BASE_TYPES };
-
+    Type supers[] = SUPERS;\
+    fun_##NAME = Type_define(names, WORD(STR), supers, NUM_SUPERS);\
+}
+    BASE_TYPES
 #undef X
-
-    for (size_t i = 0; i < ARRAY_SIZE(base_types); ++i) {
-        BaseTypeDef *def = &base_types[i];
-
-        *def->output =
-            Type_define(names, def->name, def->supers, def->num_supers);
-    }
 }
 
 #define PRECS\

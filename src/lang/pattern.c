@@ -87,20 +87,20 @@ void pattern_lang_init(Names *names) {
 
         GET_PREC(pattern_prec, "Pattern");
         GET_PREC(default_prec, "Default");
-        GET_PREC(or_prec, "Or");
-        GET_PREC(bang_prec, "Bang");
+        GET_PREC(or_prec,      "Or");
+        GET_PREC(bang_prec,    "Bang");
 
 #undef GET_PREC
 
 #define IMM_TYPE(VAR, NAME) Type VAR = Rule_immediate_type(names, WORD(NAME))
 
         IMM_TYPE(ty_match_expr, "MatchExpr");
-        IMM_TYPE(ty_or, "TypeOr");
-        IMM_TYPE(ty_bang, "TypeBang");
-        IMM_TYPE(ty_returns, "Returns");
-        IMM_TYPE(ty_pattern, "Pattern");
-        IMM_TYPE(ty_where_clause, "WhereClause");
-        IMM_TYPE(ty_where, "Where");
+        IMM_TYPE(ty_or,         "TypeOr");
+        IMM_TYPE(ty_bang,       "TypeBang");
+        IMM_TYPE(ty_returns,    "Returns");
+        IMM_TYPE(ty_pattern,    "Pattern");
+        IMM_TYPE(ty_wh_clause,  "WhereClause");
+        IMM_TYPE(ty_where,      "Where");
 
 #undef IMM_TYPE
 
@@ -120,8 +120,10 @@ void pattern_lang_init(Names *names) {
         matches[1] = new_match_lxm(p, ":");
         matches[2] = new_match_expr(p, TypeExpr_atom(p, ty_bang), NULL, 0);
 
-        Lang_immediate_legislate(&lang, ty_match_expr, default_prec,
-                                 (Pattern){ .matches = matches, .len = len });
+        Lang_immediate_legislate(&lang, ty_match_expr, default_prec, (Pattern){
+            .matches = matches,
+            .len = len
+        });
 
         // type or
         len = 3;
@@ -130,27 +132,33 @@ void pattern_lang_init(Names *names) {
         matches[1] = new_match_lxm(p, "|");
         matches[2] = new_match_expr(p, any_rule_type, NULL, 0);
 
-        Lang_immediate_legislate(&lang, ty_or, or_prec,
-                                 (Pattern){ .matches = matches, .len = len });
+        Lang_immediate_legislate(&lang, ty_or, or_prec, (Pattern){
+            .matches = matches,
+            .len = len
+        });
 
         // type sep (bang)
         len = 3;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_expr(p, any_rule_type, NULL, 0);
         matches[1] = new_match_lxm(p, "!");
-        matches[2] = new_match_expr(p, TypeExpr_atom(p, fun_any), NULL, 0);
+        matches[2] = new_match_expr(p, TypeExpr_atom(p, fun_any_expr), NULL, 0);
 
-        Lang_immediate_legislate(&lang, ty_bang, bang_prec,
-                                 (Pattern){ .matches = matches, .len = len });
+        Lang_immediate_legislate(&lang, ty_bang, bang_prec, (Pattern){
+            .matches = matches,
+            .len = len
+        });
 
         // return type
         len = 2;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_lxm(p, "->");
-        matches[1] = new_match_expr(p, TypeExpr_atom(p, fun_any), NULL, 0);
+        matches[1] = new_match_expr(p, TypeExpr_atom(p, fun_any_expr), NULL, 0);
 
-        Lang_immediate_legislate(&lang, ty_returns, default_prec,
-                                 (Pattern){ .matches = matches, .len = len });
+        Lang_immediate_legislate(&lang, ty_returns, default_prec, (Pattern){
+            .matches = matches,
+            .len = len
+        });
 
         // where clause
         len = 3;
@@ -158,20 +166,24 @@ void pattern_lang_init(Names *names) {
         matches[0] =
             new_match_expr(p, TypeExpr_atom(p, fun_ident), NULL, 0);
         matches[1] = new_match_lxm(p, "is");
-        matches[2] = new_match_expr(p, TypeExpr_atom(p, fun_any), NULL, 0);
+        matches[2] = new_match_expr(p, TypeExpr_atom(p, fun_any_expr), NULL, 0);
 
-        Lang_immediate_legislate(&lang, ty_where_clause, default_prec,
-                                 (Pattern){ .matches = matches, .len = len });
+        Lang_immediate_legislate(&lang, ty_wh_clause, default_prec, (Pattern){
+            .matches = matches,
+            .len = len
+        });
 
         // where clause series
         len = 2;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_lxm(p, "where");
-        matches[1] = new_match_expr(p, TypeExpr_atom(p, ty_where_clause), NULL,
+        matches[1] = new_match_expr(p, TypeExpr_atom(p, ty_wh_clause), NULL,
                                     REPEATING);
 
-        Lang_immediate_legislate(&lang, ty_where, default_prec,
-                                 (Pattern){ .matches = matches, .len = len });
+        Lang_immediate_legislate(&lang, ty_where, default_prec, (Pattern){
+            .matches = matches,
+            .len = len
+        });
 
         // pattern
         len = 3;
@@ -190,8 +202,10 @@ void pattern_lang_init(Names *names) {
         matches[2] = new_match_expr(p, TypeExpr_atom(p, ty_where), NULL,
                                     OPTIONAL);
 
-        Lang_immediate_legislate(&lang, ty_pattern, pattern_prec,
-                                 (Pattern){ .matches = matches, .len = len });
+        Lang_immediate_legislate(&lang, ty_pattern, pattern_prec, (Pattern){
+            .matches = matches,
+            .len = len
+        });
     }
 
     RuleTree_crystallize(&lang.rules);
