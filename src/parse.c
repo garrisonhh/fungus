@@ -424,8 +424,8 @@ static void collapse_right(AstCtx *ctx, AstExpr **slice, size_t *io_len,
         // collapse
         size_t len_diff = match->len - 1;
 
-        stack[len_diff] = rule_copy_of_slice(ctx->pool, rules, match->rule, stack,
-                                             match->len);
+        stack[len_diff] = rule_copy_of_slice(ctx->pool, rules, match->rule,
+                                             stack, match->len);
 
         stack += len_diff;
         new_len -= len_diff;
@@ -483,11 +483,15 @@ static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
 
             if (match_len > 0) {
                 Prec rule_prec = Rule_get(rules, matched)->prec;
+                Comparison cmp = Prec_cmp(precs, rule_prec, highest);
 
                 // if this is now the highest precedence, reset match list
-                if (!num_matches || Prec_cmp(precs, rule_prec, highest) > 0) {
+                if (!num_matches || cmp > 0) {
                     highest = rule_prec;
                     num_matches = 0;
+                } else if (cmp < 0) {
+                    // this match is below the highest precedence
+                    continue;
                 }
 
                 // if this match is contained by a greedy previous match, ignore
@@ -506,6 +510,24 @@ static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
                 };
             }
         }
+
+#if 0
+        puts(TC_CYAN "COLLAPSING:" TC_RESET);
+        for (size_t j = 0; j < buf_len; ++j)
+            AstExpr_dump(buf[j], ctx->lang, ctx->file);
+
+        const Word *prec_name = Prec_name(&ctx->lang->precs, highest);
+
+        printf(TC_YELLOW "matches: (precedence %.*s)" TC_RESET "\n",
+               (int)prec_name->len, prec_name->str);
+        for (size_t j = 0; j < num_matches; ++j) {
+            const MatchSlice *match = &matches[j];
+            const Word *name = Rule_get(rules, match->rule)->name;
+
+            printf("%.*s %zu %zu\n", (int)name->len, name->str, match->start,
+                   match->len);
+        }
+#endif
 
         // if no matches are found, parsing of slice is done
         if (!num_matches)

@@ -38,7 +38,7 @@ void fungus_define_base(Names *names) {
     // RULE("ConstDecl", "Assignment", "`const assign: Assign")\
     // RULE("LetDecl",   "Assignment", "`let assign: Assign")
 
-void fungus_lang_init(void) {
+void fungus_lang_init(Names *names) {
     Lang fun = Lang_new(WORD("Fungus"));
 
     // precedences
@@ -72,7 +72,7 @@ void fungus_lang_init(void) {
 #define RULE(NAME, PREC, PAT) do {\
         Word prec_name = WORD(PREC);\
         Prec prec = Prec_by_name(&fun.precs, &prec_name);\
-        AstExpr *pre_pat = precompile_pattern(&fun.rules.pool, PAT);\
+        AstExpr *pre_pat = precompile_pattern(&fun.rules.pool, names, PAT);\
         Lang_legislate(&fun, WORD(NAME), prec, pre_pat);\
     } while (0);
 

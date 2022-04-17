@@ -61,7 +61,7 @@ typedef struct Pattern {
 void pattern_lang_init(Names *);
 void pattern_lang_quit(void);
 
-AstExpr *precompile_pattern(Bump *, const char *str);
+AstExpr *precompile_pattern(Bump *, Names *names, const char *str);
 Pattern compile_pattern(Bump *, const Lang *lang, AstExpr *ast);
 
 bool MatchAtom_equals(const MatchAtom *, const MatchAtom *);

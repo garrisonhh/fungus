@@ -17,6 +17,10 @@ typedef uint32_t hsize_t;
     X(any,       "Any",       0, {0}) /* truly any valid type */\
     X(any_val,   "AnyValue",  1, { fun_any }) /* any runtime value */\
     X(any_expr,  "AnyExpr",   1, { fun_any }) /* any AST expr */\
+    X(nil,       "nil",       1, { fun_any_val })\
+    /* metatypes */\
+    X(type,      "Type",      1, { fun_any_expr }) /* fungus type */\
+    X(match,     "Match",     1, { fun_any_expr }) /* type!evaltype */\
     /* primitives */\
     X(primitive, "Primitive", 1, { fun_any_val })\
     X(bool,      "bool",      1, { fun_primitive })\
@@ -40,7 +44,7 @@ extern Lang fungus_lang;
 
 void fungus_define_base(Names *);
 
-void fungus_lang_init(void);
+void fungus_lang_init(Names *);
 void fungus_lang_quit(void);
 
 #endif

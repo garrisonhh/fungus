@@ -101,12 +101,11 @@ void Names_define_type(Names *names, const Word *name,
     });
 }
 
-void Names_define_var(Names *names, const Word *name,
-                      const TypeExpr *type_expr) {
+void Names_define_var(Names *names, const Word *name, Type type) {
     put_entry(names, &(NameEntry){
         .name = name,
         .type = NAMED_VARIABLE,
-        .type_expr = type_expr
+        .var_type = type
     });
 }
 

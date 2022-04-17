@@ -28,8 +28,11 @@ typedef struct NameEntry {
 
     NamedType type;
     union {
-        // vars | types
+        // types
         const TypeExpr *type_expr;
+
+        // vars
+        Type var_type;
     };
 } NameEntry;
 
@@ -58,7 +61,7 @@ void Names_push_scope(Names *);
 void Names_drop_scope(Names *);
 
 void Names_define_type(Names *, const Word *name, const TypeExpr *type_expr);
-void Names_define_var(Names *, const Word *name, const TypeExpr *type_expr);
+void Names_define_var(Names *, const Word *name, Type type);
 
 const NameEntry *name_lookup(const Names *, const Word *name);
 

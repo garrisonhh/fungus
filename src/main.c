@@ -66,10 +66,10 @@ int main(int argc, char **argv) {
 
     types_dump();
 
-    precompile_pattern(&pool,
+    precompile_pattern(&pool, &name_table,
         "a: Literal | Rule ! T `+ b: Literal | Rule ! T -> T\n"
         "    where T is Number\n");
-    precompile_pattern(&pool,
+    precompile_pattern(&pool, &name_table,
         "`++ expr: Ident ! T -> T where T is Number\n");
 
     pattern_lang_quit();

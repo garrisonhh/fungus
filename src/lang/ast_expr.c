@@ -73,7 +73,6 @@ void AstExpr_dump(const AstExpr *expr, const Lang *lang, const File *file) {
 
         printf(TC_RESET);
 
-
         // print expr
         if (!is_atom) {
             // print rule type
@@ -81,8 +80,9 @@ void AstExpr_dump(const AstExpr *expr, const Lang *lang, const File *file) {
             Type_print(expr->type);
             printf(TC_RESET "!" TC_RED);
             Type_print(expr->evaltype);
-            printf(TC_RESET);
+            printf(TC_RESET " ");
 
+            // move up a scope
             scopes[size] = expr;
             indices[size] = 0;
             ++size;

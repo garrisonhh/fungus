@@ -106,6 +106,10 @@ Associativity Prec_assoc(const PrecGraph *pg, Prec prec) {
     return PG_get(pg, prec)->assoc;
 }
 
+const Word *Prec_name(const PrecGraph *pg, Prec prec) {
+    return PG_get(pg, prec)->name;
+}
+
 void PrecGraph_dump(const PrecGraph *pg) {
     puts(TC_CYAN "PrecGraph:" TC_RESET);
 
