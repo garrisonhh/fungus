@@ -4,20 +4,35 @@
 
 Lang fungus_lang;
 
-#define X(NAME, STR) Type fun_##NAME;
+#define X(NAME, ...) Type fun_##NAME;
 BASE_TYPES
 #undef X
 
 void fungus_define_base(Names *names) {
-#define X(NAME, STR) WORD(STR),
-    Word base_names[] = { BASE_TYPES };
-#undef X
-#define X(NAME, STR) &fun_##NAME,
-    Type *base_vars[] = { BASE_TYPES };
+    typedef struct BaseTypeDef {
+        Type *output;
+        Word name;
+        size_t num_supers;
+        Type *supers;
+    } BaseTypeDef;
+
+#define X(NAME, STR, NUM_SUPERS, SUPERS) {\
+    .output = &fun_##NAME,\
+    .name = WORD(STR),\
+    .num_supers = NUM_SUPERS,\
+    .supers = (Type[])SUPERS\
+},
+
+    BaseTypeDef base_types[] = { BASE_TYPES };
+
 #undef X
 
-    for (size_t i = 0; i < ARRAY_SIZE(base_vars); ++i)
-        *base_vars[i] = Type_define(names, base_names[i]);
+    for (size_t i = 0; i < ARRAY_SIZE(base_types); ++i) {
+        BaseTypeDef *def = &base_types[i];
+
+        *def->output =
+            Type_define(names, def->name, def->supers, def->num_supers);
+    }
 }
 
 #define PRECS\

@@ -43,7 +43,7 @@ typedef struct TypeExpr {
 void types_init(void);
 void types_quit(void);
 
-Type Type_define(Names *, Word name);
+Type Type_define(Names *, Word name, Type *supers, size_t num_supers);
 
 const Word *Type_name(Type);
 

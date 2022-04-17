@@ -48,7 +48,6 @@ typedef struct RuleTree {
 
     // 'constants'; available for every Lang
     Rule rule_scope;
-    // Type ty_scope, ty_any, ty_literal, ty_lexeme, ty_ident;
 
 #ifdef DEBUG
     unsigned crystallized: 1;

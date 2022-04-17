@@ -134,8 +134,7 @@ static void place_rule(RuleTree *rt, const Pattern *pat, Rule rule) {
 }
 
 Type Rule_immediate_type(Names *names, Word name) {
-    // TODO add to a Rule abstract type?
-    return Type_define(names, name);
+    return Type_define(names, name, &fun_rule, 1);
 }
 
 Rule Rule_immediate_define(RuleTree *rt, Type type, Prec prec, Pattern pat) {

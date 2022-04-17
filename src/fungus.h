@@ -10,22 +10,25 @@
 
 typedef uint32_t hsize_t;
 
-// TODO actually impl abstract types like Any
+// table of (name, fun name, num supers, super list)
 #define BASE_TYPES\
-    X(any,     "Any")\
+    X(any,       "Any",       0, {0}) /* any runtime value */\
+    X(any_expr,  "AnyExpr",   0, {0}) /* any AST expr */\
     /* primitives */\
-    X(bool,    "bool")\
-    X(string,  "string")\
-    X(int,     "int")\
-    X(float,   "float")\
+    X(primitive, "Primitive", 1, { fun_any })\
+    X(bool,      "bool",      1, { fun_primitive })\
+    X(string,    "string",    1, { fun_primitive })\
+    X(int,       "int",       1, { fun_primitive })\
+    X(float,     "float",     1, { fun_primitive })\
     /* rules */\
-    X(scope,   "Scope")\
-    X(lexeme,  "Lexeme")\
-    X(literal, "Literal")\
-    X(ident,   "Ident")\
+    X(rule,      "Rule",      1, { fun_any_expr })\
+    X(scope,     "Scope",     1, { fun_rule })\
+    X(lexeme,    "Lexeme",    1, { fun_any_expr })\
+    X(literal,   "Literal",   1, { fun_any_expr })\
+    X(ident,     "Ident",     1, { fun_any_expr })\
 
 // define fun_X global vars that are defined in fungus_define_base
-#define X(NAME, STR) extern Type fun_##NAME;
+#define X(NAME, ...) extern Type fun_##NAME;
 BASE_TYPES
 #undef X
 
