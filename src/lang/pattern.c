@@ -300,8 +300,24 @@ static TypeExpr *compile_type_expr(Bump *pool, const Names *names,
     }
 }
 
-// TODO handle templating. could be done by simply adding `where` clauses in
-// as scoped names, and then separately checking relational stuff!
+// adds where clause to scope as aliased typeexprs and returns proper
+// representation for Pattern
+static WhereClause compile_where_clause(Bump *pool, Names *names,
+                                        const File *file, const AstExpr *expr) {
+    assert(expr->type.id == fun_wh_clause.id);
+
+    Word name = AstExpr_as_word(file, expr->exprs[0]);
+    const TypeExpr *type_expr =
+        compile_type_expr(pool, names, file, expr->exprs[2]);
+
+    Names_define_type(names, &name, type_expr);
+
+    return (WhereClause){
+        .name = Word_copy_of(&name, pool),
+        .type_expr = type_expr
+    };
+}
+
 static void compile_match_atom(MatchAtom *match, Bump *pool, const Names *names,
                                const File *file, const AstExpr *expr) {
     if (expr->type.id == fun_literal.id) {
@@ -334,7 +350,7 @@ static void compile_match_atom(MatchAtom *match, Bump *pool, const Names *names,
     }
 }
 
-Pattern compile_pattern(Bump *pool, const Names *names, const File *file,
+Pattern compile_pattern(Bump *pool, Names *names, const File *file,
                         const AstExpr *ast) {
     Pattern pat = {0};
 
@@ -358,6 +374,21 @@ Pattern compile_pattern(Bump *pool, const Names *names, const File *file,
         ++pat.len;
     }
 
+    // parse `where` clauses (done first for scoping templated types)
+    Names_push_scope(names);
+
+    const AstExpr *where_expr = pat_expr->exprs[pat_expr->len - 1];
+
+    if (where_expr->type.id == fun_where.id) {
+        pat.wheres_len = where_expr->len - 1;
+        pat.wheres = Bump_alloc(pool, pat.wheres_len * sizeof(*pat.wheres));
+
+        for (size_t i = 1; i < where_expr->len; ++i) {
+            pat.wheres[i - 1] =
+                compile_where_clause(pool, names, file, where_expr->exprs[i]);
+        }
+    }
+
     // parse match atoms
     pat.matches = Bump_alloc(pool, pat.len * sizeof(*pat.matches));
 
@@ -372,6 +403,9 @@ Pattern compile_pattern(Bump *pool, const Names *names, const File *file,
     assert(ret_expr->type.id == fun_returns.id);
 
     pat.returns = compile_type_expr(pool, names, file, ret_expr->exprs[1]);
+
+    // drop `where` scope
+    Names_drop_scope(names);
 
 #if 1
     printf(TC_CYAN "compiled pattern: " TC_RESET);
@@ -428,4 +462,17 @@ void Pattern_print(const Pattern *pat) {
         TypeExpr_print(pat->returns);
     else
         printf(TC_BLUE "_" TC_RESET);
+
+    /*
+    if (pat->wheres_len) {
+        printf(" where");
+
+        for (size_t i = 0; i < pat->wheres_len; ++i) {
+            const Word *name = pat->wheres[i].name;
+
+            printf(" %.*s is ", (int)name->len, name->str);
+            TypeExpr_print(pat->wheres[i].type_expr);
+        }
+    }
+    */
 }

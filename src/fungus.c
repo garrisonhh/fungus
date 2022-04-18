@@ -26,13 +26,19 @@ void fungus_define_base(Names *names) {
 
 // table of name, prec, pattern
 #define RULES\
-    RULE("Parens",   "Highest", "`( expr: Any!T `) -> T")\
+    RULE("Parens",   "Highest",\
+         "`( expr: AnyExpr!T `) -> T where T = Any")\
     \
-    RULE("Add",      "AddSub",  "a: Any!T `+ b: Any!T -> T")\
-    RULE("Subtract", "AddSub",  "a: Any!T `- b: Any!T -> T")\
-    RULE("Multiply", "MulDiv",  "a: Any!T `* b: Any!T -> T")\
-    RULE("Divide",   "MulDiv",  "a: Any!T `/ b: Any!T -> T")\
-    RULE("Modulo",   "MulDiv",  "a: Any!T `% b: Any!T -> T")\
+    RULE("Add", "AddSub",\
+         "a: AnyExpr!T `+ b: AnyExpr!T -> T where T = Any")\
+    RULE("Subtract", "AddSub",\
+         "a: AnyExpr!T `- b: AnyExpr!T -> T where T = Any")\
+    RULE("Multiply", "MulDiv",\
+         "a: AnyExpr!T `* b: AnyExpr!T -> T where T = Any")\
+    RULE("Divide", "MulDiv",\
+         "a: AnyExpr!T `/ b: AnyExpr!T -> T where T = Any")\
+    RULE("Modulo", "MulDiv",\
+         "a: AnyExpr!T `% b: AnyExpr!T -> T where T = Any")\
     \
     // RULE("Assign",    "Assignment", "name: Ident `= rvalue: T -> T")\
     // RULE("ConstDecl", "Assignment", "`const assign: Assign")\
@@ -72,7 +78,8 @@ void fungus_lang_init(Names *names) {
 #define RULE(NAME, PREC, PAT) do {\
         Word prec_name = WORD(PREC);\
         Prec prec = Prec_by_name(&fun.precs, &prec_name);\
-        AstExpr *pre_pat = precompile_pattern(&fun.rules.pool, names, PAT);\
+        File file = pattern_file(PAT);\
+        AstExpr *pre_pat = precompile_pattern(&fun.rules.pool, names, &file);\
         Lang_legislate(&fun, WORD(NAME), prec, pre_pat);\
     } while (0);
 

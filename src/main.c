@@ -75,14 +75,9 @@ int main(int argc, char **argv) {
 }
 
     TEST_PATTERN(
-        "a: Literal | Rule ! Number `+ b: Literal | Rule ! Number -> Number"
-    );
-    /* TODO
-    TEST_PATTERN(
         "a: Literal | Rule ! T `+ b: Literal | Rule ! T -> T\n"
         "    where T is Number\n"
     );
-    */
 
     pattern_lang_quit();
 

@@ -45,7 +45,7 @@ typedef struct Pattern {
     size_t len;
     const TypeExpr *returns;
 
-    const WhereClause *wheres;
+    WhereClause *wheres;
     size_t wheres_len;
 } Pattern;
 
@@ -55,7 +55,7 @@ void pattern_lang_quit(void);
 // for internal use only:
 File pattern_file(const char *str);
 AstExpr *precompile_pattern(Bump *, Names *names, const File *file);
-Pattern compile_pattern(Bump *, const Names *names, const File *file,
+Pattern compile_pattern(Bump *, Names *names, const File *file,
                         const AstExpr *ast);
 
 bool MatchAtom_equals(const MatchAtom *, const MatchAtom *);
