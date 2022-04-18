@@ -2,10 +2,9 @@
 #define AST_EXPR_H
 
 #include "rules.h"
-#include "../fungus.h"
+#include "../file.h"
 #include "../sema/types.h"
 
-typedef struct File File;
 typedef struct Lang Lang;
 
 // TODO get rid of this ideally
@@ -31,6 +30,7 @@ typedef struct AstExpr {
 } AstExpr;
 
 bool AstExpr_is_atom(const AstExpr *);
+Word AstExpr_as_word(const File *, const AstExpr *expr);
 
 void AstExpr_error(const File *, const AstExpr *, const char *fmt, ...);
 void AstExpr_error_from(const File *, const AstExpr *, const char *fmt, ...);

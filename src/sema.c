@@ -2,6 +2,8 @@
 
 #include "sema.h"
 #include "fungus.h"
+#include "lang.h"
+#include "lang/ast_expr.h"
 
 // expands pattern into `expanded` list
 static void expand_pattern(AstExpr *expr, Pattern *pat, MatchAtom *expanded) {
@@ -20,7 +22,10 @@ static void expand_pattern(AstExpr *expr, Pattern *pat, MatchAtom *expanded) {
 static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
     Names *names = ctx->names;
 
+    // TODO interpret declarations for var scoping
+
     if (AstExpr_is_atom(expr)) {
+
         if (expr->type.id == fun_ident.id) {
             // identify identifier
             // unidentifiable identifiers recieve evaltype `Ident`
@@ -71,7 +76,7 @@ static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
                 if (!type_check_and_infer(ctx, expr->exprs[i]))
                     return false;
 
-            // TODO allow templated stuff here
+            // TODO figure out templated stuff here
             const Pattern *pat = &entry->pat;
 
             if (pat->returns->type == TET_ATOM)
@@ -83,8 +88,10 @@ static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
 }
 
 void sema(SemaCtx *ctx, AstExpr *ast) {
-    if (!type_check_and_infer(ctx, ast))
+    if (!type_check_and_infer(ctx, ast)) {
+        global_error = true;
         return;
+    }
 
     // TODO other stuff
 }

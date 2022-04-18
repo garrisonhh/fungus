@@ -8,6 +8,8 @@
 #include <stdbool.h>
 #include <stdnoreturn.h>
 
+typedef uint32_t hsize_t;
+
 // random useful stuff =========================================================
 
 #define CAT2(A, B) A##B

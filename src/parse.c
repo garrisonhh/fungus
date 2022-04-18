@@ -1,8 +1,9 @@
 #include <assert.h>
 
 #include "parse.h"
-#include "lex/char_classify.h"
 #include "fungus.h"
+#include "lang/ast_expr.h"
+#include "lex/char_classify.h"
 
 /*
  * parsing works in two stages:

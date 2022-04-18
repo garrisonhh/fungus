@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#include "fungus.h"
 // lexing
 #include "lex.h"
 // parsing
@@ -66,11 +67,22 @@ int main(int argc, char **argv) {
 
     types_dump();
 
-    precompile_pattern(&pool, &name_table,
+#define TEST_PATTERN(STR) {\
+    File f = pattern_file(STR);\
+    AstExpr *ast = precompile_pattern(&pool, &name_table, &f);\
+    Pattern compiled = compile_pattern(&pool, &name_table, &f, ast);\
+    (void)compiled;\
+}
+
+    TEST_PATTERN(
+        "a: Literal | Rule ! Number `+ b: Literal | Rule ! Number -> Number"
+    );
+    /* TODO
+    TEST_PATTERN(
         "a: Literal | Rule ! T `+ b: Literal | Rule ! T -> T\n"
-        "    where T is Number\n");
-    precompile_pattern(&pool, &name_table,
-        "`++ expr: Ident ! T -> T where T is Number\n");
+        "    where T is Number\n"
+    );
+    */
 
     pattern_lang_quit();
 
