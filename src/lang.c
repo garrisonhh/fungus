@@ -1,6 +1,9 @@
 #include <ctype.h>
 
 #include "lang.h"
+#include "fungus.h"
+#include "lang/ast_expr.h"
+#include "lex/char_classify.h"
 
 Lang Lang_new(Word name) {
     // copy name
@@ -27,17 +30,11 @@ void Lang_del(Lang *lang) {
     free((char *)lang->name.str);
 }
 
-// searches for lexeme literals recursively and defines any
-static void define_ast_lexemes(Lang *lang, AstExpr *expr) {
-    UNIMPLEMENTED;
-}
+Rule Lang_legislate(Lang *lang, Names *names, const File *file, Word word,
+                    Prec prec, AstExpr *pat_ast) {
+    Type type = Rule_define_type(names, word);
 
-Rule Lang_legislate(Lang *lang, Word word, Prec prec, AstExpr *pat_ast) {
-    Rule rule = Rule_define(&lang->rules, word, prec, pat_ast);
-
-    define_ast_lexemes(lang, pat_ast);
-
-    return rule;
+    return Rule_define(&lang->rules, file, type, prec, pat_ast);
 }
 
 Rule Lang_immediate_legislate(Lang *lang, Type type, Prec prec, Pattern pat) {
@@ -64,6 +61,30 @@ Prec Lang_make_prec(Lang *lang, PrecDef *prec_def) {
     // will need to do something here at some point I'm sure
 
     return prec;
+}
+
+void Lang_crystallize(Lang *lang, Names *names) {
+    RuleTree_crystallize(&lang->rules, names);
+
+    // extract lexemes
+    for (size_t i = 0; i < lang->rules.entries.len; ++i) {
+        if (i == lang->rules.rule_scope.id)
+            continue;
+
+        const RuleEntry *entry = lang->rules.entries.data[i];
+        const MatchAtom *matches = entry->pat.matches;
+
+        for (size_t j = 0; j < entry->pat.len; ++j) {
+            const MatchAtom *match = &matches[j];
+
+            if (match->type == MATCH_LEXEME) {
+                if (ch_is_symbol(match->lxm->str[0]))
+                    HashSet_put(&lang->syms, match->lxm);
+                else
+                    HashSet_put(&lang->words, match->lxm);
+            }
+        }
+    }
 }
 
 void Lang_dump(const Lang *lang) {

@@ -75,16 +75,26 @@ void fungus_lang_init(Names *names) {
     }
 
     // rules
+#define RULE(...) {0},
+    File files[] = { RULES };
+#undef RULE
+    size_t idx = 0;
+
 #define RULE(NAME, PREC, PAT) do {\
         Word prec_name = WORD(PREC);\
         Prec prec = Prec_by_name(&fun.precs, &prec_name);\
-        File file = pattern_file(PAT);\
-        AstExpr *pre_pat = precompile_pattern(&fun.rules.pool, names, &file);\
-        Lang_legislate(&fun, WORD(NAME), prec, pre_pat);\
+        files[idx] = pattern_file(PAT);\
+        AstExpr *pre_pat =\
+            precompile_pattern(&fun.rules.pool, names, &files[idx]);\
+        assert(pre_pat);\
+        Lang_legislate(&fun, names, &files[idx], WORD(NAME), prec, pre_pat);\
+        ++idx;\
     } while (0);
 
     RULES
 #undef RULE
+
+    Lang_crystallize(&fun, names);
 
     fungus_lang = fun;
 }

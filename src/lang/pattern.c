@@ -162,7 +162,7 @@ void pattern_lang_init(Names *names) {
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_expr(p, TypeExpr_atom(p, fun_ident),
                                     TypeExpr_atom(p, fun_unknown), 0);
-        matches[1] = new_match_lxm(p, "is");
+        matches[1] = new_match_lxm(p, "=");
         matches[2] = new_match_expr(p, TypeExpr_atom(p, fun_any_expr),
                                     TypeExpr_atom(p, fun_type), 0);
 
@@ -214,8 +214,7 @@ void pattern_lang_init(Names *names) {
         });
     }
 
-    RuleTree_crystallize(&lang.rules);
-
+    lang.rules.crystallized = true; // TODO this is ugly
     pattern_lang = lang;
 
 #ifdef DEBUG
@@ -462,17 +461,4 @@ void Pattern_print(const Pattern *pat) {
         TypeExpr_print(pat->returns);
     else
         printf(TC_BLUE "_" TC_RESET);
-
-    /*
-    if (pat->wheres_len) {
-        printf(" where");
-
-        for (size_t i = 0; i < pat->wheres_len; ++i) {
-            const Word *name = pat->wheres[i].name;
-
-            printf(" %.*s is ", (int)name->len, name->str);
-            TypeExpr_print(pat->wheres[i].type_expr);
-        }
-    }
-    */
 }

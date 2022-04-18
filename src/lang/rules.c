@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include "rules.h"
+#include "ast_expr.h"
 #include "../fungus.h"
 
 static void *RT_alloc(RuleTree *rt, size_t n_bytes) {
@@ -133,7 +134,7 @@ static void place_rule(RuleTree *rt, const Pattern *pat, Rule rule) {
     place_rule_r(rt, NULL, &rt->roots, pat, 0, rule);
 }
 
-Type Rule_immediate_type(Names *names, Word name) {
+Type Rule_define_type(Names *names, Word name) {
     return Type_define(names, name, &fun_rule, 1);
 }
 
@@ -154,12 +155,41 @@ Rule Rule_immediate_define(RuleTree *rt, Type type, Prec prec, Pattern pat) {
     return handle;
 }
 
-Rule Rule_define(RuleTree *rt, Word name, Prec prec, AstExpr *pat_ast) {
-    UNIMPLEMENTED;
+Rule Rule_define(RuleTree *rt, const File *file, Type type, Prec prec,
+                 AstExpr *pat_ast) {
+    assert(file && pat_ast);
+
+    RuleEntry *entry = RT_alloc(rt, sizeof(*entry));
+
+    *entry = (RuleEntry){
+        .name = Word_copy_of(Type_name(type), &rt->pool),
+        .pre_file = file,
+        .pre_pat = pat_ast,
+        .prec = prec,
+        .type = type
+    };
+
+    return register_entry(rt, entry);
 }
 
-void RuleTree_crystallize(RuleTree *rt) {
-    // TODO compile patterns
+void RuleTree_crystallize(RuleTree *rt, Names *names) {
+#ifdef DEBUG
+    assert(!rt->crystallized);
+#endif
+
+    puts(TC_CYAN "crystallizing:" TC_RESET);
+
+    // compile and place all rules
+    for (size_t i = 0; i < rt->entries.len; ++i) {
+        if (i == rt->rule_scope.id)
+            continue;
+
+        RuleEntry *entry = rt->entries.data[i];
+
+        entry->pat =
+            compile_pattern(&rt->pool, names, entry->pre_file, entry->pre_pat);
+        place_rule(rt, &entry->pat, Rule_by_name(rt, entry->name));
+    }
 
 #ifdef DEBUG
     rt->crystallized = true;
@@ -171,10 +201,6 @@ Type Rule_typeof(const RuleTree *rt, Rule rule) {
 }
 
 Rule Rule_by_name(const RuleTree *rt, const Word *name) {
-#ifdef DEBUG
-    assert(rt->crystallized);
-#endif
-
     return (Rule){ IdMap_get(&rt->by_name, name) };
 }
 
