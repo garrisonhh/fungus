@@ -15,10 +15,12 @@ static hsize_t AstExpr_tok_start(const AstExpr *expr) {
 }
 
 static hsize_t AstExpr_tok_len(const AstExpr *expr) {
+    hsize_t start = AstExpr_tok_start(expr);
+
     while (!AstExpr_is_atom(expr))
         expr = expr->exprs[expr->len - 1];
 
-    return expr->tok_start + expr->tok_len - AstExpr_tok_start(expr);
+    return expr->tok_start + expr->tok_len - start;
 }
 
 Word AstExpr_as_word(const File *file, const AstExpr *expr) {

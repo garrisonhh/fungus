@@ -214,7 +214,9 @@ void pattern_lang_init(Names *names) {
         });
     }
 
+#ifdef DEBUG
     lang.rules.crystallized = true; // TODO this is ugly
+#endif
     pattern_lang = lang;
 
 #ifdef DEBUG
@@ -269,7 +271,7 @@ AstExpr *precompile_pattern(Bump *pool, Names *names, const File *file) {
         .names = names
     }, ast);
 
-#if 1
+#if 0
     puts(TC_CYAN "precompiled pattern:" TC_RESET);
     AstExpr_dump(ast, &pattern_lang, file);
     puts("");
@@ -354,8 +356,11 @@ Pattern compile_pattern(Bump *pool, Names *names, const File *file,
     Pattern pat = {0};
 
     // ensure compiled ast is properly formatted
-    if (ast->len != 1 || ast->evaltype.id != fun_pattern.id)
+    if (ast->len != 1 || ast->evaltype.id != fun_pattern.id) {
+        AstExpr_dump(ast, &pattern_lang, file);
+
         AstExpr_error(file, ast, "invalid pattern!");
+    }
 
     // count number of match atoms
     const AstExpr *pat_expr = ast->exprs[0];
@@ -406,7 +411,7 @@ Pattern compile_pattern(Bump *pool, Names *names, const File *file,
     // drop `where` scope
     Names_drop_scope(names);
 
-#if 1
+#if 0
     printf(TC_CYAN "compiled pattern: " TC_RESET);
     Pattern_print(&pat);
     printf("\n" TC_CYAN "from: " TC_RESET "%.*s\n", (int)file->text.len,

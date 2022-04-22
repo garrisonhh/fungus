@@ -177,8 +177,6 @@ void RuleTree_crystallize(RuleTree *rt, Names *names) {
     assert(!rt->crystallized);
 #endif
 
-    puts(TC_CYAN "crystallizing:" TC_RESET);
-
     // compile and place all rules
     for (size_t i = 0; i < rt->entries.len; ++i) {
         if (i == rt->rule_scope.id)

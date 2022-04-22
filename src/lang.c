@@ -56,11 +56,8 @@ Rule Lang_immediate_legislate(Lang *lang, Type type, Prec prec, Pattern pat) {
 }
 
 Prec Lang_make_prec(Lang *lang, PrecDef *prec_def) {
-    Prec prec = Prec_define(&lang->precs, prec_def);
-
     // will need to do something here at some point I'm sure
-
-    return prec;
+    return Prec_define(&lang->precs, prec_def);
 }
 
 void Lang_crystallize(Lang *lang, Names *names) {

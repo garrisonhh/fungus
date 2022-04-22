@@ -40,9 +40,10 @@ void fungus_define_base(Names *names) {
     RULE("Modulo", "MulDiv",\
          "a: AnyExpr!T `% b: AnyExpr!T -> T where T = Any")\
     \
-    // RULE("Assign",    "Assignment", "name: Ident `= rvalue: T -> T")\
-    // RULE("ConstDecl", "Assignment", "`const assign: Assign")\
-    // RULE("LetDecl",   "Assignment", "`let assign: Assign")
+    RULE("Assign",    "Assignment",\
+         "name: Ident!Any `= rvalue: AnyExpr!T -> T where T = Any")\
+    // RULE("ConstDecl", "Assignment", "`const assign: Assign!Any -> nil")\
+    // RULE("LetDecl",   "Assignment", "`let assign: Assign!Any -> nil")
 
 void fungus_lang_init(Names *names) {
     Lang fun = Lang_new(WORD("Fungus"));

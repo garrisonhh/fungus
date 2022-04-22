@@ -585,8 +585,11 @@ static size_t ast_used_memory(AstExpr *expr) {
 }
 
 AstExpr *parse(AstCtx *ctx, const TokBuf *tb) {
-#ifdef DEBUG
+#if 1
     double start = time_now();
+#endif
+
+#ifdef DEBUG
     size_t start_mem = ctx->pool->total;
 #endif
 
@@ -600,7 +603,9 @@ AstExpr *parse(AstCtx *ctx, const TokBuf *tb) {
         printf("ast used/total allocated memory: %zu/%zu\n",
                ast_used_memory(ast), ctx->pool->total - start_mem);
     }
+#endif
 
+#if 1
     double duration = time_now() - start;
 
     printf("parsing took %.6fs.\n", duration);

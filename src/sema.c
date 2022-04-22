@@ -25,7 +25,6 @@ static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
     // TODO interpret declarations for var scoping
 
     if (AstExpr_is_atom(expr)) {
-
         if (expr->type.id == fun_ident.id) {
             // identify identifier
             // unidentifiable identifiers recieve evaltype `Ident`
