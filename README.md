@@ -11,6 +11,7 @@ Feature goals for the first version:
   - [X] algebraic types
 - [X] compile-time operator precedence
 - [X] compile-time syntax rule definitions for parsing tokens into an AST
+  - [x] meta-compiling milestone: compile new syntax from fungus syntax
   - [ ] syntax rule ambiguity checking
   - [ ] strong static type analysis of AST
 - [ ] IR generation from AST
