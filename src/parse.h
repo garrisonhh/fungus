@@ -2,8 +2,9 @@
 #define PARSE_H
 
 #include "lex.h"
-#include "lang.h"
-#include "lang/ast_expr.h"
+
+typedef struct AstExpr AstExpr;
+typedef struct Lang Lang;
 
 typedef struct AstCtx {
     Bump *pool;

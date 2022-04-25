@@ -2,43 +2,25 @@
 #define AST_EXPR_H
 
 #include "rules.h"
-#include "../fun_types.h"
+#include "../file.h"
 #include "../sema/types.h"
 
-typedef struct File File;
 typedef struct Lang Lang;
 
 // TODO get rid of this ideally
 #define MAX_AST_DEPTH 2048
 
-#define ATOM_TYPES\
-    X(INVALID)\
-    \
-    X(IDENT)\
-    X(LEXEME)\
-    X(BOOL)\
-    X(INT)\
-    X(FLOAT)\
-    X(STRING)\
-
-#define X(A) ATOM_##A,
-typedef enum AstAtomType { ATOM_TYPES ATOM_COUNT } AstAtomType;
-#undef X
-
-extern const char *ATOM_NAME[ATOM_COUNT];
-
 typedef struct AstExpr {
-    Type type; // on RuleTree TypeGraph
-    bool is_atom;
+    // `type` is AST type; `evaltype` is type this evaluates to
+    Type type, evaltype;
 
     union {
         // for atoms
         struct {
-            AstAtomType atom_type; // TODO use type system instead?
             hsize_t tok_start, tok_len;
         };
 
-        // for rules
+        // for rules (rules include all composite AST nodes)
         struct {
             Rule rule;
             struct AstExpr **exprs;
@@ -46,6 +28,9 @@ typedef struct AstExpr {
         };
     };
 } AstExpr;
+
+bool AstExpr_is_atom(const AstExpr *);
+Word AstExpr_as_word(const File *, const AstExpr *expr);
 
 void AstExpr_error(const File *, const AstExpr *, const char *fmt, ...);
 void AstExpr_error_from(const File *, const AstExpr *, const char *fmt, ...);

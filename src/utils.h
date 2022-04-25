@@ -8,6 +8,8 @@
 #include <stdbool.h>
 #include <stdnoreturn.h>
 
+typedef uint32_t hsize_t;
+
 // random useful stuff =========================================================
 
 #define CAT2(A, B) A##B
@@ -59,7 +61,7 @@ void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len);
 
 // time ========================================================================
 
-#if defined(DEBUG) && defined(__linux__)
+#if defined(__linux__)
 #include <sys/time.h>
 
 static inline double time_now(void) {
@@ -69,7 +71,7 @@ static inline double time_now(void) {
     return (double)t.tv_sec + (double)t.tv_usec * 0.000001;
 }
 #else
-#define time_now() (0.0lf)
+#define time_now() 0.0
 #endif
 
 // errors ======================================================================
@@ -81,14 +83,13 @@ extern bool global_error;
 void fungus_error(const char *msg, ...);
 noreturn void fungus_panic(const char *msg, ...);
 
-// used for breakpoints
-void fungus_unimpl(void);
-
-#define UNIMPLEMENTED do {\
-    fungus_unimpl();\
+#define UNIMPLEMENTED \
     fungus_panic("unimplemented in " TC_YELLOW "%s" TC_RESET " at " TC_YELLOW\
-                 "%s:%d" TC_RESET, __func__, __FILE__, __LINE__);\
-} while (0)
+                 "%s:%d" TC_RESET, __func__, __FILE__, __LINE__)
+
+#define UNREACHABLE \
+    fungus_panic("reached unreachable code in " TC_YELLOW "%s" TC_RESET " at "\
+                 TC_YELLOW "%s:%d" TC_RESET, __func__, __FILE__, __LINE__)
 
 // hashing =====================================================================
 

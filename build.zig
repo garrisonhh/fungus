@@ -16,7 +16,6 @@ pub fn build(b: *std.build.Builder) anyerror!void {
     exe.setOutputDir(b.pathFromRoot("."));
     exe.linkLibC();
 
-    // walk all C sources and add to exe
     {
         var c_flags = std.ArrayList([]const u8).init(allocator);
         defer c_flags.deinit();
@@ -26,9 +25,7 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             "-Wextra",
             "-Wpedantic",
             "-Wvla",
-            "-std=c11",
-
-            "-Isrc"
+            "-std=c11"
         });
 
         if (mode == std.builtin.Mode.Debug) {
@@ -44,6 +41,7 @@ pub fn build(b: *std.build.Builder) anyerror!void {
 
         const sources = [_][]const u8 {
             "main.c",
+            "fungus.c",
 
             // lexical analysis
             "lex.c",
@@ -54,7 +52,6 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             "lang/rules.c",
             "lang/precedence.c",
             "lang/pattern.c",
-            "lang/fungus.c",
             "lang/ast_expr.c",
 
             // sema

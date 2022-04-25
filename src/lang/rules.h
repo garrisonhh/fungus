@@ -19,7 +19,10 @@ typedef struct RuleHandle { unsigned id; } Rule;
 typedef struct RuleEntry {
     const Word *name;
     union {
-        AstExpr *pre_pat; // compiled during crystallization
+        struct {
+            const File *pre_file;
+            AstExpr *pre_pat; // compiled during crystallization
+        };
         Pattern pat;
     };
     Prec prec;
@@ -46,19 +49,8 @@ typedef struct RuleTree {
     IdMap by_name;
     Vec roots; // Vec<RuleNode *>
 
-    /*
-     * this is the internal type system for Rules, used for Pattern matching
-     * RuleTree's TypeGraph also includes some special types that aren't
-     * associated with a rule, zB literals, lexemes, and idents. this is to
-     * allow AstExprs + Pattern TypeExprs to have a universal type system
-     *
-     * TODO should probably move this to Lang
-     */
-    TypeGraph types;
-
     // 'constants'; available for every Lang
     Rule rule_scope;
-    Type ty_scope, ty_any, ty_literal, ty_lexeme, ty_ident;
 
 #ifdef DEBUG
     unsigned crystallized: 1;
@@ -68,15 +60,17 @@ typedef struct RuleTree {
 RuleTree RuleTree_new(void);
 void RuleTree_del(RuleTree *);
 
-// these are used by PatternLang exclusively in order to skip pattern compiling
+Type Rule_define_type(Names *, Word name);
+
+// used by PatternLang exclusively in order to skip pattern compiling
 // (it can't compile itself, lol)
-Type Rule_immediate_type(RuleTree *, Word name);
 Rule Rule_immediate_define(RuleTree *, Type type, Prec prec, Pattern pattern);
 
 // first phase: queue rule definitions
-Rule Rule_define(RuleTree *, Word name, Prec prec, AstExpr *pat_ast);
+Rule Rule_define(RuleTree *, const File *, Type type, Prec prec,
+                 AstExpr *pat_ast);
 // second phase: compiling + applying queued definitions
-void RuleTree_crystallize(RuleTree *);
+void RuleTree_crystallize(RuleTree *, Names *);
 
 Type Rule_typeof(const RuleTree *, Rule rule);
 Rule Rule_by_name(const RuleTree *, const Word *name);

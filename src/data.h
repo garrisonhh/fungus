@@ -4,7 +4,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h>
-#include <utils.h>
+
+#include "utils.h"
 
 // dyn array ===================================================================
 
@@ -115,7 +116,7 @@ void IdSet_del(IdSet *);
 
 void IdSet_add_superset(IdSet *, IdSet *super);
 void IdSet_put(IdSet *, unsigned id);
-bool IdSet_has(IdSet *, unsigned id);
+bool IdSet_has(const IdSet *, unsigned id);
 
 // put-only hash map + set =====================================================
 
