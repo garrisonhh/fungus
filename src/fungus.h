@@ -35,15 +35,39 @@
     X(string,     "string",      1, { fun_primitive })\
     X(number,     "Number",      1, { fun_primitive })\
     X(int,        "int",         1, { fun_number })\
-    X(float,      "float",       1, { fun_number })\
-    /* misc essential */\
-    X(const_decl, "ConstDecl",   1, { fun_rule })\
-    X(let_decl,   "LetDecl",     1, { fun_rule })\
+    X(float,      "float",       1, { fun_number })
+
+// table of (name, prec, pattern)
+#define BASE_RULES\
+    /* basic math stuff */\
+    RULE(parens, "Parens", "Highest",\
+         "`( expr: AnyExpr!T `) -> T where T = Any")\
+    RULE(add, "Add", "AddSub",\
+         "lhs: AnyExpr!T `+ rhs: AnyExpr!T -> T where T = int | float")\
+    RULE(subtract, "Subtract", "AddSub",\
+         "lhs: AnyExpr!T `- rhs: AnyExpr!T -> T where T = int | float")\
+    RULE(multiply, "Multiply", "MulDiv",\
+         "lhs: AnyExpr!T `* rhs: AnyExpr!T -> T where T = int | float")\
+    RULE(divide, "Divide", "MulDiv",\
+         "lhs: AnyExpr!T `/ rhs: AnyExpr!T -> T where T = int | float")\
+    RULE(modulo, "Modulo", "MulDiv",\
+         "lhs: AnyExpr!T `% rhs: AnyExpr!T -> T where T = int | float")\
+    /* variable assignment */\
+    RULE(assign, "Assign",    "Assignment",\
+         "name: Ident!T `= value: AnyExpr!T -> T where T = AnyValue")\
+    RULE(const_decl, "ConstDecl", "Assignment",\
+         "`const assign: Assign!AnyValue -> nil")\
+    RULE(let_decl, "LetDecl", "Assignment",\
+         "`let assign: Assign!AnyValue -> nil")\
+    /* control flow TODO */\
 
 // define fun_X global vars that are defined in fungus_define_base
 #define X(NAME, ...) extern Type fun_##NAME;
 BASE_TYPES
 #undef X
+#define RULE(NAME, ...) extern Type fun_##NAME;
+BASE_RULES
+#undef RULE
 
 extern Lang fungus_lang;
 

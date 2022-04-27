@@ -7,6 +7,9 @@ Lang fungus_lang;
 #define X(NAME, ...) Type fun_##NAME;
 BASE_TYPES
 #undef X
+#define RULE(NAME, ...) Type fun_##NAME;
+BASE_RULES
+#undef RULE
 
 void fungus_define_base(Names *names) {
 #define X(NAME, STR, NUM_SUPERS, SUPERS) {\
@@ -15,6 +18,12 @@ void fungus_define_base(Names *names) {
 }
     BASE_TYPES
 #undef X
+
+#define RULE(NAME, STR, ...)\
+    fun_##NAME = Type_define(names, WORD(STR), &fun_rule, 1);
+
+    BASE_RULES
+#undef RULE
 }
 
 #define PRECS\
@@ -23,27 +32,6 @@ void fungus_define_base(Names *names) {
     PREC("AddSub",     LEFT)\
     PREC("MulDiv",     LEFT)\
     PREC("Highest",    LEFT)
-
-// table of name, prec, pattern
-#define RULES\
-    /* basic math stuff */\
-    RULE("Parens",   "Highest",\
-         "`( expr: AnyExpr!T `) -> T where T = Any")\
-    RULE("Add", "AddSub",\
-         "lhs: AnyExpr!T `+ rhs: AnyExpr!T -> T where T = int | float")\
-    RULE("Subtract", "AddSub",\
-         "lhs: AnyExpr!T `- rhs: AnyExpr!T -> T where T = int | float")\
-    RULE("Multiply", "MulDiv",\
-         "lhs: AnyExpr!T `* rhs: AnyExpr!T -> T where T = int | float")\
-    RULE("Divide", "MulDiv",\
-         "lhs: AnyExpr!T `/ rhs: AnyExpr!T -> T where T = int | float")\
-    RULE("Modulo", "MulDiv",\
-         "lhs: AnyExpr!T `% rhs: AnyExpr!T -> T where T = int | float")\
-    /* variable assignment */\
-    RULE("Assign",    "Assignment",\
-         "name: Ident!T `= value: AnyExpr!T -> T where T = AnyValue")\
-    RULE("ConstDecl", "Assignment", "`const assign: Assign!AnyValue -> nil")\
-    RULE("LetDecl", "Assignment", "`let assign: Assign!AnyValue -> nil")\
 
 void fungus_lang_init(Names *names) {
     Lang fun = Lang_new(WORD("Fungus"));
@@ -77,12 +65,31 @@ void fungus_lang_init(Names *names) {
 
     // rules
 #define RULE(...) {0},
-    File files[] = { RULES };
+    File files[] = { BASE_RULES };
 #undef RULE
-    size_t idx = 0;
+#define RULE(NAME, STR, PREC, PAT) &fun_##NAME,
+    Type *types[] = { BASE_RULES };
+#undef RULE
+#define RULE(NAME, STR, PREC, PAT) WORD(PREC),
+    Word precs[] = { BASE_RULES };
+#undef RULE
+#define RULE(NAME, STR, PREC, PAT) PAT,
+    const char *pats[] = { BASE_RULES };
+#undef RULE
 
+    for (size_t i = 0; i < ARRAY_SIZE(pats); ++i) {
+        files[i] = pattern_file(pats[i]);
+
+        Prec prec = Prec_by_name(&fun.precs, &precs[i]);
+        AstExpr *pre_pat =
+            precompile_pattern(&fun.rules.pool, names, &files[i]);
+
+        Lang_legislate(&fun, &files[i], *types[i], prec, pre_pat);
+    }
+
+    /*
     // TODO de-macro-ify this LOL
-#define RULE(NAME, PREC, PAT) do {\
+#define RULE(NAME, STR, PREC, PAT) do {\
         Word prec_name = WORD(PREC);\
         Prec prec = Prec_by_name(&fun.precs, &prec_name);\
         files[idx] = pattern_file(PAT);\
@@ -90,23 +97,19 @@ void fungus_lang_init(Names *names) {
             precompile_pattern(&fun.rules.pool, names, &files[idx]);\
         assert(pre_pat);\
         \
-        Word name = WORD(NAME);\
+        Word name = WORD(STR);\
         const NameEntry *entry = name_lookup(names, &name);\
-        Type type;\
-        if (entry) {\
-            assert(entry->type == NAMED_TYPE\
-                && entry->type_expr->type == TET_ATOM);\
-            type = entry->type_expr->atom;\
-        } else {\
-            type = Type_define(names, name, &fun_rule, 1);\
-        }\
+        assert(entry->type == NAMED_TYPE\
+            && entry->type_expr->type == TET_ATOM);\
         \
-        Lang_legislate(&fun, &files[idx], type, prec, pre_pat);\
+        Lang_legislate(&fun, &files[idx], entry->type_expr->atom, prec,\
+                       pre_pat);\
         ++idx;\
     } while (0);
 
-    RULES
+    BASE_RULES
 #undef RULE
+    */
 
     Lang_crystallize(&fun, names);
 
