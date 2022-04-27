@@ -75,12 +75,36 @@ static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
             const char *text = &tb->file->text.str[start];
 
             if (text[0] == '`') {
-                // escaped literal lexeme
-                if (len == 1)
-                    File_error_at(tb->file, start, len, "bare lexeme escape.");
+                AstExpr *expr;
 
-                AstExpr *expr =
-                    new_atom(ctx->pool, fun_literal, fun_lexeme, start, len);
+                // escaped literal lexeme
+                if (len == 1) {
+                    // check for consumable word
+                    if (i >= tb->len) {
+                        File_error_at(tb->file, start, len,
+                                      "bare lexeme escape.");
+                    }
+
+                    ++i;
+
+                    TokType next_type = tb->types[i];
+                    hsize_t next_start = tb->starts[i];
+                    hsize_t next_len = tb->lens[i];
+
+                    if (next_type != TOK_WORD
+                     || next_start != start + len) {
+                        File_error_at(tb->file, start, len,
+                                      "bare lexeme escape.");
+                    }
+
+                    // word literal lexeme
+                    expr = new_atom(ctx->pool, fun_literal, fun_lexeme, start,
+                                    next_len + 1);
+                } else {
+                    // symbol literal lexeme
+                    expr = new_atom(ctx->pool, fun_literal, fun_lexeme, start,
+                                    len);
+                }
 
                 Vec_push(list, expr);
             } else {
@@ -277,24 +301,6 @@ static bool translate_scope(AstCtx *ctx, AstExpr *scope) {
 
 // stage 2: rule parsing =======================================================
 
-static bool expr_matches(AstCtx *ctx, const AstExpr *expr,
-                         const MatchAtom *pred) {
-    bool matches = false;
-
-    if (expr->type.id == fun_lexeme.id) {
-        // lexeme
-        View token = { &ctx->file->text.str[expr->tok_start], expr->tok_len };
-
-        matches = pred->type == MATCH_LEXEME && Word_eq_view(pred->lxm, &token);
-    } else {
-        // expr
-        matches = pred->type == MATCH_EXPR
-               && Type_matches(expr->type, pred->rule_expr);
-    }
-
-    return matches;
-}
-
 static size_t try_match_r(AstCtx *ctx, const Vec *nexts, AstExpr **slice,
                           size_t len, size_t depth, Rule *o_rule) {
     if (len == 0)
@@ -306,7 +312,7 @@ static size_t try_match_r(AstCtx *ctx, const Vec *nexts, AstExpr **slice,
     for (size_t i = 0; i < nexts->len; ++i) {
         const RuleNode *node = nexts->data[i];
 
-        if (expr_matches(ctx, slice[0], node->pred)) {
+        if (MatchAtom_matches_rule(ctx->file, node->pred, slice[0])) {
             // match node children
             Rule child_rule;
             size_t child_depth = try_match_r(ctx, &node->nexts, slice + 1,

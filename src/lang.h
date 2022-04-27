@@ -21,7 +21,7 @@ typedef struct Lang {
 Lang Lang_new(Word name);
 void Lang_del(Lang *);
 
-Rule Lang_legislate(Lang *, Names *, const File *, Word word, Prec prec,
+Rule Lang_legislate(Lang *, const File *, Type type, Prec prec,
                     AstExpr *pat_ast);
 Rule Lang_immediate_legislate(Lang *, Type type, Prec prec, Pattern pat);
 Prec Lang_make_prec(Lang *, PrecDef *);

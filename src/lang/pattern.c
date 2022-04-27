@@ -6,7 +6,6 @@
 #include "../lang.h"
 #include "../lex.h"
 #include "../parse.h"
-#include "../sema/names.h"
 
 Lang pattern_lang;
 
@@ -103,7 +102,7 @@ void pattern_lang_init(Names *names) {
         len = 3;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_expr(p, TypeExpr_atom(p, fun_ident),
-                                    TypeExpr_atom(p, fun_ident), 0);
+                                    TypeExpr_atom(p, fun_unknown), 0);
         matches[1] = new_match_lxm(p, ":");
         matches[2] = new_match_expr(p, TypeExpr_atom(p, fun_type_bang),
                                     TypeExpr_atom(p, fun_match), 0);
@@ -228,6 +227,32 @@ void pattern_lang_quit(void) {
     Lang_del(&pattern_lang);
 }
 
+bool MatchAtom_matches_rule(const File *file, const MatchAtom *pred,
+                            const AstExpr *expr) {
+    bool matches = false;
+
+    if (expr->type.id == fun_lexeme.id) {
+        // lexeme
+        View token = { &file->text.str[expr->tok_start], expr->tok_len };
+
+        matches = pred->type == MATCH_LEXEME && Word_eq_view(pred->lxm, &token);
+    } else {
+        // expr
+        matches = pred->type == MATCH_EXPR
+               && Type_matches(expr->type, pred->rule_expr);
+    }
+
+    return matches;
+}
+
+bool MatchAtom_matches_type(const File *file, const MatchAtom *pred,
+                            const AstExpr *expr) {
+    if (pred->type == MATCH_LEXEME)
+        return true;
+
+    return Type_matches(expr->evaltype, pred->type_expr);
+}
+
 // used to determined what RuleNodes can work with each other
 bool MatchAtom_equals(const MatchAtom *a, const MatchAtom *b) {
     if (a->type == b->type) {
@@ -264,17 +289,14 @@ AstExpr *precompile_pattern(Bump *pool, Names *names, const File *file) {
         .lang = &pattern_lang
     }, &tokens);
 
-    sema(&(SemaCtx){
-        .pool = pool,
-        .file = file,
-        .lang = &pattern_lang,
-        .names = names
-    }, ast);
+    /*
+     * used to do sema here but it ended up being problematic, may want to
+     * bring it back in the future? unsure
+     */
 
 #if 0
-    puts(TC_CYAN "precompiled pattern:" TC_RESET);
+    puts(TC_YELLOW "precompiled pattern:" TC_RESET);
     AstExpr_dump(ast, &pattern_lang, file);
-    puts("");
 #endif
 
     TokBuf_del(&tokens);
@@ -288,10 +310,20 @@ static TypeExpr *compile_type_expr(Bump *pool, const Names *names,
         Word word = AstExpr_as_word(file, expr);
         const NameEntry *entry = name_lookup(names, &word);
 
-        assert(entry->type == NAMED_TYPE);
+#ifdef DEBUG
+        if (!entry)
+            AstExpr_error(file, expr, "unknown pattern type.");
+        else if (entry->type != NAMED_TYPE)
+            AstExpr_error(file, expr, "not a pattern type.");
+#endif
 
         return TypeExpr_deepcopy(pool, entry->type_expr);
     } else {
+#ifdef DEBUG
+        if (expr->type.id != fun_type_or.id)
+            AstExpr_error(file, expr, "invalid pattern type expr.");
+#endif
+
         assert(expr->type.id == fun_type_or.id);
 
         TypeExpr *lhs = compile_type_expr(pool, names, file, expr->exprs[0]);
@@ -360,25 +392,6 @@ static WhereClause compile_where_clause(Bump *pool, const Names *names,
     bool return_is_template =
         expr_is_template(file, pat->exprs[num_params]->exprs[1], &name);
 
-#if 1
-    puts(TC_CYAN "COMPILING WHERE" TC_RESET);
-
-    AstExpr_dump(pat, &pattern_lang, file);
-    AstExpr_dump(clause, &pattern_lang, file);
-
-    puts(TC_YELLOW "FOUND CONSTRAINS" TC_RESET);
-
-    for (size_t i = 0; i < con_len; ++i) {
-        if (i) printf(", ");
-        printf("%zu", pooled_constrains[i]);
-    }
-
-    if (return_is_template)
-        printf(", ret");
-
-    puts("");
-#endif
-
     return (WhereClause){
         .name = Word_copy_of(&name, pool),
         .type_expr = compile_type_expr(pool, names, file, clause->exprs[2]),
@@ -423,12 +436,6 @@ static void compile_match_atom(MatchAtom *match, Bump *pool, const Names *names,
 Pattern compile_pattern(Bump *pool, Names *names, const File *file,
                         const AstExpr *ast) {
     Pattern pat = {0};
-
-    // ensure compiled ast is properly formatted
-    if (ast->len != 1 || ast->evaltype.id != fun_pattern.id) {
-        AstExpr_dump(ast, &pattern_lang, file);
-        AstExpr_error(file, ast, "invalid pattern!");
-    }
 
     // count number of match atoms
     const AstExpr *pat_expr = ast->exprs[0];

@@ -36,6 +36,9 @@
     X(number,     "Number",      1, { fun_primitive })\
     X(int,        "int",         1, { fun_number })\
     X(float,      "float",       1, { fun_number })\
+    /* misc essential */\
+    X(const_decl, "ConstDecl",   1, { fun_rule })\
+    X(let_decl,   "LetDecl",     1, { fun_rule })\
 
 // define fun_X global vars that are defined in fungus_define_base
 #define X(NAME, ...) extern Type fun_##NAME;

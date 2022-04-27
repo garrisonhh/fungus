@@ -26,24 +26,24 @@ void fungus_define_base(Names *names) {
 
 // table of name, prec, pattern
 #define RULES\
+    /* basic math stuff */\
     RULE("Parens",   "Highest",\
          "`( expr: AnyExpr!T `) -> T where T = Any")\
-    \
     RULE("Add", "AddSub",\
-         "a: AnyExpr!T `+ b: AnyExpr!T -> T where T = Any")\
+         "lhs: AnyExpr!T `+ rhs: AnyExpr!T -> T where T = int | float")\
     RULE("Subtract", "AddSub",\
-         "a: AnyExpr!T `- b: AnyExpr!T -> T where T = Any")\
+         "lhs: AnyExpr!T `- rhs: AnyExpr!T -> T where T = int | float")\
     RULE("Multiply", "MulDiv",\
-         "a: AnyExpr!T `* b: AnyExpr!T -> T where T = Any")\
+         "lhs: AnyExpr!T `* rhs: AnyExpr!T -> T where T = int | float")\
     RULE("Divide", "MulDiv",\
-         "a: AnyExpr!T `/ b: AnyExpr!T -> T where T = Any")\
+         "lhs: AnyExpr!T `/ rhs: AnyExpr!T -> T where T = int | float")\
     RULE("Modulo", "MulDiv",\
-         "a: AnyExpr!T `% b: AnyExpr!T -> T where T = Any")\
-    \
+         "lhs: AnyExpr!T `% rhs: AnyExpr!T -> T where T = int | float")\
+    /* variable assignment */\
     RULE("Assign",    "Assignment",\
-         "name: Ident!Any `= rvalue: AnyExpr!T -> T where T = Any")\
-    // RULE("ConstDecl", "Assignment", "`const assign: Assign!Any -> nil")\
-    // RULE("LetDecl",   "Assignment", "`let assign: Assign!Any -> nil")
+         "name: Ident!T `= value: AnyExpr!T -> T where T = AnyValue")\
+    RULE("ConstDecl", "Assignment", "`const assign: Assign!AnyValue -> nil")\
+    RULE("LetDecl", "Assignment", "`let assign: Assign!AnyValue -> nil")\
 
 void fungus_lang_init(Names *names) {
     Lang fun = Lang_new(WORD("Fungus"));
@@ -81,6 +81,7 @@ void fungus_lang_init(Names *names) {
 #undef RULE
     size_t idx = 0;
 
+    // TODO de-macro-ify this LOL
 #define RULE(NAME, PREC, PAT) do {\
         Word prec_name = WORD(PREC);\
         Prec prec = Prec_by_name(&fun.precs, &prec_name);\
@@ -88,7 +89,19 @@ void fungus_lang_init(Names *names) {
         AstExpr *pre_pat =\
             precompile_pattern(&fun.rules.pool, names, &files[idx]);\
         assert(pre_pat);\
-        Lang_legislate(&fun, names, &files[idx], WORD(NAME), prec, pre_pat);\
+        \
+        Word name = WORD(NAME);\
+        const NameEntry *entry = name_lookup(names, &name);\
+        Type type;\
+        if (entry) {\
+            assert(entry->type == NAMED_TYPE\
+                && entry->type_expr->type == TET_ATOM);\
+            type = entry->type_expr->atom;\
+        } else {\
+            type = Type_define(names, name, &fun_rule, 1);\
+        }\
+        \
+        Lang_legislate(&fun, &files[idx], type, prec, pre_pat);\
         ++idx;\
     } while (0);
 
