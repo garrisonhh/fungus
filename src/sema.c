@@ -27,23 +27,21 @@ static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
     if (AstExpr_is_atom(expr)) {
         if (expr->type.id == fun_ident.id) {
             // identify identifier
-            // unidentifiable identifiers recieve evaltype `Ident`
             Word word =
                 Word_new(&ctx->file->text.str[expr->tok_start], expr->tok_len);
 
             const NameEntry *entry = name_lookup(names, &word);
 
             if (!entry) {
-                expr->evaltype = fun_ident;
+                // unidentifiable identifer
+                expr->evaltype = fun_unknown;
             } else {
                 switch (entry->type) {
                 case NAMED_TYPE:
                     expr->evaltype = fun_type;
                     break;
                 case NAMED_VARIABLE:
-                    // TODO backref?
                     expr->evaltype = entry->var_type;
-
                     break;
                 default: UNREACHABLE;
                 }

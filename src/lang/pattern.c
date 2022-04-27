@@ -301,21 +301,90 @@ static TypeExpr *compile_type_expr(Bump *pool, const Names *names,
     }
 }
 
-// adds where clause to scope as aliased typeexprs and returns proper
-// representation for Pattern
-static WhereClause compile_where_clause(Bump *pool, Names *names,
-                                        const File *file, const AstExpr *expr) {
-    assert(expr->type.id == fun_wh_clause.id);
+static bool expr_is_template(const File *file, const AstExpr *expr,
+                             const Word *name) {
+    if (expr->type.id != fun_ident.id)
+        return false;
 
-    Word name = AstExpr_as_word(file, expr->exprs[0]);
-    const TypeExpr *type_expr =
-        compile_type_expr(pool, names, file, expr->exprs[2]);
+    Word ident = AstExpr_as_word(file, expr);
 
-    Names_define_type(names, &name, type_expr);
+    return Word_eq(&ident, name);
+}
+
+// parse `where` clauses, type check patterns, and push template names
+// temporarily on Names as types
+static WhereClause compile_where_clause(Bump *pool, const Names *names,
+                                        const File *file,
+                                        const AstExpr *pat,
+                                        size_t num_params,
+                                        const AstExpr *clause) {
+    assert(pat->type.id == fun_pattern.id);
+    assert(clause->type.id == fun_wh_clause.id);
+
+    Word name = AstExpr_as_word(file, clause->exprs[0]);
+
+    // figure out constrained param/return types
+    size_t con_len = 0, con_cap = 8;
+    size_t *constrains = malloc(con_cap * sizeof(*constrains));
+
+    for (size_t i = 0; i < num_params; ++i) {
+        const AstExpr *param = pat->exprs[i];
+
+        if (param->type.id != fun_match_expr.id)
+            continue;
+
+        const AstExpr *param_bang = param->exprs[2];
+        const AstExpr *param_evaltype = param_bang->exprs[2];
+
+        if (expr_is_template(file, param_evaltype, &name)) {
+            // found template, add to constrains list
+            if (con_len == con_cap) {
+                con_cap *= 2;
+                constrains =
+                    realloc(constrains, con_cap * sizeof(*constrains));
+            }
+
+            constrains[con_len++] = i;
+        }
+    }
+
+    // copy constrains
+    size_t *pooled_constrains = Bump_alloc(pool, con_len * sizeof(*constrains));
+
+    for (size_t i = 0; i < con_len; ++i)
+        pooled_constrains[i] = constrains[i];
+
+    free(constrains);
+
+    // return type
+    bool return_is_template =
+        expr_is_template(file, pat->exprs[num_params]->exprs[1], &name);
+
+#if 1
+    puts(TC_CYAN "COMPILING WHERE" TC_RESET);
+
+    AstExpr_dump(pat, &pattern_lang, file);
+    AstExpr_dump(clause, &pattern_lang, file);
+
+    puts(TC_YELLOW "FOUND CONSTRAINS" TC_RESET);
+
+    for (size_t i = 0; i < con_len; ++i) {
+        if (i) printf(", ");
+        printf("%zu", pooled_constrains[i]);
+    }
+
+    if (return_is_template)
+        printf(", ret");
+
+    puts("");
+#endif
 
     return (WhereClause){
         .name = Word_copy_of(&name, pool),
-        .type_expr = type_expr
+        .type_expr = compile_type_expr(pool, names, file, clause->exprs[2]),
+        .constrains = pooled_constrains,
+        .num_constrains = con_len,
+        .hits_return = return_is_template
     };
 }
 
@@ -358,7 +427,6 @@ Pattern compile_pattern(Bump *pool, Names *names, const File *file,
     // ensure compiled ast is properly formatted
     if (ast->len != 1 || ast->evaltype.id != fun_pattern.id) {
         AstExpr_dump(ast, &pattern_lang, file);
-
         AstExpr_error(file, ast, "invalid pattern!");
     }
 
@@ -388,8 +456,13 @@ Pattern compile_pattern(Bump *pool, Names *names, const File *file,
         pat.wheres = Bump_alloc(pool, pat.wheres_len * sizeof(*pat.wheres));
 
         for (size_t i = 1; i < where_expr->len; ++i) {
-            pat.wheres[i - 1] =
-                compile_where_clause(pool, names, file, where_expr->exprs[i]);
+            WhereClause *clause = &pat.wheres[i - 1];
+
+            *clause =
+                compile_where_clause(pool, names, file, pat_expr, pat.len,
+                                     where_expr->exprs[i]);
+
+            Names_define_type(names, clause->name, clause->type_expr);
         }
     }
 

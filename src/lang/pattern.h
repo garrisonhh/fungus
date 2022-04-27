@@ -36,6 +36,11 @@ typedef struct MatchAtom {
 typedef struct WhereClause {
     const Word *name;
     const TypeExpr *type_expr;
+
+    // indices of templated params
+    size_t *constrains;
+    size_t num_constrains;
+    bool hits_return; // whether `returns` is constrained
 } WhereClause;
 
 typedef struct Pattern {
