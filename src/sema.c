@@ -34,13 +34,15 @@ static bool pattern_check_and_infer(const SemaCtx *ctx, AstExpr *expr,
     } else {
         size_t idx = 0;
 
-        for (size_t i = 0; i < pat->len; ++i) {
+        for (size_t i = 0; i < pat->len && idx < expr->len; ++i) {
             const MatchAtom *pred = &pat->matches[i];
 
             if (pred->repeating) {
-                while (MatchAtom_matches_rule(ctx->file, pred,
-                                              expr->exprs[idx]))
+                while (idx < expr->len
+                    && MatchAtom_matches_rule(ctx->file, pred,
+                                              expr->exprs[idx])) {
                     match_forms[idx++] = i;
+                }
             } else if (MatchAtom_matches_rule(ctx->file, pred,
                                               expr->exprs[idx])) {
                 match_forms[idx++] = i;
@@ -77,15 +79,17 @@ static bool pattern_check_and_infer(const SemaCtx *ctx, AstExpr *expr,
             const AstExpr *model = NULL;
             size_t idx = 0;
 
-            for (size_t j = 0; j < clause->num_constrains; ++j) {
+            for (size_t j = 0;
+                 j < clause->num_constrains && idx < expr->len;
+                 ++j) {
                 size_t constrained = clause->constrains[j];
 
                 // move up to constrained value
-                while (match_forms[idx] < constrained)
+                while (match_forms[idx] < constrained && idx < expr->len)
                     ++idx;
 
                 // check constrained value
-                while (match_forms[idx] == constrained) {
+                while (match_forms[idx] == constrained && idx < expr->len) {
                     if (!model)
                         model = expr->exprs[idx];
                     else if (!check_evaltype(ctx, model, expr->exprs[idx]))

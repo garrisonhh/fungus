@@ -26,22 +26,15 @@ void fungus_define_base(Names *names) {
 #undef RULE
 }
 
-#define PRECS\
-    PREC("Lowest",     LEFT)\
-    PREC("Assignment", RIGHT)\
-    PREC("AddSub",     LEFT)\
-    PREC("MulDiv",     LEFT)\
-    PREC("Highest",    LEFT)
-
 void fungus_lang_init(Names *names) {
     Lang fun = Lang_new(WORD("Fungus"));
 
     // precedences
 #define PREC(NAME, ASSOC) WORD(NAME),
-    Word prec_names[] = { PRECS };
+    Word prec_names[] = { BASE_PRECS };
 #undef PREC
 #define PREC(NAME, ASSOC) ASSOC_##ASSOC,
-    Associativity prec_assocs[] = { PRECS };
+    Associativity prec_assocs[] = { BASE_PRECS };
 #undef PREC
 
     Prec last;

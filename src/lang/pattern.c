@@ -13,7 +13,7 @@ Lang pattern_lang;
     PREC("Lowest",  LEFT)\
     PREC("Pattern", RIGHT)\
     PREC("Default", LEFT)\
-    PREC("Bang",    LEFT)\
+    PREC("Match",   LEFT)\
     PREC("Or",      LEFT)\
     PREC("Highest", LEFT)
 
@@ -91,7 +91,7 @@ void pattern_lang_init(Names *names) {
         GET_PREC(pattern_prec, "Pattern");
         GET_PREC(default_prec, "Default");
         GET_PREC(or_prec,      "Or");
-        GET_PREC(bang_prec,    "Bang");
+        GET_PREC(match_prec,   "Match");
 
 #undef GET_PREC
 
@@ -99,12 +99,18 @@ void pattern_lang_init(Names *names) {
         size_t len;
 
         // match expr
+        const TypeExpr *match_expr_types =
+            TypeExpr_sum(p, 3,
+                         TypeExpr_atom(p, fun_type_bang),
+                         TypeExpr_atom(p, fun_rep_match),
+                         TypeExpr_atom(p, fun_opt_match));
+
         len = 3;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_expr(p, TypeExpr_atom(p, fun_ident),
                                     TypeExpr_atom(p, fun_unknown), 0);
         matches[1] = new_match_lxm(p, ":");
-        matches[2] = new_match_expr(p, TypeExpr_atom(p, fun_type_bang),
+        matches[2] = new_match_expr(p, match_expr_types,
                                     TypeExpr_atom(p, fun_match), 0);
 
         Lang_immediate_legislate(&lang, fun_match_expr, default_prec, (Pattern){
@@ -137,7 +143,33 @@ void pattern_lang_init(Names *names) {
         matches[2] = new_match_expr(p, TypeExpr_atom(p, fun_any_expr),
                                     TypeExpr_atom(p, fun_type), 0);
 
-        Lang_immediate_legislate(&lang, fun_type_bang, bang_prec, (Pattern){
+        Lang_immediate_legislate(&lang, fun_type_bang, match_prec, (Pattern){
+            .matches = matches,
+            .len = len,
+            .returns = TypeExpr_atom(p, fun_match),
+        });
+
+        // optional modifier
+        len = 2;
+        matches = Bump_alloc(p, len * sizeof(*matches));
+        matches[0] = new_match_expr(p, match_expr_types,
+                                    TypeExpr_atom(p, fun_match), 0);
+        matches[1] = new_match_lxm(p, "?");
+
+        Lang_immediate_legislate(&lang, fun_opt_match, match_prec, (Pattern){
+            .matches = matches,
+            .len = len,
+            .returns = TypeExpr_atom(p, fun_match),
+        });
+
+        // repeating modifier
+        len = 2;
+        matches = Bump_alloc(p, len * sizeof(*matches));
+        matches[0] = new_match_expr(p, match_expr_types,
+                                    TypeExpr_atom(p, fun_match), 0);
+        matches[1] = new_match_lxm(p, "*");
+
+        Lang_immediate_legislate(&lang, fun_rep_match, match_prec, (Pattern){
             .matches = matches,
             .len = len,
             .returns = TypeExpr_atom(p, fun_match),
@@ -294,7 +326,7 @@ AstExpr *precompile_pattern(Bump *pool, Names *names, const File *file) {
      * bring it back in the future? unsure
      */
 
-#if 0
+#if 1
     puts(TC_YELLOW "precompiled pattern:" TC_RESET);
     AstExpr_dump(ast, &pattern_lang, file);
 #endif
@@ -365,8 +397,18 @@ static WhereClause compile_where_clause(Bump *pool, const Names *names,
         if (param->type.id != fun_match_expr.id)
             continue;
 
-        const AstExpr *param_bang = param->exprs[2];
-        const AstExpr *param_evaltype = param_bang->exprs[2];
+        const AstExpr *param_match = param->exprs[2];
+
+        while (param_match->type.id != fun_type_bang.id) {
+            if (param_match->type.id == fun_opt_match.id)
+                param_match = param_match->exprs[0];
+            else if (param_match->type.id == fun_rep_match.id)
+                param_match = param_match->exprs[0];
+            else
+                assert(false);
+        }
+
+        const AstExpr *param_evaltype = param_match->exprs[2];
 
         if (expr_is_template(file, param_evaltype, &name)) {
             // found template, add to constrains list
@@ -401,7 +443,7 @@ static WhereClause compile_where_clause(Bump *pool, const Names *names,
     };
 }
 
-static void compile_match_atom(MatchAtom *match, Bump *pool, const Names *names,
+static void compile_match_atom(MatchAtom *pred, Bump *pool, const Names *names,
                                const File *file, const AstExpr *expr) {
     if (expr->type.id == fun_literal.id) {
         // match lexeme
@@ -413,22 +455,38 @@ static void compile_match_atom(MatchAtom *match, Bump *pool, const Names *names,
         ++word.str;
         --word.len;
 
-        *match = (MatchAtom){
+        *pred = (MatchAtom){
             .type = MATCH_LEXEME,
             .lxm = Word_copy_of(&word, pool),
         };
     } else {
-        // match expr
+        // pred expr
         assert(expr->type.id == fun_match_expr.id);
 
-        AstExpr *bang = expr->exprs[expr->len - 1];
+        AstExpr *match = expr->exprs[expr->len - 1];
 
-        assert(bang->type.id == fun_type_bang.id);
+        bool opt = false, rep = false;
 
-        *match = (MatchAtom){
+        while (match->type.id != fun_type_bang.id) {
+            if (match->type.id == fun_opt_match.id) {
+                opt = true;
+                match = match->exprs[0];
+            } else if (match->type.id == fun_rep_match.id) {
+                rep = true;
+                match = match->exprs[0];
+            } else {
+                assert(false);
+            }
+        }
+
+        assert(match->type.id == fun_type_bang.id);
+
+        *pred = (MatchAtom){
             .type = MATCH_EXPR,
-            .rule_expr = compile_type_expr(pool, names, file, bang->exprs[0]),
-            .type_expr = compile_type_expr(pool, names, file, bang->exprs[2])
+            .rule_expr = compile_type_expr(pool, names, file, match->exprs[0]),
+            .type_expr = compile_type_expr(pool, names, file, match->exprs[2]),
+            .optional = opt,
+            .repeating = rep
         };
     }
 }

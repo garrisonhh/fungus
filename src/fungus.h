@@ -25,6 +25,8 @@
     X(match_expr, "MatchExpr",   1, { fun_rule })\
     X(type_or,    "TypeOr",      1, { fun_rule })\
     X(type_bang,  "TypeBang",    1, { fun_rule })\
+    X(opt_match,  "OptMatch",    1, { fun_rule })\
+    X(rep_match,  "RepMatch",    1, { fun_rule })\
     X(returns,    "Returns",     1, { fun_rule })\
     X(pattern,    "Pattern",     1, { fun_rule })\
     X(wh_clause,  "WhereClause", 1, { fun_rule })\
@@ -36,6 +38,16 @@
     X(number,     "Number",      1, { fun_primitive })\
     X(int,        "int",         1, { fun_number })\
     X(float,      "float",       1, { fun_number })
+
+#define BASE_PRECS\
+    PREC("Lowest",     LEFT)\
+    \
+    PREC("Default",    LEFT)\
+    PREC("Assignment", RIGHT)\
+    PREC("AddSub",     LEFT)\
+    PREC("MulDiv",     LEFT)\
+    \
+    PREC("Highest",    LEFT)
 
 // table of (name, prec, pattern)
 #define BASE_RULES\
@@ -60,6 +72,15 @@
     RULE(let_decl, "LetDecl", "Assignment",\
          "`let assign: Assign!AnyValue -> nil")\
     /* control flow TODO */\
+    RULE(if, "If", "Default",\
+         "`if cond: AnyExpr!bool body: Scope!T -> T"\
+         "    where T = AnyValue")\
+    RULE(elif, "Elif", "Default",\
+         "`elif cond: AnyExpr!bool body: Scope!T -> T where T = AnyValue")\
+    RULE(else, "Else", "Default",\
+         "`else body: Scope!T -> T where T = AnyValue")\
+    RULE(if_chain, "IfChain", "Default",\
+         "if: If!T elif: Elif!T?* else: Else!T? -> T where T = AnyValue")\
 
 // define fun_X global vars that are defined in fungus_define_base
 #define X(NAME, ...) extern Type fun_##NAME;
