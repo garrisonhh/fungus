@@ -5,9 +5,64 @@
 #include "lang.h"
 #include "lang/ast_expr.h"
 
-// expands pattern into `expanded` list
-static void expand_pattern(AstExpr *expr, Pattern *pat, MatchAtom *expanded) {
-    // TODO
+// for pattern checking
+static bool check_evaltype(const SemaCtx *ctx, const AstExpr *model,
+                           const AstExpr *expr, Type ty) {
+    if (expr->evaltype.id == ty.id)
+        return true;
+
+    const Word *ty_name = Type_name(ty);
+
+    AstExpr_error(ctx->file, expr,
+                  "expected this expr to resolve to type `%.*s`",
+                  (int)ty_name->len, ty_name->str);
+    AstExpr_error(ctx->file, model, "matching this expression");
+
+    return false;
+}
+
+// checks pattern for expr, fills in evaltype, returns success
+static bool pattern_check_and_infer(const SemaCtx *ctx, AstExpr *expr,
+                                    const Pattern *pat) {
+    // pattern expansion TODO
+    if (pat->len != expr->len && pat->wheres_len)
+        UNIMPLEMENTED;
+
+    // type inference
+    bool inferred_ret = false;
+
+    // where clauses
+    for (size_t i = 0; i < pat->wheres_len; ++i) {
+        WhereClause *clause = &pat->wheres[i];
+        Type resolved = fun_unknown;
+
+        if (clause->num_constrains) {
+            const AstExpr *model = expr->exprs[clause->constrains[0]];
+
+            resolved = model->evaltype;
+
+            for (size_t j = 1; j < clause->num_constrains; ++j) {
+                size_t idx = clause->constrains[j];
+
+                if (!check_evaltype(ctx, model, expr->exprs[idx], resolved))
+                    return false;
+            }
+        }
+
+        if (clause->hits_return) {
+            inferred_ret = true;
+            expr->evaltype = resolved;
+        }
+    }
+
+    // evaltype is uninferred
+    if (!inferred_ret) {
+        assert(pat->returns->type == TET_ATOM);
+
+        expr->evaltype = pat->returns->atom;
+    }
+
+    return true;
 }
 
 /*
@@ -69,15 +124,15 @@ static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
             else
                 expr->evaltype = expr->exprs[expr->len - 1]->evaltype;
         } else {
+            // normal rules
             for (size_t i = 0; i < expr->len; ++i)
                 if (!type_check_and_infer(ctx, expr->exprs[i]))
                     return false;
 
-            // TODO figure out templated stuff here
             const Pattern *pat = &entry->pat;
 
-            if (pat->returns->type == TET_ATOM)
-                expr->evaltype = pat->returns->atom;
+            if (!pattern_check_and_infer(ctx, expr, pat))
+                return false;
         }
     }
 

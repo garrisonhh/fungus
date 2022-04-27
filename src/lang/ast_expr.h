@@ -32,6 +32,7 @@ typedef struct AstExpr {
 bool AstExpr_is_atom(const AstExpr *);
 Word AstExpr_as_word(const File *, const AstExpr *expr);
 
+void AstExpr_display(const File *, const AstExpr *);
 void AstExpr_error(const File *, const AstExpr *, const char *fmt, ...);
 void AstExpr_error_from(const File *, const AstExpr *, const char *fmt, ...);
 void AstExpr_dump(const AstExpr *, const Lang *, const File *);
