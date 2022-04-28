@@ -94,7 +94,6 @@ TypeExpr *TypeExpr_deepcopy(Bump *pool, const TypeExpr *expr) {
         copy->atom = expr->atom;
         break;
     case TET_SUM:
-    case TET_PRODUCT:
         copy->len = expr->len;
         copy->exprs = Bump_alloc(pool, copy->len * sizeof(*copy->exprs));
 
@@ -121,15 +120,6 @@ bool TypeExpr_deepequals(const TypeExpr *expr, const TypeExpr *other) {
         fungus_panic("TODO sum deepequals");
 
         return true;
-    case TET_PRODUCT:
-        if (expr->len != other->len)
-            return false;
-
-        for (size_t i = 0; i < expr->len; ++i)
-            if (!TypeExpr_deepequals(expr->exprs[i], other->exprs[i]))
-                return false;
-
-        return true;
     }
 }
 
@@ -150,9 +140,6 @@ bool Type_matches(Type ty, const TypeExpr *pat) {
     case TET_ATOM:;
         // whether atom is the other atom
         return Type_is(ty, pat->atom);
-    case TET_PRODUCT:
-        // atoms can't match products
-        return false;
     case TET_SUM:
         // whether atom is included in sum
         for (size_t i = 0; i < pat->len; ++i)
@@ -174,29 +161,6 @@ bool TypeExpr_matches(const TypeExpr *expr, const TypeExpr *pat) {
                 return false;
 
         return true;
-    case TET_PRODUCT:
-        switch (pat->type) {
-        case TET_ATOM:
-            // products can't match atoms
-            return false;
-        case TET_SUM:
-            // products could match something in a sum
-            for (size_t i = 0; i < pat->len; ++i)
-                if (TypeExpr_matches(expr, pat->exprs[i]))
-                    return true;
-
-            return false;
-        case TET_PRODUCT:
-            // whether all of expr members match pat's members
-            if (pat->len != expr->len)
-                return false;
-
-            for (size_t i = 0; i < expr->len; ++i)
-                if (!TypeExpr_matches(expr->exprs[i], pat->exprs[i]))
-                    return false;
-
-            return true;
-        }
     }
 }
 
@@ -225,15 +189,6 @@ bool TypeExpr_equals(const TypeExpr *a, const TypeExpr *b) {
             if (!found)
                 return false;
         }
-
-        return true;
-    case TET_PRODUCT:
-        if (a->len != b->len)
-            return false;
-
-        for (size_t i = 0; i < a->len; ++i)
-            if (!TypeExpr_equals(a->exprs[i], b->exprs[i]))
-                return false;
 
         return true;
     }
@@ -293,17 +248,7 @@ void TypeExpr_print(const TypeExpr *expr) {
         break;
     case TET_SUM:
         for (size_t i = 0; i < expr->len; ++i) {
-            bool add_parens = expr->exprs[i]->type == TET_PRODUCT;
-
             if (i) printf(" | ");
-            if (add_parens) printf("(");
-            TypeExpr_print(expr->exprs[i]);
-            if (add_parens) printf(")");
-        }
-        break;
-    case TET_PRODUCT:
-        for (size_t i = 0; i < expr->len; ++i) {
-            if (i) printf(" * ");
             TypeExpr_print(expr->exprs[i]);
         }
         break;
