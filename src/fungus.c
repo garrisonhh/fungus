@@ -4,20 +4,20 @@
 
 Lang fungus_lang;
 
-#define X(NAME, ...) Type fun_##NAME;
+#define TYPE(NAME, ...) Type fun_##NAME;
 BASE_TYPES
-#undef X
+#undef TYPE
 #define RULE(NAME, ...) Type fun_##NAME;
 BASE_RULES
 #undef RULE
 
 void fungus_define_base(Names *names) {
-#define X(NAME, ENUM_NAME, STR, NUM_SUPERS, SUPERS) {\
+#define TYPE(NAME, ENUM_NAME, STR, NUM_SUPERS, SUPERS) {\
     Type supers[] = SUPERS;\
     fun_##NAME = Type_define(names, WORD(STR), supers, NUM_SUPERS);\
 }
     BASE_TYPES
-#undef X
+#undef TYPE
 
 #define RULE(NAME, ENUM_NAME, STR, ...)\
     fun_##NAME = Type_define(names, WORD(STR), &fun_rule, 1);
@@ -79,30 +79,6 @@ void fungus_lang_init(Names *names) {
 
         Lang_legislate(&fun, &files[i], *types[i], prec, pre_pat);
     }
-
-    /*
-    // TODO de-macro-ify this LOL
-#define RULE(NAME, STR, PREC, PAT) do {\
-        Word prec_name = WORD(PREC);\
-        Prec prec = Prec_by_name(&fun.precs, &prec_name);\
-        files[idx] = pattern_file(PAT);\
-        AstExpr *pre_pat =\
-            precompile_pattern(&fun.rules.pool, names, &files[idx]);\
-        assert(pre_pat);\
-        \
-        Word name = WORD(STR);\
-        const NameEntry *entry = name_lookup(names, &name);\
-        assert(entry->type == NAMED_TYPE\
-            && entry->type_expr->type == TET_ATOM);\
-        \
-        Lang_legislate(&fun, &files[idx], entry->type_expr->atom, prec,\
-                       pre_pat);\
-        ++idx;\
-    } while (0);
-
-    BASE_RULES
-#undef RULE
-    */
 
     Lang_crystallize(&fun, names);
 

@@ -83,6 +83,7 @@ static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
                     if (i >= tb->len) {
                         File_error_at(tb->file, start, len,
                                       "bare lexeme escape.");
+                        global_error = true;
                     }
 
                     ++i;
@@ -95,6 +96,7 @@ static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
                      || next_start != start + len) {
                         File_error_at(tb->file, start, len,
                                       "bare lexeme escape.");
+                        global_error = true;
                     }
 
                     // word literal lexeme
