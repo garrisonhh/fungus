@@ -5,39 +5,39 @@
 #include "sema/types.h"
 #include "sema/names.h"
 
-// table of (name, fun name, num supers, super list)
+// table of (name, enum name, fun name, num supers, super list)
 #define BASE_TYPES\
     /* special */\
-    X(unknown,    "Unknown",     0, {0}) /* placeholder for parsing */\
-    X(any,        "Any",         0, {0}) /* truly any valid type */\
-    X(any_val,    "AnyValue",    1, { fun_any }) /* any runtime value */\
-    X(any_expr,   "AnyExpr",     1, { fun_any }) /* any AST expr */\
-    X(rule,       "Rule",        1, { fun_any_expr })\
-    X(nil,        "nil",         1, { fun_any_val })\
+    X(unknown,    UNKNOWN,    "Unknown",     0, {0}) /* placeholder; invalid */\
+    X(any,        ANY,        "Any",         0, {0}) /* truly any valid type */\
+    X(any_val,    ANY_VAL,    "AnyValue",    1, { fun_any })\
+    X(any_expr,   ANY_EXPR,   "AnyExpr",     1, { fun_any }) /* any AST expr */\
+    X(rule,       RULE,       "Rule",        1, { fun_any_expr })\
+    X(nil,        NIL,        "nil",         1, { fun_any_val })\
     /* metatypes + parsing */\
-    X(scope,      "Scope",       1, { fun_rule })\
-    X(lexeme,     "Lexeme",      1, { fun_any_expr })\
-    X(literal,    "Literal",     1, { fun_any_expr })\
-    X(ident,      "Ident",       1, { fun_any_expr })\
-    X(type,       "Type",        1, { fun_any_expr }) /* fungus type */\
+    X(scope,      SCOPE,      "Scope",       1, { fun_rule })\
+    X(lexeme,     LEXEME,     "Lexeme",      1, { fun_any_expr })\
+    X(literal,    LITERAL,    "Literal",     1, { fun_any_expr })\
+    X(ident,      IDENT,      "Ident",       1, { fun_any_expr })\
+    X(type,       TYPE,       "Type",        1, { fun_any_expr })\
     /* pattern types */\
-    X(match,      "Match",       1, { fun_rule }) /* type!evaltype */\
-    X(match_expr, "MatchExpr",   1, { fun_rule })\
-    X(type_or,    "TypeOr",      1, { fun_rule })\
-    X(type_bang,  "TypeBang",    1, { fun_rule })\
-    X(opt_match,  "OptMatch",    1, { fun_rule })\
-    X(rep_match,  "RepMatch",    1, { fun_rule })\
-    X(returns,    "Returns",     1, { fun_rule })\
-    X(pattern,    "Pattern",     1, { fun_rule })\
-    X(wh_clause,  "WhereClause", 1, { fun_rule })\
-    X(where,      "Where",       1, { fun_rule })\
+    X(match,      MATCH,      "Match",       1, { fun_rule })\
+    X(match_expr, MATCH_EXPR, "MatchExpr",   1, { fun_rule })\
+    X(type_or,    TYPE_OR,    "TypeOr",      1, { fun_rule })\
+    X(type_bang,  TYPE_BANG,  "TypeBang",    1, { fun_rule })\
+    X(opt_match,  OPT_MATCH,  "OptMatch",    1, { fun_rule })\
+    X(rep_match,  REP_MATCH,  "RepMatch",    1, { fun_rule })\
+    X(returns,    RETURNS,    "Returns",     1, { fun_rule })\
+    X(pattern,    PATTERN,    "Pattern",     1, { fun_rule })\
+    X(wh_clause,  WH_CLAUSE,  "WhereClause", 1, { fun_rule })\
+    X(where,      WHERE,      "Where",       1, { fun_rule })\
     /* primitives */\
-    X(primitive,  "Primitive",   1, { fun_any_val })\
-    X(bool,       "bool",        1, { fun_primitive })\
-    X(string,     "string",      1, { fun_primitive })\
-    X(number,     "Number",      1, { fun_primitive })\
-    X(int,        "int",         1, { fun_number })\
-    X(float,      "float",       1, { fun_number })
+    X(primitive,  PRIMITIVE,  "Primitive",   1, { fun_any_val })\
+    X(bool,       BOOL,       "bool",        1, { fun_primitive })\
+    X(string,     STRING,     "string",      1, { fun_primitive })\
+    X(number,     NUMBER,     "Number",      1, { fun_primitive })\
+    X(int,        INT,        "int",         1, { fun_number })\
+    X(float,      FLOAT,      "float",       1, { fun_number })
 
 #define BASE_PRECS\
     PREC("Lowest",     LEFT)\
@@ -52,34 +52,34 @@
 // table of (name, prec, pattern)
 #define BASE_RULES\
     /* basic math stuff */\
-    RULE(parens, "Parens", "Highest",\
+    RULE(parens, PARENS, "Parens", "Highest",\
          "`( expr: AnyExpr!T `) -> T where T = Any")\
-    RULE(add, "Add", "AddSub",\
+    RULE(add, ADD, "Add", "AddSub",\
          "lhs: AnyExpr!T `+ rhs: AnyExpr!T -> T where T = int | float")\
-    RULE(subtract, "Subtract", "AddSub",\
+    RULE(subtract, SUBTRACT, "Subtract", "AddSub",\
          "lhs: AnyExpr!T `- rhs: AnyExpr!T -> T where T = int | float")\
-    RULE(multiply, "Multiply", "MulDiv",\
+    RULE(multiply, MULTIPLY, "Multiply", "MulDiv",\
          "lhs: AnyExpr!T `* rhs: AnyExpr!T -> T where T = int | float")\
-    RULE(divide, "Divide", "MulDiv",\
+    RULE(divide, DIVIDE, "Divide", "MulDiv",\
          "lhs: AnyExpr!T `/ rhs: AnyExpr!T -> T where T = int | float")\
-    RULE(modulo, "Modulo", "MulDiv",\
+    RULE(modulo, MODULO, "Modulo", "MulDiv",\
          "lhs: AnyExpr!T `% rhs: AnyExpr!T -> T where T = int | float")\
     /* variable assignment */\
-    RULE(assign, "Assign",    "Assignment",\
+    RULE(assign, ASSIGN, "Assign",    "Assignment",\
          "name: Ident!T `= value: AnyExpr!T -> T where T = AnyValue")\
-    RULE(const_decl, "ConstDecl", "Assignment",\
+    RULE(const_decl, CONST_DECL, "ConstDecl", "Assignment",\
          "`const assign: Assign!AnyValue -> nil")\
-    RULE(let_decl, "LetDecl", "Assignment",\
+    RULE(let_decl, LET_DECL, "LetDecl", "Assignment",\
          "`let assign: Assign!AnyValue -> nil")\
     /* control flow TODO */\
-    RULE(if, "If", "Default",\
+    RULE(if, IF, "If", "Default",\
          "`if cond: AnyExpr!bool body: Scope!T -> T"\
          "    where T = AnyValue")\
-    RULE(elif, "Elif", "Default",\
+    RULE(elif, ELIF, "Elif", "Default",\
          "`elif cond: AnyExpr!bool body: Scope!T -> T where T = AnyValue")\
-    RULE(else, "Else", "Default",\
+    RULE(else, ELSE, "Else", "Default",\
          "`else body: Scope!T -> T where T = AnyValue")\
-    RULE(if_chain, "IfChain", "Default",\
+    RULE(if_chain, IF_CHAIN, "IfChain", "Default",\
          "if: If!T elif: Elif!T?* else: Else!T? -> T where T = AnyValue")\
 
 // define fun_X global vars that are defined in fungus_define_base
@@ -89,6 +89,12 @@ BASE_TYPES
 #define RULE(NAME, ...) extern Type fun_##NAME;
 BASE_RULES
 #undef RULE
+
+#define X(NAME, ENUM_NAME, ...) ID_##ENUM_NAME,
+#define RULE(NAME, ENUM_NAME, ...) ID_##ENUM_NAME,
+enum BaseTypeIDs { BASE_TYPES BASE_RULES };
+#undef RULE
+#undef X
 
 extern Lang fungus_lang;
 

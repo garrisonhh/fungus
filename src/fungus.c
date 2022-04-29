@@ -12,14 +12,14 @@ BASE_RULES
 #undef RULE
 
 void fungus_define_base(Names *names) {
-#define X(NAME, STR, NUM_SUPERS, SUPERS) {\
+#define X(NAME, ENUM_NAME, STR, NUM_SUPERS, SUPERS) {\
     Type supers[] = SUPERS;\
     fun_##NAME = Type_define(names, WORD(STR), supers, NUM_SUPERS);\
 }
     BASE_TYPES
 #undef X
 
-#define RULE(NAME, STR, ...)\
+#define RULE(NAME, ENUM_NAME, STR, ...)\
     fun_##NAME = Type_define(names, WORD(STR), &fun_rule, 1);
 
     BASE_RULES
@@ -60,13 +60,13 @@ void fungus_lang_init(Names *names) {
 #define RULE(...) {0},
     File files[] = { BASE_RULES };
 #undef RULE
-#define RULE(NAME, STR, PREC, PAT) &fun_##NAME,
+#define RULE(NAME, ENUM_NAME, STR, PREC, PAT) &fun_##NAME,
     Type *types[] = { BASE_RULES };
 #undef RULE
-#define RULE(NAME, STR, PREC, PAT) WORD(PREC),
+#define RULE(NAME, ENUM_NAME, STR, PREC, PAT) WORD(PREC),
     Word precs[] = { BASE_RULES };
 #undef RULE
-#define RULE(NAME, STR, PREC, PAT) PAT,
+#define RULE(NAME, ENUM_NAME, STR, PREC, PAT) PAT,
     const char *pats[] = { BASE_RULES };
 #undef RULE
 
