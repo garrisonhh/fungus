@@ -59,6 +59,9 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             "sema/types.c",
             "sema/names.c",
 
+            // sir
+            "sir.c",
+
             // utility
             "file.c",
             "utils.c",

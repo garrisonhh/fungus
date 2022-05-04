@@ -61,9 +61,10 @@ static void copy_entry_to(Bump *pool, NameEntry *dst, const NameEntry *entry) {
 
     switch (entry->type) {
     case NAMED_TYPE:
-    case NAMED_VARIABLE:
         dst->type_expr = TypeExpr_deepcopy(pool, entry->type_expr);
-
+        break;
+    case NAMED_VARIABLE:
+        dst->var_type = entry->var_type;
         break;
     default:
         UNIMPLEMENTED;

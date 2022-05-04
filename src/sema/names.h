@@ -5,10 +5,8 @@
 #include "types.h"
 
 /*
- * this is a symbol table implementation for use in typing + typechecking the
- * AST in sema.
- *
- * there are two ways sym
+ * this is a symbol table implementation for use in sema typing, typechecking,
+ * templating, (TODO) var backrefs, etc.
  */
 
 #define NAMED_TYPES\
@@ -28,7 +26,7 @@ typedef struct NameEntry {
 
     NamedType type;
     union {
-        // types
+        // types + templates
         const TypeExpr *type_expr;
 
         // vars
@@ -39,7 +37,7 @@ typedef struct NameEntry {
 /*
  * trivially optimizable into a hashmap eventually
  *
- * scopes[0] isn't really used; at level 0 entries go into a global symbol table
+ * scopes[0] is unused; at level 0 entries go into a global symbol table
  */
 typedef struct Names {
     Bump pool;

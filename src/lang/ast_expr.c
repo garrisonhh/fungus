@@ -30,6 +30,10 @@ Word AstExpr_as_word(const File *file, const AstExpr *expr) {
     return Word_new(&file->text.str[start], len);
 }
 
+void AstExpr_display(const File *f, const AstExpr *expr) {
+    File_display_at(stderr, f, AstExpr_tok_start(expr), AstExpr_tok_len(expr));
+}
+
 void AstExpr_error(const File *f, const AstExpr *expr, const char *fmt, ...) {
     va_list args;
 

@@ -5,7 +5,7 @@
 #include "lex.h"
 #include "parse.h"
 #include "sema.h"
-#include "lang/ast_expr.h"
+#include "sir.h"
 
 void repl(Names *names) {
     puts(TC_YELLOW "fungus v0 - by garrisonhh" TC_RESET);
@@ -29,6 +29,7 @@ void repl(Names *names) {
 
         if (global_error) goto cleanup_parse;
 
+        // sema
         sema(&(SemaCtx){
             .pool = &parse_pool,
             .file = &file,
@@ -38,12 +39,21 @@ void repl(Names *names) {
 
         if (global_error) goto cleanup_parse;
 
+        // sir
+        Bump sir_pool = Bump_new();
+        const SirExpr *sir = generate_sir(&sir_pool, &file, ast);
+
+        if (global_error) goto cleanup_sir;
+
 #if 1
-        puts(TC_CYAN "AST:" TC_RESET);
-        AstExpr_dump(ast, &fungus_lang, tokbuf.file);
+        puts(TC_CYAN "generated sir:" TC_RESET);
+        SirExpr_dump(sir);
+        puts("");
 #endif
 
         // cleanup
+cleanup_sir:
+        Bump_del(&sir_pool);
 cleanup_parse:
         Bump_del(&parse_pool);
 cleanup_lex:

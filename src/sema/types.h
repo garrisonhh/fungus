@@ -16,21 +16,17 @@ typedef struct Names Names;
 typedef struct TypeHandle { unsigned id; } Type;
 
 typedef enum TypeExprType {
-    // basic unit like `u64`
     TET_ATOM,
-
-    // algebraic typing
     TET_SUM,
-    TET_PRODUCT,
 } TypeExprType;
 
 typedef struct TypeExpr {
     TypeExprType type;
     union {
-        // atomic
+        // atom
         Type atom;
 
-        // algebraic
+        // sum
         struct {
             struct TypeExpr **exprs;
             size_t len;
@@ -62,7 +58,6 @@ bool TypeExpr_equals(const TypeExpr *, const TypeExpr *);
 // TypeExpr convenience funcs
 TypeExpr *TypeExpr_atom(Bump *pool, Type ty);
 TypeExpr *TypeExpr_sum(Bump *pool, size_t n, ...);
-TypeExpr *TypeExpr_product(Bump *pool, size_t n, ...);
 
 void TypeExpr_print(const TypeExpr *expr);
 void Type_print(Type ty);

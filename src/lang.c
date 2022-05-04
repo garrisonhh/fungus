@@ -30,10 +30,8 @@ void Lang_del(Lang *lang) {
     free((char *)lang->name.str);
 }
 
-Rule Lang_legislate(Lang *lang, Names *names, const File *file, Word word,
+Rule Lang_legislate(Lang *lang, const File *file, Type type,
                     Prec prec, AstExpr *pat_ast) {
-    Type type = Rule_define_type(names, word);
-
     return Rule_define(&lang->rules, file, type, prec, pat_ast);
 }
 

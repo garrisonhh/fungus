@@ -6,7 +6,6 @@
 #include "../lang.h"
 #include "../lex.h"
 #include "../parse.h"
-#include "../sema/names.h"
 
 Lang pattern_lang;
 
@@ -14,7 +13,7 @@ Lang pattern_lang;
     PREC("Lowest",  LEFT)\
     PREC("Pattern", RIGHT)\
     PREC("Default", LEFT)\
-    PREC("Bang",    LEFT)\
+    PREC("Match",   LEFT)\
     PREC("Or",      LEFT)\
     PREC("Highest", LEFT)
 
@@ -92,7 +91,7 @@ void pattern_lang_init(Names *names) {
         GET_PREC(pattern_prec, "Pattern");
         GET_PREC(default_prec, "Default");
         GET_PREC(or_prec,      "Or");
-        GET_PREC(bang_prec,    "Bang");
+        GET_PREC(match_prec,   "Match");
 
 #undef GET_PREC
 
@@ -100,12 +99,18 @@ void pattern_lang_init(Names *names) {
         size_t len;
 
         // match expr
+        const TypeExpr *match_expr_types =
+            TypeExpr_sum(p, 3,
+                         TypeExpr_atom(p, fun_type_bang),
+                         TypeExpr_atom(p, fun_rep_match),
+                         TypeExpr_atom(p, fun_opt_match));
+
         len = 3;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_expr(p, TypeExpr_atom(p, fun_ident),
-                                    TypeExpr_atom(p, fun_ident), 0);
+                                    TypeExpr_atom(p, fun_unknown), 0);
         matches[1] = new_match_lxm(p, ":");
-        matches[2] = new_match_expr(p, TypeExpr_atom(p, fun_type_bang),
+        matches[2] = new_match_expr(p, match_expr_types,
                                     TypeExpr_atom(p, fun_match), 0);
 
         Lang_immediate_legislate(&lang, fun_match_expr, default_prec, (Pattern){
@@ -138,7 +143,33 @@ void pattern_lang_init(Names *names) {
         matches[2] = new_match_expr(p, TypeExpr_atom(p, fun_any_expr),
                                     TypeExpr_atom(p, fun_type), 0);
 
-        Lang_immediate_legislate(&lang, fun_type_bang, bang_prec, (Pattern){
+        Lang_immediate_legislate(&lang, fun_type_bang, match_prec, (Pattern){
+            .matches = matches,
+            .len = len,
+            .returns = TypeExpr_atom(p, fun_match),
+        });
+
+        // optional modifier
+        len = 2;
+        matches = Bump_alloc(p, len * sizeof(*matches));
+        matches[0] = new_match_expr(p, match_expr_types,
+                                    TypeExpr_atom(p, fun_match), 0);
+        matches[1] = new_match_lxm(p, "?");
+
+        Lang_immediate_legislate(&lang, fun_opt_match, match_prec, (Pattern){
+            .matches = matches,
+            .len = len,
+            .returns = TypeExpr_atom(p, fun_match),
+        });
+
+        // repeating modifier
+        len = 2;
+        matches = Bump_alloc(p, len * sizeof(*matches));
+        matches[0] = new_match_expr(p, match_expr_types,
+                                    TypeExpr_atom(p, fun_match), 0);
+        matches[1] = new_match_lxm(p, "*");
+
+        Lang_immediate_legislate(&lang, fun_rep_match, match_prec, (Pattern){
             .matches = matches,
             .len = len,
             .returns = TypeExpr_atom(p, fun_match),
@@ -228,6 +259,32 @@ void pattern_lang_quit(void) {
     Lang_del(&pattern_lang);
 }
 
+bool MatchAtom_matches_rule(const File *file, const MatchAtom *pred,
+                            const AstExpr *expr) {
+    bool matches = false;
+
+    if (expr->type.id == fun_lexeme.id) {
+        // lexeme
+        View token = { &file->text.str[expr->tok_start], expr->tok_len };
+
+        matches = pred->type == MATCH_LEXEME && Word_eq_view(pred->lxm, &token);
+    } else {
+        // expr
+        matches = pred->type == MATCH_EXPR
+               && Type_matches(expr->type, pred->rule_expr);
+    }
+
+    return matches;
+}
+
+bool MatchAtom_matches_type(const File *file, const MatchAtom *pred,
+                            const AstExpr *expr) {
+    if (pred->type == MATCH_LEXEME)
+        return true;
+
+    return Type_matches(expr->evaltype, pred->type_expr);
+}
+
 // used to determined what RuleNodes can work with each other
 bool MatchAtom_equals(const MatchAtom *a, const MatchAtom *b) {
     if (a->type == b->type) {
@@ -264,17 +321,14 @@ AstExpr *precompile_pattern(Bump *pool, Names *names, const File *file) {
         .lang = &pattern_lang
     }, &tokens);
 
-    sema(&(SemaCtx){
-        .pool = pool,
-        .file = file,
-        .lang = &pattern_lang,
-        .names = names
-    }, ast);
+    /*
+     * used to do sema here but it ended up being problematic, may want to
+     * bring it back in the future? unsure
+     */
 
-#if 0
-    puts(TC_CYAN "precompiled pattern:" TC_RESET);
+#if 1
+    puts(TC_YELLOW "precompiled pattern:" TC_RESET);
     AstExpr_dump(ast, &pattern_lang, file);
-    puts("");
 #endif
 
     TokBuf_del(&tokens);
@@ -288,10 +342,20 @@ static TypeExpr *compile_type_expr(Bump *pool, const Names *names,
         Word word = AstExpr_as_word(file, expr);
         const NameEntry *entry = name_lookup(names, &word);
 
-        assert(entry->type == NAMED_TYPE);
+#ifdef DEBUG
+        if (!entry)
+            AstExpr_error(file, expr, "unknown pattern type.");
+        else if (entry->type != NAMED_TYPE)
+            AstExpr_error(file, expr, "not a pattern type.");
+#endif
 
         return TypeExpr_deepcopy(pool, entry->type_expr);
     } else {
+#ifdef DEBUG
+        if (expr->type.id != fun_type_or.id)
+            AstExpr_error(file, expr, "invalid pattern type expr.");
+#endif
+
         assert(expr->type.id == fun_type_or.id);
 
         TypeExpr *lhs = compile_type_expr(pool, names, file, expr->exprs[0]);
@@ -301,25 +365,85 @@ static TypeExpr *compile_type_expr(Bump *pool, const Names *names,
     }
 }
 
-// adds where clause to scope as aliased typeexprs and returns proper
-// representation for Pattern
-static WhereClause compile_where_clause(Bump *pool, Names *names,
-                                        const File *file, const AstExpr *expr) {
-    assert(expr->type.id == fun_wh_clause.id);
+static bool expr_is_template(const File *file, const AstExpr *expr,
+                             const Word *name) {
+    if (expr->type.id != fun_ident.id)
+        return false;
 
-    Word name = AstExpr_as_word(file, expr->exprs[0]);
-    const TypeExpr *type_expr =
-        compile_type_expr(pool, names, file, expr->exprs[2]);
+    Word ident = AstExpr_as_word(file, expr);
 
-    Names_define_type(names, &name, type_expr);
+    return Word_eq(&ident, name);
+}
+
+// parse `where` clauses, type check patterns, and push template names
+// temporarily on Names as types
+static WhereClause compile_where_clause(Bump *pool, const Names *names,
+                                        const File *file,
+                                        const AstExpr *pat,
+                                        size_t num_params,
+                                        const AstExpr *clause) {
+    assert(pat->type.id == fun_pattern.id);
+    assert(clause->type.id == fun_wh_clause.id);
+
+    Word name = AstExpr_as_word(file, clause->exprs[0]);
+
+    // figure out constrained param/return types
+    size_t con_len = 0, con_cap = 8;
+    size_t *constrains = malloc(con_cap * sizeof(*constrains));
+
+    for (size_t i = 0; i < num_params; ++i) {
+        const AstExpr *param = pat->exprs[i];
+
+        if (param->type.id != fun_match_expr.id)
+            continue;
+
+        const AstExpr *param_match = param->exprs[2];
+
+        while (param_match->type.id != fun_type_bang.id) {
+            if (param_match->type.id == fun_opt_match.id)
+                param_match = param_match->exprs[0];
+            else if (param_match->type.id == fun_rep_match.id)
+                param_match = param_match->exprs[0];
+            else
+                assert(false);
+        }
+
+        const AstExpr *param_evaltype = param_match->exprs[2];
+
+        if (expr_is_template(file, param_evaltype, &name)) {
+            // found template, add to constrains list
+            if (con_len == con_cap) {
+                con_cap *= 2;
+                constrains =
+                    realloc(constrains, con_cap * sizeof(*constrains));
+            }
+
+            constrains[con_len++] = i;
+        }
+    }
+
+    // copy constrains
+    size_t *pooled_constrains = Bump_alloc(pool, con_len * sizeof(*constrains));
+
+    for (size_t i = 0; i < con_len; ++i)
+        pooled_constrains[i] = constrains[i];
+
+    free(constrains);
+
+    // return type
+    bool return_is_template =
+        expr_is_template(file, pat->exprs[num_params]->exprs[1], &name);
 
     return (WhereClause){
         .name = Word_copy_of(&name, pool),
-        .type_expr = type_expr
+        .type_expr = compile_type_expr(pool, names, file, clause->exprs[2]),
+        .constrains = pooled_constrains,
+        .num_constrains = con_len,
+        .hits_return = return_is_template
     };
 }
 
-static void compile_match_atom(MatchAtom *match, Bump *pool, const Names *names,
+static void compile_match_atom(MatchAtom *pred, Bump *pool, const Names *names,
                                const File *file, const AstExpr *expr) {
     if (expr->type.id == fun_literal.id) {
         // match lexeme
@@ -331,22 +455,38 @@ static void compile_match_atom(MatchAtom *match, Bump *pool, const Names *names,
         ++word.str;
         --word.len;
 
-        *match = (MatchAtom){
+        *pred = (MatchAtom){
             .type = MATCH_LEXEME,
             .lxm = Word_copy_of(&word, pool),
         };
     } else {
-        // match expr
+        // pred expr
         assert(expr->type.id == fun_match_expr.id);
 
-        AstExpr *bang = expr->exprs[expr->len - 1];
+        AstExpr *match = expr->exprs[expr->len - 1];
 
-        assert(bang->type.id == fun_type_bang.id);
+        bool opt = false, rep = false;
 
-        *match = (MatchAtom){
+        while (match->type.id != fun_type_bang.id) {
+            if (match->type.id == fun_opt_match.id) {
+                opt = true;
+                match = match->exprs[0];
+            } else if (match->type.id == fun_rep_match.id) {
+                rep = true;
+                match = match->exprs[0];
+            } else {
+                assert(false);
+            }
+        }
+
+        assert(match->type.id == fun_type_bang.id);
+
+        *pred = (MatchAtom){
             .type = MATCH_EXPR,
-            .rule_expr = compile_type_expr(pool, names, file, bang->exprs[0]),
-            .type_expr = compile_type_expr(pool, names, file, bang->exprs[2])
+            .rule_expr = compile_type_expr(pool, names, file, match->exprs[0]),
+            .type_expr = compile_type_expr(pool, names, file, match->exprs[2]),
+            .optional = opt,
+            .repeating = rep
         };
     }
 }
@@ -354,13 +494,6 @@ static void compile_match_atom(MatchAtom *match, Bump *pool, const Names *names,
 Pattern compile_pattern(Bump *pool, Names *names, const File *file,
                         const AstExpr *ast) {
     Pattern pat = {0};
-
-    // ensure compiled ast is properly formatted
-    if (ast->len != 1 || ast->evaltype.id != fun_pattern.id) {
-        AstExpr_dump(ast, &pattern_lang, file);
-
-        AstExpr_error(file, ast, "invalid pattern!");
-    }
 
     // count number of match atoms
     const AstExpr *pat_expr = ast->exprs[0];
@@ -388,8 +521,13 @@ Pattern compile_pattern(Bump *pool, Names *names, const File *file,
         pat.wheres = Bump_alloc(pool, pat.wheres_len * sizeof(*pat.wheres));
 
         for (size_t i = 1; i < where_expr->len; ++i) {
-            pat.wheres[i - 1] =
-                compile_where_clause(pool, names, file, where_expr->exprs[i]);
+            WhereClause *clause = &pat.wheres[i - 1];
+
+            *clause =
+                compile_where_clause(pool, names, file, pat_expr, pat.len,
+                                     where_expr->exprs[i]);
+
+            Names_define_type(names, clause->name, clause->type_expr);
         }
     }
 
