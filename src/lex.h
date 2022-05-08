@@ -3,18 +3,15 @@
 
 #include "file.h"
 
-#define TOK_TYPES\
-    TYPE(INVALID)\
-    TYPE(WORD)\
-    TYPE(SYMBOLS)\
-    TYPE(BOOL)\
-    TYPE(INT)\
-    TYPE(FLOAT)\
-    TYPE(STRING)
-
-#define TYPE(NAME) TOK_##NAME,
-typedef enum TokType { TOK_TYPES TOK_COUNT } TokType;
-#undef TYPE
+typedef enum TokType {
+    TOK_INVALID,
+    TOK_WORD,
+    TOK_SYMBOLS,
+    TOK_BOOL,
+    TOK_INT,
+    TOK_FLOAT,
+    TOK_STRING
+} TokType;
 
 typedef struct TokBuf {
     TokType *types;

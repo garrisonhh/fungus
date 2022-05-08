@@ -68,7 +68,7 @@ void Lang_crystallize(Lang *lang, Names *names) {
             const MatchAtom *match = &matches[j];
 
             if (match->type == MATCH_LEXEME) {
-                if (ch_is_symbol(match->lxm->str[0]))
+                if (classify_char(match->lxm->str[0]) == CH_SYMBOL)
                     HashSet_put(&lang->syms, match->lxm);
                 else
                     HashSet_put(&lang->words, match->lxm);

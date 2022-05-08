@@ -5,6 +5,21 @@
 
 #include "../utils.h"
 
+// from zig vvv
+typedef enum CharClass {
+    CH_EOF,
+    CH_SPACE,
+    CH_ALPHA,
+    CH_DIGIT,
+    CH_UNDERSCORE,
+    CH_SYMBOL
+} CharClass;
+
+CharClass classify_char(char ch);
+const char *CharClass_name(CharClass);
+// from zig ^^^
+
+// TODO PHASE OUT vvv
 static inline bool ch_is_alpha(char c) {
     return IN_RANGE(c, 'a', 'z') || IN_RANGE(c, 'A', 'Z');
 }

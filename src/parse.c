@@ -253,7 +253,7 @@ static bool translate_scope(AstCtx *ctx, AstExpr *scope) {
             // or stay lexemes
             View tok = { &ctx->file->text.str[expr->tok_start], expr->tok_len };
 
-            if (ch_is_symbol(tok.str[0])) {
+            if (classify_char(tok.str[0]) == CH_SYMBOL) {
                 hsize_t sym_start = expr->tok_start;
                 size_t match_len;
 
