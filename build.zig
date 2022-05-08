@@ -11,9 +11,10 @@ pub fn build(b: *std.build.Builder) anyerror!void {
     const mode = b.standardReleaseOptions();
 
     const exe = b.addExecutable("fungus", null);
+
     exe.setTarget(target);
     exe.setBuildMode(mode);
-    exe.setOutputDir(b.pathFromRoot("."));
+    exe.setOutputDir(".");
     exe.linkLibC();
 
     {

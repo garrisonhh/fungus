@@ -468,7 +468,7 @@ static void collapse_right(AstCtx *ctx, AstExpr **slice, size_t *io_len,
 static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
                              size_t *o_len) {
     const RuleTree *rules = &ctx->lang->rules;
-    const PrecGraph *precs = &ctx->lang->precs;
+    const Precs *precs = &ctx->lang->precs;
 
     // construct buffers for slice matching
     AstExpr **buf = malloc(len * sizeof(*slice));
@@ -492,7 +492,7 @@ static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
 
             if (match_len > 0) {
                 Prec rule_prec = Rule_get(rules, matched)->prec;
-                Comparison cmp = Prec_cmp(precs, rule_prec, highest);
+                int cmp = Prec_cmp(rule_prec, highest);
 
                 // if this is now the highest precedence, reset match list
                 if (!num_matches || cmp > 0) {
@@ -519,24 +519,6 @@ static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
                 };
             }
         }
-
-#if 0
-        puts(TC_CYAN "COLLAPSING:" TC_RESET);
-        for (size_t j = 0; j < buf_len; ++j)
-            AstExpr_dump(buf[j], ctx->lang, ctx->file);
-
-        const Word *prec_name = Prec_name(&ctx->lang->precs, highest);
-
-        printf(TC_YELLOW "matches: (precedence %.*s)" TC_RESET "\n",
-               (int)prec_name->len, prec_name->str);
-        for (size_t j = 0; j < num_matches; ++j) {
-            const MatchSlice *match = &matches[j];
-            const Word *name = Rule_get(rules, match->rule)->name;
-
-            printf("%.*s %zu %zu\n", (int)name->len, name->str, match->start,
-                   match->len);
-        }
-#endif
 
         // if no matches are found, parsing of slice is done
         if (!num_matches)

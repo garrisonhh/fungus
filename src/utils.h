@@ -25,14 +25,6 @@ typedef uint32_t hsize_t;
 
 #define IN_RANGE(C, A, B) ((C) >= (A) && (C) <= (B))
 
-/*
- * for comparison functions:
- * cmp(a, b) > 0 // a > b
- * cmp(a, b) == 0 // a == b
- * cmp(a, b) < 0 // a < b
- */
-typedef enum Comparison { LT = -1, EQ = 0, GT = 1 } Comparison;
-
 // table names =================================================================
 
 // when using table macros I usually like to make name arrays nicer looking

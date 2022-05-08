@@ -37,24 +37,8 @@ void fungus_lang_init(Names *names) {
     Associativity prec_assocs[] = { BASE_PRECS };
 #undef PREC
 
-    Prec last;
-
-    for (size_t i = 0; i < ARRAY_SIZE(prec_names); ++i) {
-        size_t above_len = 0;
-        Prec *above = NULL;
-
-        if (i) {
-            above_len = 1;
-            above = &last;
-        }
-
-        last = Lang_make_prec(&fun, &(PrecDef){
-            .name = prec_names[i],
-            .assoc = prec_assocs[i],
-            .above = above,
-            .above_len = above_len
-        });
-    }
+    for (size_t i = 0; i < ARRAY_SIZE(prec_names); ++i)
+        Lang_make_prec(&fun, prec_names[i], prec_assocs[i]);
 
     // rules
 #define RULE(...) {0},

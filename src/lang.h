@@ -13,7 +13,7 @@ typedef struct Lang {
     Word name;
 
     RuleTree rules;
-    PrecGraph precs;
+    Precs precs;
 
     HashSet words, syms;
 } Lang;
@@ -24,8 +24,7 @@ void Lang_del(Lang *);
 Rule Lang_legislate(Lang *, const File *, Type type, Prec prec,
                     AstExpr *pat_ast);
 Rule Lang_immediate_legislate(Lang *, Type type, Prec prec, Pattern pat);
-Prec Lang_make_prec(Lang *, PrecDef *);
-
+Prec Lang_make_prec(Lang *, Word name, Associativity assoc);
 void Lang_crystallize(Lang *, Names *);
 
 void Lang_dump(const Lang *);

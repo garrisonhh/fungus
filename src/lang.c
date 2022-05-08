@@ -15,7 +15,7 @@ Lang Lang_new(Word name) {
     return (Lang){
         .name = { .str = copy, .len = name.len, .hash = name.hash },
         .rules = RuleTree_new(),
-        .precs = PrecGraph_new(),
+        .precs = Precs_new(),
         .words = HashSet_new(),
         .syms = HashSet_new()
     };
@@ -24,7 +24,7 @@ Lang Lang_new(Word name) {
 void Lang_del(Lang *lang) {
     HashSet_del(&lang->syms);
     HashSet_del(&lang->words);
-    PrecGraph_del(&lang->precs);
+    Precs_del(&lang->precs);
     RuleTree_del(&lang->rules);
 
     free((char *)lang->name.str);
@@ -53,11 +53,6 @@ Rule Lang_immediate_legislate(Lang *lang, Type type, Prec prec, Pattern pat) {
     return rule;
 }
 
-Prec Lang_make_prec(Lang *lang, PrecDef *prec_def) {
-    // will need to do something here at some point I'm sure
-    return Prec_define(&lang->precs, prec_def);
-}
-
 void Lang_crystallize(Lang *lang, Names *names) {
     RuleTree_crystallize(&lang->rules, names);
 
@@ -82,6 +77,10 @@ void Lang_crystallize(Lang *lang, Names *names) {
     }
 }
 
+Prec Lang_make_prec(Lang *lang, Word name, Associativity assoc) {
+    return Prec_define(&lang->precs, name, assoc);
+}
+
 void Lang_dump(const Lang *lang) {
     printf(TC_YELLOW "language %.*s:\n" TC_RESET,
            (int)lang->name.len, lang->name.str);
@@ -93,6 +92,6 @@ void Lang_dump(const Lang *lang) {
     HashSet_print(&lang->syms);
     puts("\n");
 
-    PrecGraph_dump(&lang->precs);
+    Precs_dump(&lang->precs);
     RuleTree_dump(&lang->rules);
 }

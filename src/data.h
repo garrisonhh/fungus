@@ -74,7 +74,10 @@ bool Word_eq_view(const Word *a, const View *b);
 
 // ordered Word -> id hashmap ==================================================
 
-// TODO replace with a (much) faster flat version at some point
+/*
+ * TODO replace with a (much) faster flat version at some point. pretty sure
+ * IdMap_remove isn't even used, soooo
+ */
 
 typedef struct IdMapNode {
     struct IdMapNode *next;
