@@ -297,7 +297,7 @@ File pattern_file(const char *str) {
 
 AstExpr *precompile_pattern(Bump *pool, Names *names, const File *file) {
     // create ast
-    TokBuf tokens = lex(file);
+    TokBuf tokens = lex(file, &pattern_lang);
 
     AstExpr *ast = parse(&(AstCtx){
         .pool = pool,

@@ -58,6 +58,7 @@ void fungus_lang_init(Names *names) {
         files[i] = pattern_file(pats[i]);
 
         Prec prec = Prec_by_name(&fun.precs, &precs[i]);
+
         AstExpr *pre_pat =
             precompile_pattern(&fun.rules.pool, names, &files[i]);
 

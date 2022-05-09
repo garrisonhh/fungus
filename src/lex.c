@@ -75,7 +75,7 @@ static void tokenize(TokBuf *tb, const View *str) {
                     c = View_get(str, ++idx);
                 } while (ch_is_symbol(c) && c != '"');
 
-                type = TOK_SYMBOLS;
+                type = TOK_SYMBOL;
             }
         } else if (ch_is_digit(c)) {
             // number
@@ -120,7 +120,7 @@ lex_error:
 #define TOKBUF_INIT_CAP 32
 #endif
 
-TokBuf lex(const File *file) {
+TokBuf lex(const File *file, const Lang *lang) {
     // make empty TokBuf
     TokBuf tb = { .cap = TOKBUF_INIT_CAP, .file = file };
 
@@ -143,7 +143,7 @@ void TokBuf_del(TokBuf *tb) {
 
 void TokBuf_dump(TokBuf *tb) {
     static const char *colors[TOK_COUNT] = {
-        [TOK_SYMBOLS] = TC_WHITE,
+        [TOK_SYMBOL] = TC_WHITE,
         [TOK_WORD] = TC_BLUE,
         [TOK_BOOL] = TC_MAGENTA,
         [TOK_INT] = TC_MAGENTA,

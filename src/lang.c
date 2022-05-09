@@ -1,5 +1,3 @@
-#include <ctype.h>
-
 #include "lang.h"
 #include "fungus.h"
 #include "lang/ast_expr.h"
@@ -35,6 +33,20 @@ Rule Lang_legislate(Lang *lang, const File *file, Type type,
     return Rule_define(&lang->rules, file, type, prec, pat_ast);
 }
 
+static void Lang_add_lxm(Lang *lang, const Word *lxm) {
+    HashSet *set = &lang->syms;
+
+    switch (classify_char(lxm->str[0])) {
+    case CH_ALPHA:
+    case CH_UNDERSCORE:
+        set = &lang->words;
+    default:
+        break;
+    }
+
+    HashSet_put(set, lxm);
+}
+
 Rule Lang_immediate_legislate(Lang *lang, Type type, Prec prec, Pattern pat) {
     Rule rule = Rule_immediate_define(&lang->rules, type, prec, pat);
 
@@ -42,12 +54,8 @@ Rule Lang_immediate_legislate(Lang *lang, Type type, Prec prec, Pattern pat) {
     for (size_t i = 0; i < pat.len; ++i) {
         MatchAtom *atom = &pat.matches[i];
 
-        if (atom->type == MATCH_LEXEME) {
-            HashSet *set =
-                ispunct(atom->lxm->str[0]) ? &lang->syms : &lang->words;
-
-            HashSet_put(set, atom->lxm);
-        }
+        if (atom->type == MATCH_LEXEME)
+            Lang_add_lxm(lang, atom->lxm);
     }
 
     return rule;
@@ -67,18 +75,22 @@ void Lang_crystallize(Lang *lang, Names *names) {
         for (size_t j = 0; j < entry->pat.len; ++j) {
             const MatchAtom *match = &matches[j];
 
-            if (match->type == MATCH_LEXEME) {
-                if (classify_char(match->lxm->str[0]) == CH_SYMBOL)
-                    HashSet_put(&lang->syms, match->lxm);
-                else
-                    HashSet_put(&lang->words, match->lxm);
-            }
+            if (match->type == MATCH_LEXEME)
+                Lang_add_lxm(lang, match->lxm);
         }
     }
 }
 
 Prec Lang_make_prec(Lang *lang, Word name, Associativity assoc) {
     return Prec_define(&lang->precs, name, assoc);
+}
+
+HashSet *Lang_syms(Lang *lang) {
+    return &lang->syms;
+}
+
+HashSet *Lang_words(Lang *lang) {
+    return &lang->words;
 }
 
 void Lang_dump(const Lang *lang) {

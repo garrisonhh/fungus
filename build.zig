@@ -22,7 +22,8 @@ pub fn build(b: *std.build.Builder) anyerror!void {
     // zig sources (compiled as separate object and linked with C source)
     {
         const zig_sources = [_][2][]const u8{
-            .{ "char_classify", "lex/char_classify.zig" },
+            // .{ "char_classify", "lex/char_classify.zig" },
+            .{ "lex", "lex.zig" },
         };
 
         for (zig_sources) |name_and_path| {
@@ -66,7 +67,7 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             "fungus.c",
 
             // lexical analysis
-            "lex.c",
+            //"lex.c",
 
             // parsing
             "parse.c",

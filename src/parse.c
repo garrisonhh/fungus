@@ -71,8 +71,8 @@ static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
 
         assert(toktype != TOK_INVALID);
 
-        if (toktype == TOK_SYMBOLS) {
-            const char *text = &tb->file->text.str[start];
+        if (toktype == TOK_SYMBOL) {
+            const char *text = &ctx->file->text.str[start];
 
             if (text[0] == '`') {
                 AstExpr *expr;
@@ -81,7 +81,7 @@ static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
                 if (len == 1) {
                     // check for consumable word
                     if (i >= tb->len) {
-                        File_error_at(tb->file, start, len,
+                        File_error_at(ctx->file, start, len,
                                       "bare lexeme escape.");
                         global_error = true;
                     }
@@ -94,7 +94,7 @@ static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
 
                     if (next_type != TOK_WORD
                      || next_start != start + len) {
-                        File_error_at(tb->file, start, len,
+                        File_error_at(ctx->file, start, len,
                                       "bare lexeme escape.");
                         global_error = true;
                     }

@@ -35,7 +35,7 @@ typedef struct RuleNode {
 
     // rule
     Rule rule;
-    unsigned has_rule: 1;
+    bool has_rule;
 } RuleNode;
 
 typedef struct RuleBacktrack {
@@ -53,7 +53,7 @@ typedef struct RuleTree {
     Rule rule_scope;
 
 #ifdef DEBUG
-    unsigned crystallized: 1;
+    bool crystallized;
 #endif
 } RuleTree;
 

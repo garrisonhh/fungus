@@ -19,7 +19,7 @@ CharClass classify_char(char ch);
 const char *CharClass_name(CharClass);
 // from zig ^^^
 
-// TODO PHASE OUT vvv
+#if 0
 static inline bool ch_is_alpha(char c) {
     return IN_RANGE(c, 'a', 'z') || IN_RANGE(c, 'A', 'Z');
 }
@@ -55,5 +55,6 @@ static inline bool ch_is_space(char c) {
 static inline bool ch_is_symbol(char c) {
     return IN_RANGE(c, ' ', '~') && !ch_is_word(c) && !ch_is_space(c);
 }
+#endif
 
 #endif
