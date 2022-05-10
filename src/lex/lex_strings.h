@@ -1,9 +1,9 @@
 #ifndef LEX_STRINGS_H
 #define LEX_STRINGS_H
 
-#include <stdbool.h>
+#include <stddef.h>
 
-#include "../utils.h"
+// just forwarding functions from lex_strings.zig
 
 typedef enum CharClass {
     CH_EOF,
@@ -16,5 +16,8 @@ typedef enum CharClass {
 
 CharClass classify_char(char ch);
 const char *CharClass_name(CharClass);
+
+// returns malloc'd string
+char *escape_cstr(const char *str, size_t len);
 
 #endif

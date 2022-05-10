@@ -90,7 +90,7 @@ const TokBuf = struct {
         return if (self.*.types.len == 0)
             null
         else
-            self.*.types[self.*.types.len - 1];
+            self.*.types[self.*.len - 1];
     }
 
     fn dump(self: *TokBuf, file: *c.File) void {
@@ -104,8 +104,12 @@ const TokBuf = struct {
                 .String => c.TC_GREEN,
                 else => c.TC_WHITE
             };
+            const tag_name = @tagName(self.*.types[i]);
 
-            _ = c.printf("%s%.*s" ++ c.TC_RESET ++ "\n", color,
+            _ = c.printf("%.*s: '%s%.*s" ++ c.TC_RESET ++ "'\n",
+                         @intCast(c_int, tag_name.len),
+                         tag_name.ptr,
+                         color,
                          @intCast(c_int, self.*.lens[i]),
                          &c.File_str(file)[self.*.starts[i]]);
         }
@@ -114,9 +118,13 @@ const TokBuf = struct {
     }
 };
 
+const LexError = error {
+    SymbolNotFound,
+};
+
 fn splitSymbol(
     tbuf: *TokBuf, lang: *c.Lang, slice: []const u8, start: hsize_t
-) void {
+) LexError!void {
     var i: hsize_t = 0;
     while (i < slice.len) {
         const token_view = c.View{
@@ -126,16 +134,8 @@ fn splitSymbol(
         const match_len =
             @intCast(hsize_t, c.HashSet_longest(c.Lang_syms(lang), &token_view));
 
-        if (match_len == 0) {
-            _ = c.printf("couldn't find symbol '%.*s'\n",
-                         @intCast(c_int, token_view.len), &slice[i]);
-            _ = c.printf("in: ");
-            c.HashSet_print(c.Lang_syms(lang));
-            _ = c.puts("");
-
-            // TODO return error
-            @panic("no symbol match");
-        }
+        if (match_len == 0)
+            return LexError.SymbolNotFound;
 
         tbuf.push(.Symbol, start + i, match_len);
         i += match_len;
@@ -143,7 +143,7 @@ fn splitSymbol(
 }
 
 // TODO specific and descriptive errors
-fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) anyerror!void {
+fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
     const str: []const u8 = c.File_str(file)[0..c.File_len(file) + 1];
 
     var i: hsize_t = 0;
@@ -177,7 +177,7 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) anyerror!void {
 
                 tbuf.push(.Word, start, i - start);
             },
-            .Symbol => {
+            .Symbol => blk: {
                 // symbols
                 const start = i;
 
@@ -188,17 +188,15 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) anyerror!void {
                         break;
                 }
 
-                blk: {
-                    // check for literal lexeme
-                    if (tbuf.peek()) |last| {
-                        if (last == .Escape)
-                            tbuf.push(.Symbol, start, i - start);
-
+                // check for literal lexeme
+                if (tbuf.peek()) |last| {
+                    if (last == .Escape) {
+                        tbuf.push(.Symbol, start, i - start);
                         break :blk;
                     }
-
-                    splitSymbol(tbuf, lang, str[start..i], start);
                 }
+
+                try splitSymbol(tbuf, lang, str[start..i], start);
             },
             .Digit => {
                 // ints and floats
@@ -227,17 +225,42 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) anyerror!void {
                 tbuf.push(tok_type, start, i - start);
             },
             .Escape => {
-                tbuf.push(.Escape, i, i + 1);
+                tbuf.push(.Escape, i, 1);
                 i += 1;
             },
-            .DQuote => @panic("TODO strings"),
-            .LCurly, .RCurly => @panic("TODO scopess"),
+            .DQuote => {
+                // strings
+                const start = i;
+
+                while (true) {
+                    i += 1;
+
+                    if (str[i] == '"' and str[i - 1] != '\\')
+                        break;
+                }
+
+                tbuf.push(.String, start, i - start);
+            },
+            .LCurly => {
+                // scopes
+                const start = i;
+
+                var level: i32 = 0;
+                while (true) : (i += 1) {
+                    switch (str[i]) {
+                        '{' => level += 1,
+                        '}' => level -= 1,
+                        else => {}
+                    }
+
+                    if (level == 0)
+                        break;
+                }
+
+                tbuf.push(.Scope, start, i - start);
+            }
         }
     }
-
-    // TODO REMOVE vvv
-    tbuf.dump(file);
-    c.exit(0);
 }
 
 export fn lex(file: *c.File, lang: *c.Lang) TokBuf.CTokBuf {
@@ -249,10 +272,8 @@ export fn lex(file: *c.File, lang: *c.Lang) TokBuf.CTokBuf {
         c.fungus_panic("tokenization failed.");
     };
 
+    _ = c.puts(c.TC_YELLOW ++ "LEXED" ++ c.TC_RESET);
     tbuf.dump(file);
-
-    _ = c.printf("");
-    c.exit(-1);
 
     return tbuf.asCTokBuf();
 }

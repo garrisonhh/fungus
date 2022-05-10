@@ -1,7 +1,9 @@
 const std = @import("std");
+const ArrayList = std.ArrayList;
 
 const c = @cImport({
     @cInclude("lex/lex_strings.h");
+    @cInclude("utils.h");
 });
 
 pub const CharClass = enum(c_int) {
@@ -15,7 +17,6 @@ pub const CharClass = enum(c_int) {
     // specific un-redefineable symbols
     Escape,
     LCurly,
-    RCurly,
     DQuote
 };
 
@@ -28,9 +29,8 @@ pub export fn classify_char(ch: u8) CharClass {
         '_' => .Underscore,
         '`' => .Escape,
         '{' => .LCurly,
-        '}' => .RCurly,
         '"' => .DQuote,
-        else =>  if (ch < 0x20) {
+        else => if (ch < 0x20) {
             c.fungus_panic("cannot classify character 0x%hhx.\n", ch);
             unreachable;
         } else .Symbol
@@ -40,4 +40,51 @@ pub export fn classify_char(ch: u8) CharClass {
 // just exposing @tagName to c
 export fn CharClass_name(class: CharClass) [*:0]const u8 {
     return @tagName(class);
+}
+
+pub fn escapeCStr(str: [*:0]const u8, len: usize) !ArrayList(u8) {
+    var buf = ArrayList(u8).init(std.heap.c_allocator);
+
+    // create escaped string
+    var i: usize = 0;
+    while (i < len) : (i += 1) {
+        switch (str[i]) {
+            0x00 => try buf.appendSlice("\\0"),
+            '\n' => try buf.appendSlice("\\n"),
+            '\r' => try buf.appendSlice("\\r"),
+            '\t' => try buf.appendSlice("\\t"),
+            '\\' => try buf.appendSlice("\\\\"),
+            '\'' => try buf.appendSlice("\\'"),
+            '\"' => try buf.appendSlice("\\\""),
+            else => |ch| {
+                if (ch < 0x20)
+                    @panic("unimplemented");
+
+                try buf.append(ch);
+            }
+        }
+    }
+
+    return buf;
+}
+
+// exposes escapeCStr to c
+export fn escape_cstr(str: [*:0]const u8, len: usize) [*:0]u8 {
+    var buf = escapeCStr(str, len)
+        catch @panic("escapeCStr failed.");
+    defer buf.deinit();
+
+    // copy over escaped string memory
+    const buf_len = buf.items.len;
+    const raw_mem = std.c.malloc(buf_len + 1)
+        orelse @panic("malloc failed.");
+    var cstr = @ptrCast([*:0]u8, raw_mem);
+
+    var i: usize = 0;
+    while (i < buf_len) : (i += 1)
+        cstr[i] = buf.items[i];
+
+    cstr[buf_len] = 0;
+
+    return cstr;
 }
