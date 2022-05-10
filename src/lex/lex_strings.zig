@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const c = @cImport({
-    @cInclude("lex/char_classify.h");
+    @cInclude("lex/lex_strings.h");
 });
 
 pub const CharClass = enum(c_int) {

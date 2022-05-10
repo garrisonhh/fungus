@@ -1,7 +1,7 @@
 #include "lang.h"
 #include "fungus.h"
 #include "lang/ast_expr.h"
-#include "lex/char_classify.h"
+#include "lex/lex_strings.h"
 
 Lang Lang_new(Word name) {
     // copy name

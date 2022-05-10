@@ -2,9 +2,9 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const c_allocator = std.heap.c_allocator;
 
-const char_classify = @import("lex/char_classify.zig");
-const classifyChar = char_classify.classify_char;
-const CharClass = char_classify.CharClass;
+const lex_strings = @import("lex/lex_strings.zig");
+const classifyChar = lex_strings.classify_char;
+const CharClass = lex_strings.CharClass;
 
 const c = @cImport({
     @cInclude("lang.h");
