@@ -104,7 +104,7 @@ void AstExpr_dump(const AstExpr *expr, const Lang *lang, const File *file) {
                 && expr->evaltype.id == fun_lexeme.id) {
             // lexeme literal
             printf("`" TC_GREEN "%.*s" TC_RESET,
-                   (int)expr->tok_len - 1, &text[expr->tok_start + 1]);
+                   (int)expr->tok_len, &text[expr->tok_start]);
         } else {
             // must be other atom
             if (expr->evaltype.id == fun_ident.id)

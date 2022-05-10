@@ -5,17 +5,6 @@
 #include "lang/ast_expr.h"
 #include "lex/lex_strings.h"
 
-/*
- * parsing works in two stages:
- * 1. turn scopes (`{ ... }`) into a tree. this is the only parsing rule that is
- *    truly hardcoded into Fungus
- * 2. recursively parse scopes given a language context. this requires
- *    integration with semantic analysis, because `language`s must be parsed
- *    before they can be used for parsing
- */
-
-// stage 1: scope tree =========================================================
-
 static AstExpr *new_atom(Bump *pool, Type type, Type evaltype,
                          hsize_t start, hsize_t len) {
     AstExpr *expr = Bump_alloc(pool, sizeof(*expr));
@@ -55,253 +44,74 @@ static AstExpr *rule_copy_of_slice(Bump *pool, const RuleTree *rt, Rule rule,
     return new_rule(pool, rt, rule, exprs, len);
 }
 
-// turns tokens -> list of exprs, separating `{` and `}` as symbols but not
-// creating the tree yet
-static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
-    Type evaltype_of_lit[TOK_COUNT] = {
-        [TOK_BOOL] = fun_bool,
-        [TOK_INT] = fun_int,
-        [TOK_FLOAT] = fun_float,
-        [TOK_STRING] = fun_string,
-    };
+// turns tokens -> scope of AstExprs
+static AstExpr *gen_initial_scope(AstCtx *ctx, const TokBuf *tb) {
+    Vec list = Vec_new();
 
     for (size_t i = 0; i < tb->len; ++i) {
         TokType toktype = tb->types[i];
         hsize_t start = tb->starts[i], len = tb->lens[i];
 
+        AstExpr *expr = NULL;
+
         assert(toktype != TOK_INVALID);
 
-        if (toktype == TOK_SYMBOL) {
-            const char *text = &ctx->file->text.str[start];
-
-            if (text[0] == '`') {
-                AstExpr *expr;
-
-                // escaped literal lexeme
-                if (len == 1) {
-                    // check for consumable word
-                    if (i >= tb->len) {
-                        File_error_at(ctx->file, start, len,
-                                      "bare lexeme escape.");
-                        global_error = true;
-                    }
-
-                    ++i;
-
-                    TokType next_type = tb->types[i];
-                    hsize_t next_start = tb->starts[i];
-                    hsize_t next_len = tb->lens[i];
-
-                    if (next_type != TOK_WORD
-                     || next_start != start + len) {
-                        File_error_at(ctx->file, start, len,
-                                      "bare lexeme escape.");
-                        global_error = true;
-                    }
-
-                    // word literal lexeme
-                    expr = new_atom(ctx->pool, fun_literal, fun_lexeme, start,
-                                    next_len + 1);
-                } else {
-                    // symbol literal lexeme
-                    expr = new_atom(ctx->pool, fun_literal, fun_lexeme, start,
-                                    len);
-                }
-
-                Vec_push(list, expr);
-            } else {
-                // split symbols on `{` and `}`
-                hsize_t last_split = 0;
-
-                for (hsize_t j = 0; j < len; ++j) {
-                    if (text[j] == '{' || text[j] == '}') {
-                        if (j > last_split) {
-                            AstExpr *expr = new_atom(ctx->pool, fun_lexeme,
-                                                     fun_lexeme,
-                                                     start + last_split,
-                                                     j - last_split);
-
-                            Vec_push(list, expr);
-                        }
-
-                        AstExpr *expr = new_atom(ctx->pool, fun_lexeme,
-                                                 fun_lexeme, start + j, 1);
-
-                        Vec_push(list, expr);
-
-                        last_split = j + 1;
-                    }
-                }
-
-                if (last_split < len) {
-                    AstExpr *expr = new_atom(ctx->pool, fun_lexeme, fun_lexeme,
-                                             start + last_split,
-                                             len - last_split);
-
-                    Vec_push(list, expr);
-                }
+        switch (toktype) {
+        case TOK_ESCAPE:
+            // consume next token, creating a literal lexeme
+            if (i == tb->len
+             || (tb->types[i + 1] != TOK_SYMBOL
+              && tb->types[i + 1] != TOK_WORD)) {
+                File_error_at(ctx->file, start, len,
+                              "escape not followed by a lexeme.");
             }
-        } else if (toktype == TOK_WORD) {
-            AstExpr *expr =
-                new_atom(ctx->pool, fun_lexeme, fun_lexeme, start, len);
 
-            Vec_push(list, expr);
-        } else {
-            // direct token -> expr translation
-            AstExpr *expr = new_atom(ctx->pool, fun_literal,
-                                     evaltype_of_lit[toktype], start, len);
+            ++i;
+            expr = new_atom(ctx->pool, fun_literal, fun_lexeme, tb->starts[i],
+                            tb->lens[i]);
+            break;
+        case TOK_SCOPE:
+            // TODO
+            UNIMPLEMENTED;
 
-            Vec_push(list, expr);
+            break;
+        case TOK_SYMBOL:
+        case TOK_WORD:
+            // raw lexeme
+            expr = new_atom(ctx->pool, fun_lexeme, fun_lexeme, start, len);
+            break;
+        case TOK_BOOL:
+        case TOK_INT:
+        case TOK_FLOAT:
+        case TOK_STRING: {
+            Type evaltype_of_lit[TOK_COUNT] = {
+                [TOK_BOOL] = fun_bool,
+                [TOK_INT] = fun_int,
+                [TOK_FLOAT] = fun_float,
+                [TOK_STRING] = fun_string,
+            };
+
+            // literal; direct token -> expr translation
+            expr = new_atom(ctx->pool, fun_literal, evaltype_of_lit[toktype],
+                            start, len);
+            break;
         }
-    }
-}
-
-static void verify_scopes(AstCtx *ctx, const Vec *list) {
-    const File *file = ctx->file;
-
-    int level = 0;
-
-    for (size_t i = 0; i < list->len; ++i) {
-        AstExpr *expr = list->data[i];
-
-        if (expr->type.id == fun_lexeme.id && expr->tok_len == 1) {
-            char ch = file->text.str[expr->tok_start];
-
-            if (ch == '{') {
-                ++level;
-            } else if (ch == '}') {
-                if (--level < 0)
-                    AstExpr_error(file, expr, "unmatched curly.");
-            }
+        default: UNREACHABLE;
         }
+
+        assert(expr != NULL);
+        Vec_push(&list, expr);
     }
 
-    if (level > 0)
-        File_error_from(file, File_eof(file), "unfinished scope at EOF.");
-}
-
-// takes a verified list from gen_flat_list and makes a scope tree
-static AstExpr *unflatten_list(AstCtx *ctx, const Vec *list) {
+    // create scope expr
     const RuleTree *rules = &ctx->lang->rules;
-    const char *text = ctx->file->text.str;
-
-    Vec levels[MAX_AST_DEPTH];
-    size_t level = 0;
-
-    levels[level++] = Vec_new();
-
-    for (size_t i = 0; i < list->len; ++i) {
-        AstExpr *expr = list->data[i];
-
-        if (expr->type.id == fun_lexeme.id) {
-            if (text[expr->tok_start] == '{') {
-                // create new scope vec
-                levels[level++] = Vec_new();
-
-                continue;
-            } else if (text[expr->tok_start] == '}') {
-                // turn scope vec into a scope on pool
-                Vec *vec = &levels[--level];
-
-                expr = rule_copy_of_slice(ctx->pool, rules, rules->rule_scope,
-                                          (AstExpr **)vec->data, vec->len);
-
-                Vec_del(vec);
-            }
-        }
-
-        Vec_push(&levels[level - 1], expr);
-    }
-
-    AstExpr *tree = rule_copy_of_slice(ctx->pool, rules, rules->rule_scope,
-                                       (AstExpr **)levels[0].data,
-                                       levels[0].len);
-
-    Vec_del(&levels[0]);
-
-    return tree;
-}
-
-static AstExpr *gen_scope_tree(AstCtx *ctx, const TokBuf *tb) {
-    Vec root_list = Vec_new();
-
-    gen_flat_list(ctx, &root_list, tb);
-    verify_scopes(ctx, &root_list);
-
-    AstExpr *expr = unflatten_list(ctx, &root_list);
-
-    Vec_del(&root_list);
-
-    return expr;
-}
-
-// translates `scope` into the target language, returns success
-static bool translate_scope(AstCtx *ctx, AstExpr *scope) {
-    const Lang *lang = ctx->lang;
-
-    assert(scope->type.id == fun_scope.id);
-
-    AstExpr **exprs = scope->exprs;
-    size_t len = scope->len;
-    Vec list = Vec_new();
-
-    for (size_t i = 0; i < len; ++i) {
-        AstExpr *expr = exprs[i];
-
-        if (expr->type.id == fun_lexeme.id) {
-            // symbols must be split up and fully matched, words can be idents
-            // or stay lexemes
-            View tok = { &ctx->file->text.str[expr->tok_start], expr->tok_len };
-
-            if (classify_char(tok.str[0]) == CH_SYMBOL) {
-                hsize_t sym_start = expr->tok_start;
-                size_t match_len;
-
-                // match as many syms as possible
-                while (tok.len > 0
-                    && (match_len = HashSet_longest(&lang->syms, &tok))) {
-                    AstExpr *sym = new_atom(ctx->pool, fun_lexeme,
-                                            fun_lexeme, sym_start, match_len);
-
-                    Vec_push(&list, sym);
-
-                    tok.str += match_len;
-                    tok.len -= match_len;
-                    sym_start += match_len;
-                }
-
-                if (tok.len > 0) {
-                    File_error_from(ctx->file, sym_start, "unknown symbol");
-
-                    return false;
-                }
-            } else {
-                Word word = Word_new(tok.str, tok.len);
-
-                if (!HashSet_has(&lang->words, &word)) {
-                    expr->type = fun_ident;
-                    expr->evaltype = fun_unknown;
-                }
-
-                Vec_push(&list, expr);
-            }
-        } else {
-            Vec_push(&list, expr);
-        }
-    }
-
-    scope->len = list.len;
-    scope->exprs = Bump_alloc(ctx->pool, scope->len * sizeof(*scope->exprs));
-
-    for (size_t i = 0; i < list.len; ++i)
-        scope->exprs[i] = list.data[i];
+    AstExpr *expr = rule_copy_of_slice(ctx->pool, rules, rules->rule_scope,
+                                       (AstExpr **)list.data, list.len);
 
     Vec_del(&list);
 
-    return true;
+    return expr;
 }
-
-// stage 2: rule parsing =======================================================
 
 static size_t try_match_r(AstCtx *ctx, const Vec *nexts, AstExpr **slice,
                           size_t len, size_t depth, Rule *o_rule) {
@@ -547,8 +357,10 @@ static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
 
 // given a raw scope, parse it using a lang
 AstExpr *parse_scope(AstCtx *ctx, AstExpr *expr) {
+    /* TODO is this obsolete?
     if (!translate_scope(ctx, expr))
         return NULL;
+    */
 
     size_t len;
     AstExpr **slice = parse_slice(ctx, expr->exprs, expr->len, &len);
@@ -583,7 +395,7 @@ AstExpr *parse(AstCtx *ctx, const TokBuf *tb) {
     size_t start_mem = ctx->pool->total;
 #endif
 
-    AstExpr *ast = parse_scope(ctx, gen_scope_tree(ctx, tb));
+    AstExpr *ast = parse_scope(ctx, gen_initial_scope(ctx, tb));
 
     if (!ast)
         global_error = true;
