@@ -24,19 +24,6 @@ void names_to_lower(char (*dst)[MAX_NAME_LEN], char **src, size_t len) {
     }
 }
 
-// TODO deprecate
-void fungus_error(const char *msg, ...) {
-    va_list args;
-
-    fprintf(stderr, "[" TC_RED "ERROR (TODO: USE FILE ERROR)" TC_RESET "]: ");
-
-    va_start(args, msg);
-    vfprintf(stderr, msg, args);
-    va_end(args);
-
-    fprintf(stderr, "\n");
-}
-
 void fungus_panic(const char *msg, ...) {
     va_list args;
 

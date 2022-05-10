@@ -72,7 +72,6 @@ static inline double time_now(void) {
 // TODO get rid of this? what is a better error system?
 extern bool global_error;
 
-void fungus_error(const char *msg, ...);
 noreturn void fungus_panic(const char *msg, ...);
 
 #define UNIMPLEMENTED \
