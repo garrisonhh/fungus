@@ -239,12 +239,27 @@ static AstExpr *parse_scope(AstCtx *ctx, AstExpr **orig_slice, size_t len) {
                     found_match = true;
 
                     /*
-                     * TODO
                      * right associativity must check for backwards-reaching
                      * matches: for a rule that looks like `A* B`, if you have
-                     * exprs that match `A A A B`, right will first match the
-                     * final `A B`, which is incorrect
+                     * exprs that match `C A A A B`, right will first match the
+                     * final `A B`, which is incorrect. this code chunk will
+                     * extend the match backwards until it stops matching the
+                     * pattern.
                      */
+try_back_match:
+                    if (i > 0) {
+                        Rule back_match;
+                        size_t back_match_len =
+                            try_match(ctx, &slice[i - 1], len - (i - 1),
+                                      &back_match);
+
+                        if (back_match.id == match.id
+                         && back_match_len == match_len + 1) {
+                            ++match_len;
+                            --i;
+                            goto try_back_match;
+                        }
+                    }
 
                     // collapse rule
                     slice[i] = rule_copy_of_slice(ctx->pool, rules, match,
