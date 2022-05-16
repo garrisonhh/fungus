@@ -67,6 +67,10 @@ Associativity Prec_assoc(const Precs *p, Prec prec) {
     return p->assocs[prec.id];
 }
 
+const Word *Prec_name(const Precs *p, Prec prec) {
+    return p->names[prec.id];
+}
+
 void Precs_dump(const Precs *p) {
     puts(TC_CYAN "Precs:" TC_RESET);
 

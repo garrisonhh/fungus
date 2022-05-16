@@ -11,7 +11,7 @@ Lang pattern_lang;
 
 #define PRECS\
     PREC("Lowest",  LEFT)\
-    PREC("Pattern", LEFT) /* RIGHT) */\
+    PREC("Pattern", RIGHT)\
     PREC("Default", LEFT)\
     PREC("Match",   LEFT)\
     PREC("Or",      LEFT)\

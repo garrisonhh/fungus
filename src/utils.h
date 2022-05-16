@@ -26,7 +26,7 @@ typedef uint32_t hsize_t;
 #define IN_RANGE(C, A, B) ((C) >= (A) && (C) <= (B))
 
 #ifdef DEBUG
-#define DEBUG_SCOPE(...) do { __VA_ARGS__ } while (0)
+#define DEBUG_SCOPE(cond, ...) do { if (cond) { __VA_ARGS__ } } while (0)
 #else
 #define DEBUG_SCOPE(...)
 #endif

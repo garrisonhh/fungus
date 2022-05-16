@@ -33,7 +33,9 @@ Prec Prec_define(Precs *, Word name, Associativity assoc);
 bool Prec_by_name_checked(Precs *, const Word *name, Prec *o_prec);
 Prec Prec_by_name(Precs *, const Word *name);
 int Prec_cmp(Prec a, Prec b);
+
 Associativity Prec_assoc(const Precs *, Prec prec);
+const Word *Prec_name(const Precs *, Prec prec);
 
 // for parser iteration
 static inline Prec Prec_highest(const Precs *p)

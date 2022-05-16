@@ -287,9 +287,6 @@ export fn lex(file: *c.File, lang: *c.Lang) TokBuf.CTokBuf {
         c.fungus_panic("tokenization failed.");
     };
 
-    _ = c.puts(c.TC_YELLOW ++ "LEXED" ++ c.TC_RESET);
-    tbuf.dump(file);
-
     return tbuf.asCTokBuf();
 }
 
