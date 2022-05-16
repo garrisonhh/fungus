@@ -120,6 +120,7 @@ const TokBuf = struct {
 
 const LexError = error {
     SymbolNotFound,
+    UnmatchedLCurly,
 };
 
 fn splitSymbol(
@@ -159,18 +160,20 @@ fn addWord(
 
 // TODO specific and descriptive errors
 fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
-    const str: []const u8 = c.File_str(file)[0..c.File_len(file) + 1];
+    const str: []const u8 = c.File_str(file)[0..c.File_len(file)];
 
     var i: hsize_t = 0;
-    while (i < str.len) {
+    while (true) {
         var class: CharClass = undefined;
 
         // skip whitespace
-        while (true) : (i += 1) {
+        while (i < str.len) : (i += 1) {
             class = classifyChar(str[i]);
 
             if (class != .Space)
                 break;
+        } else {
+            break;
         }
 
         // identify next token
@@ -181,7 +184,7 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                 // word
                 const start = i;
 
-                while (true) {
+                while (i < str.len) {
                     class = classifyChar(str[i]);
 
                     switch (class) {
@@ -196,7 +199,7 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                 // symbols
                 const start = i;
 
-                while (true) : (i += 1) {
+                while (i < str.len) : (i += 1) {
                     class = classifyChar(str[i]);
 
                     if (class != .Symbol)
@@ -218,7 +221,7 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                 const start = i;
                 var tok_type: TokType = .Int;
 
-                while (true) : (i += 1) {
+                while (i < str.len) : (i += 1) {
                     class = classifyChar(str[i]);
 
                     if (class != .Digit and class != .Underscore)
@@ -247,7 +250,7 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                 // strings
                 const start = i;
 
-                while (true) {
+                while (i < str.len) {
                     i += 1;
 
                     if (str[i] == '"' and str[i - 1] != '\\')
@@ -261,7 +264,7 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                 const start = i;
 
                 var level: i32 = 0;
-                while (true) : (i += 1) {
+                while (i < str.len) : (i += 1) {
                     switch (str[i]) {
                         '{' => level += 1,
                         '}' => level -= 1,
@@ -270,6 +273,8 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
 
                     if (level == 0)
                         break;
+                } else {
+                    return LexError.UnmatchedLCurly;
                 }
 
                 tbuf.emit(.Scope, start, i - start);
@@ -282,9 +287,9 @@ export fn lex(file: *c.File, lang: *c.Lang) TokBuf.CTokBuf {
     var tbuf = c_allocator.create(TokBuf) catch c.abort();
     tbuf.init() catch c.abort();
 
-    tokenize(tbuf, file, lang) catch {
+    tokenize(tbuf, file, lang) catch |e| {
         // TODO descriptive error report
-        c.fungus_panic("tokenization failed.");
+        c.fungus_panic("tokenization failed with error %s", @errorName(e).ptr);
     };
 
     return tbuf.asCTokBuf();
