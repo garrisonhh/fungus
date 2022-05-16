@@ -17,8 +17,8 @@ const hsize_t = c.hsize_t;
 
 const TokType = enum(c_int) {
     Invalid = c.TOK_INVALID,
-    Word = c.TOK_WORD,
-    Symbol = c.TOK_SYMBOL,
+    Lexeme = c.TOK_LEXEME,
+    Ident = c.TOK_IDENT,
     Bool = c.TOK_BOOL,
     Int = c.TOK_INT,
     Float = c.TOK_FLOAT,
@@ -73,7 +73,7 @@ const TokBuf = struct {
             catch @panic("couldn't resize buffer.");
     }
 
-    fn push(self: *TokBuf, ty: TokType, start: hsize_t, len: hsize_t) void {
+    fn emit(self: *TokBuf, ty: TokType, start: hsize_t, len: hsize_t) void {
         if (self.*.len == self.*.types.len) {
             self.*.types = doubleBufSize(self.*.types);
             self.*.starts = doubleBufSize(self.*.starts);
@@ -99,7 +99,7 @@ const TokBuf = struct {
         var i: usize = 0;
         while (i < self.*.len) : (i += 1) {
             const color = switch (self.*.types[i]) {
-                .Word => c.TC_BLUE,
+                .Ident => c.TC_BLUE,
                 .Bool, .Int, .Float => c.TC_MAGENTA,
                 .String => c.TC_GREEN,
                 else => c.TC_WHITE
@@ -132,14 +132,29 @@ fn splitSymbol(
             .len = slice.len - i,
         };
         const match_len =
-            @intCast(hsize_t, c.HashSet_longest(c.Lang_syms(lang), &token_view));
+            @intCast(hsize_t,
+                     c.HashSet_longest(c.Lang_syms(lang), &token_view));
 
         if (match_len == 0)
             return LexError.SymbolNotFound;
 
-        tbuf.push(.Symbol, start + i, match_len);
+        tbuf.emit(.Lexeme, start + i, match_len);
         i += match_len;
     }
+}
+
+// words can be lexemes or identifiers, this checks and adds the correct one
+fn addWord(
+    tbuf: *TokBuf, lang: *c.Lang, slice: []const u8, start: hsize_t
+) LexError!void {
+    const token_cword = c.Word_new(slice.ptr, slice.len);
+    var word_type: TokType =
+        if (c.HashSet_has(c.Lang_words(lang), &token_cword))
+            .Lexeme
+        else
+            .Ident;
+
+    tbuf.emit(word_type, start, @intCast(hsize_t, slice.len));
 }
 
 // TODO specific and descriptive errors
@@ -175,7 +190,7 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                     }
                 }
 
-                tbuf.push(.Word, start, i - start);
+                try addWord(tbuf, lang, str[start..i], start);
             },
             .Symbol => blk: {
                 // symbols
@@ -191,7 +206,7 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                 // check for literal lexeme
                 if (tbuf.peek()) |last| {
                     if (last == .Escape) {
-                        tbuf.push(.Symbol, start, i - start);
+                        tbuf.emit(.Lexeme, start, i - start);
                         break :blk;
                     }
                 }
@@ -222,10 +237,10 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                     }
                 }
 
-                tbuf.push(tok_type, start, i - start);
+                tbuf.emit(tok_type, start, i - start);
             },
             .Escape => {
-                tbuf.push(.Escape, i, 1);
+                tbuf.emit(.Escape, i, 1);
                 i += 1;
             },
             .DQuote => {
@@ -239,7 +254,7 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                         break;
                 }
 
-                tbuf.push(.String, start, i - start);
+                tbuf.emit(.String, start, i - start);
             },
             .LCurly => {
                 // scopes
@@ -257,7 +272,7 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                         break;
                 }
 
-                tbuf.push(.Scope, start, i - start);
+                tbuf.emit(.Scope, start, i - start);
             }
         }
     }

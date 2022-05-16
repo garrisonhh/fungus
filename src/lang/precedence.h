@@ -2,8 +2,8 @@
 #define PRECEDENCE_H
 
 /*
- * precedence is represented by a directed acyclic graph, allowing for intuitive
- * and symbolic runtime definition of precedences.
+ * precedence is represented by a flat array, since languages will provide
+ * all precedences up front this is a very efficient representation
  */
 
 #include "../data.h"
@@ -11,10 +11,6 @@
 typedef struct PrecHandle { unsigned id; } Prec;
 typedef enum Associativity { ASSOC_LEFT, ASSOC_RIGHT } Associativity;
 
-/*
- * TODO Precs_crystallize, flattening graph by assigning a number to each
- * precedence for O(1) comparison
- */
 typedef struct Precs {
     Bump pool;
     IdMap by_name;
@@ -38,6 +34,12 @@ bool Prec_by_name_checked(Precs *, const Word *name, Prec *o_prec);
 Prec Prec_by_name(Precs *, const Word *name);
 int Prec_cmp(Prec a, Prec b);
 Associativity Prec_assoc(const Precs *, Prec prec);
+
+// for parser iteration
+static inline Prec Prec_highest(const Precs *p)
+    { return (Prec){ (unsigned)p->len - 1 }; }
+static inline void Prec_dec(Prec *prec) { --prec->id; };
+static inline bool Prec_is_lowest(Prec prec) { return prec.id == 0; };
 
 void Precs_dump(const Precs *);
 

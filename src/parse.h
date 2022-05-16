@@ -3,6 +3,12 @@
 
 #include "lex.h"
 
+/*
+ * TODO I think that sema will need to handle the interpretation and re-feeding
+ * of fungus languages back through the lexer and parser; would make a much
+ * cleaner solution than doing it in the parse method
+ */
+
 typedef struct AstExpr AstExpr;
 typedef struct Lang Lang;
 
@@ -12,9 +18,7 @@ typedef struct AstCtx {
     const Lang *lang;
 } AstCtx;
 
-// parses scope from raw tokens
+// parses scope into an AST from raw tokens
 AstExpr *parse(AstCtx *, const TokBuf *);
-// parses a processed scope
-AstExpr *parse_scope(AstCtx *, AstExpr *);
 
 #endif

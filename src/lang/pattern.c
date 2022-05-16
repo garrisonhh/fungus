@@ -11,7 +11,7 @@ Lang pattern_lang;
 
 #define PRECS\
     PREC("Lowest",  LEFT)\
-    PREC("Pattern", RIGHT)\
+    PREC("Pattern", LEFT) /* RIGHT) */\
     PREC("Default", LEFT)\
     PREC("Match",   LEFT)\
     PREC("Or",      LEFT)\
@@ -313,6 +313,8 @@ AstExpr *precompile_pattern(Bump *pool, Names *names, const File *file) {
 #if 1
     puts(TC_YELLOW "precompiled pattern:" TC_RESET);
     AstExpr_dump(ast, &pattern_lang, file);
+
+    exit(0);
 #endif
 
     TokBuf_del(&tokens);

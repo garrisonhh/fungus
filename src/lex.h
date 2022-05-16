@@ -7,8 +7,8 @@ typedef struct Lang Lang;
 
 typedef enum TokType {
     TOK_INVALID,
-    TOK_WORD,
-    TOK_SYMBOL,
+    TOK_LEXEME,
+    TOK_IDENT,
     TOK_BOOL,
     TOK_INT,
     TOK_FLOAT,

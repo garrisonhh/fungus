@@ -45,8 +45,8 @@ static AstExpr *rule_copy_of_slice(Bump *pool, const RuleTree *rt, Rule rule,
 }
 
 // turns tokens -> scope of AstExprs
-static AstExpr *gen_initial_scope(AstCtx *ctx, const TokBuf *tb) {
-    Vec list = Vec_new();
+static Vec gen_initial_scope(AstCtx *ctx, const TokBuf *tb) {
+    Vec scope = Vec_new();
 
     for (size_t i = 0; i < tb->len; ++i) {
         TokType toktype = tb->types[i];
@@ -60,8 +60,8 @@ static AstExpr *gen_initial_scope(AstCtx *ctx, const TokBuf *tb) {
         case TOK_ESCAPE:
             // consume next token, creating a literal lexeme
             if (i == tb->len
-             || (tb->types[i + 1] != TOK_SYMBOL
-              && tb->types[i + 1] != TOK_WORD)) {
+             || (tb->types[i + 1] != TOK_LEXEME
+              && tb->types[i + 1] != TOK_IDENT)) {
                 File_error_at(ctx->file, start, len,
                               "escape not followed by a lexeme.");
             }
@@ -75,10 +75,11 @@ static AstExpr *gen_initial_scope(AstCtx *ctx, const TokBuf *tb) {
             UNIMPLEMENTED;
 
             break;
-        case TOK_SYMBOL:
-        case TOK_WORD:
-            // raw lexeme
+        case TOK_LEXEME:
             expr = new_atom(ctx->pool, fun_lexeme, fun_lexeme, start, len);
+            break;
+        case TOK_IDENT:
+            expr = new_atom(ctx->pool, fun_ident, fun_unknown, start, len);
             break;
         case TOK_BOOL:
         case TOK_INT:
@@ -96,21 +97,30 @@ static AstExpr *gen_initial_scope(AstCtx *ctx, const TokBuf *tb) {
                             start, len);
             break;
         }
-        default: UNREACHABLE;
+        case TOK_INVALID:
+        case TOK_COUNT:
+            UNREACHABLE;
         }
 
         assert(expr != NULL);
-        Vec_push(&list, expr);
+        Vec_push(&scope, expr);
     }
 
-    // create scope expr
-    const RuleTree *rules = &ctx->lang->rules;
-    AstExpr *expr = rule_copy_of_slice(ctx->pool, rules, rules->rule_scope,
-                                       (AstExpr **)list.data, list.len);
+    DEBUG_SCOPE(
+        puts(TC_YELLOW "TRANSLATED TOKENS:" TC_RESET);
 
-    Vec_del(&list);
+        for (size_t i = 0; i < scope.len; ++i) {
+            const AstExpr *expr = scope.data[i];
 
-    return expr;
+            Type_print(expr->type);
+            printf("!");
+            Type_print(expr->evaltype);
+            printf(TC_GRAY "\t--- " TC_RESET);
+            AstExpr_dump(expr, ctx->lang, ctx->file);
+        }
+    );
+
+    return scope;
 }
 
 static size_t try_match_r(AstCtx *ctx, const Vec *nexts, AstExpr **slice,
@@ -149,14 +159,78 @@ static size_t try_match_r(AstCtx *ctx, const Vec *nexts, AstExpr **slice,
 }
 
 // tries to match a rule on a slice, returns length of rule matched
+// TODO NO MATCHES ARE BEING MADE!!!
 static size_t try_match(AstCtx *ctx, AstExpr **slice, size_t len,
                         Rule *o_rule) {
-    size_t match_len =
-        try_match_r(ctx, &ctx->lang->rules.roots, slice, len, 1, o_rule);
+    DEBUG_SCOPE(
+        puts(TC_YELLOW "BEGIN MATCH:" TC_RESET);
+    );
 
-    return match_len;
+    size_t n = try_match_r(ctx, &ctx->lang->rules.roots, slice, len, 1, o_rule);
+
+    DEBUG_SCOPE(
+        puts("");
+    );
+
+    return n;
 }
 
+static void debug_slice(AstCtx *ctx, AstExpr **slice, size_t len){
+#ifdef DEBUG
+    puts(TC_YELLOW "SLICE:" TC_RESET);
+
+    for (size_t i = 0; i < len; ++i)
+        AstExpr_dump(slice[i], ctx->lang, ctx->file);
+
+    puts("");
+#endif
+}
+
+// parse a slice of unparsed exprs into a tree
+static AstExpr *parse_scope(AstCtx *ctx, AstExpr **orig_slice, size_t len) {
+    const Precs *precs = &ctx->lang->precs;
+    const RuleTree *rules = &ctx->lang->rules;
+    AstExpr **slice = orig_slice;
+
+    puts(TC_YELLOW "BEGIN PARSE" TC_RESET);
+    debug_slice(ctx, slice, len);
+
+    for (Prec prec = Prec_highest(precs); ; Prec_dec(&prec)) {
+        if (Prec_assoc(precs, prec) == ASSOC_LEFT) {
+            for (size_t i = 0; i < len; ) {
+                Rule match;
+                size_t match_len = try_match(ctx, &slice[i], len - i, &match);
+
+                if (match_len && Rule_get(rules, match)->prec.id == prec.id) {
+                    size_t match_diff = match_len - 1;
+
+                    for (int j = match_diff; j >= 0; --j)
+                        slice[match_diff + j] = slice[j];
+
+                    slice[i + match_diff] =
+                        rule_copy_of_slice(ctx->pool, rules, match, &slice[i],
+                                           match_len);
+                    slice += match_diff;
+                    len -= match_diff;
+                } else {
+                    ++i;
+                }
+            }
+
+            debug_slice(ctx, slice, len);
+        } else { // right assoc
+            UNIMPLEMENTED;
+        }
+
+        if (Prec_is_lowest(prec))
+            break;
+    }
+
+    // make scope AstExpr
+    AstExpr *tree = new_rule(ctx->pool, rules, rules->rule_scope, slice, len);
+}
+
+#if 0
 typedef struct MatchSlice {
     size_t start, len;
     Rule rule;
@@ -354,24 +428,9 @@ static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
 
     return parsed;
 }
+#endif
 
-// given a raw scope, parse it using a lang
-AstExpr *parse_scope(AstCtx *ctx, AstExpr *expr) {
-    /* TODO is this obsolete?
-    if (!translate_scope(ctx, expr))
-        return NULL;
-    */
-
-    size_t len;
-    AstExpr **slice = parse_slice(ctx, expr->exprs, expr->len, &len);
-
-    expr->exprs = slice;
-    expr->len = len;
-
-    return expr;
-}
-
-// general =====================================================================
+// interface ===================================================================
 
 static size_t ast_used_memory(AstExpr *expr) {
     size_t used = sizeof(*expr);
@@ -387,15 +446,16 @@ static size_t ast_used_memory(AstExpr *expr) {
 }
 
 AstExpr *parse(AstCtx *ctx, const TokBuf *tb) {
-#if 1
-    double start = time_now();
-#endif
-
 #ifdef DEBUG
+    double start = time_now();
     size_t start_mem = ctx->pool->total;
 #endif
 
-    AstExpr *ast = parse_scope(ctx, gen_initial_scope(ctx, tb));
+    Vec scope = gen_initial_scope(ctx, tb);
+    AstExpr *ast = parse_scope(ctx, (AstExpr **)scope.data, scope.len);
+    Vec_del(&scope);
+
+    assert(ast->type.id == fun_scope.id);
 
     if (!ast)
         global_error = true;
@@ -405,9 +465,7 @@ AstExpr *parse(AstCtx *ctx, const TokBuf *tb) {
         printf("ast used/total allocated memory: %zu/%zu\n",
                ast_used_memory(ast), ctx->pool->total - start_mem);
     }
-#endif
 
-#if 1
     double duration = time_now() - start;
 
     printf("parsing took %.6fs.\n", duration);
