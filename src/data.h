@@ -128,7 +128,7 @@ typedef struct HashMap {
     void **values;
     size_t size, cap;
 
-    unsigned is_set: 1;
+    bool is_set;
 } HashMap;
 
 typedef struct HashSet { HashMap map; } HashSet;

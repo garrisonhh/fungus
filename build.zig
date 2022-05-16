@@ -17,6 +17,28 @@ pub fn build(b: *std.build.Builder) anyerror!void {
     exe.setOutputDir(".");
     exe.linkLibC();
 
+    const src_dir = b.pathFromRoot("src");
+
+    // zig sources (compiled as separate object and linked with C source)
+    {
+        const zig_sources = [_][2][]const u8{
+            // .{ "char_classify", "lex/char_classify.zig" },
+            .{ "lex", "lex.zig" },
+        };
+
+        for (zig_sources) |name_and_path| {
+            const name = name_and_path[0];
+            const path = name_and_path[1];
+            const obj = b.addObject(name, b.pathJoin(&.{src_dir, path}));
+
+            obj.linkLibC();
+            obj.addIncludeDir("src");
+
+            exe.addObject(obj);
+        }
+    }
+
+    // c sources
     {
         var c_flags = std.ArrayList([]const u8).init(allocator);
         defer c_flags.deinit();
@@ -33,19 +55,19 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             try c_flags.append("-DDEBUG");
             try c_flags.append("-ggdb");
             try c_flags.append("-O0");
-            // ubsan makes it hard to debug segfaults
+            // ubsan makes it impossible to debug segfaults w/ valgrind
             try c_flags.append("-fno-sanitize=undefined");
         } else {
             try c_flags.append("-DNDEBUG");
             try c_flags.append("-O3");
         }
 
-        const sources = [_][]const u8 {
+        const c_sources = [_][]const u8 {
             "main.c",
             "fungus.c",
 
             // lexical analysis
-            "lex.c",
+            //"lex.c",
 
             // parsing
             "parse.c",
@@ -69,10 +91,8 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             "data.c",
         };
 
-        const abs_src_dir = b.pathFromRoot("src");
-
-        for (sources) |source| {
-            const path = b.pathJoin(&.{abs_src_dir, source});
+        for (c_sources) |source| {
+            const path = b.pathJoin(&.{src_dir, source});
 
             exe.addCSourceFile(path, c_flags.items);
         }

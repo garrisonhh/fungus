@@ -25,6 +25,12 @@ typedef uint32_t hsize_t;
 
 #define IN_RANGE(C, A, B) ((C) >= (A) && (C) <= (B))
 
+#ifdef DEBUG
+#define DEBUG_SCOPE(cond, ...) do { if (cond) { __VA_ARGS__ } } while (0)
+#else
+#define DEBUG_SCOPE(...)
+#endif
+
 // table names =================================================================
 
 // when using table macros I usually like to make name arrays nicer looking
@@ -72,7 +78,6 @@ static inline double time_now(void) {
 // TODO get rid of this? what is a better error system?
 extern bool global_error;
 
-void fungus_error(const char *msg, ...);
 noreturn void fungus_panic(const char *msg, ...);
 
 #define UNIMPLEMENTED \

@@ -16,7 +16,8 @@ void repl(Names *names) {
         if (global_error || feof(stdin)) goto cleanup_read;
 
         // lex
-        TokBuf tokbuf = lex(&file);
+        TokBuf tokbuf = lex(&file, &fungus_lang);
+
         if (global_error) goto cleanup_lex;
 
         // parse

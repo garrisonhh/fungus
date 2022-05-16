@@ -27,6 +27,10 @@ Rule Lang_immediate_legislate(Lang *, Type type, Prec prec, Pattern pat);
 Prec Lang_make_prec(Lang *, Word name, Associativity assoc);
 void Lang_crystallize(Lang *, Names *);
 
+// for zig
+HashSet *Lang_syms(Lang *);
+HashSet *Lang_words(Lang *);
+
 void Lang_dump(const Lang *);
 
 #endif

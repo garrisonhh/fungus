@@ -17,13 +17,17 @@ typedef struct File {
     size_t lines_len;
 
     // flags
-    unsigned owns_text: 1;
+    bool owns_text;
 } File;
 
 File File_open(const char *filepath);
 File File_read_stdin(void);
 File File_from_str(const char *filepath, const char *str, size_t len);
 void File_del(File *);
+
+// for zig interop
+const char *File_str(const File *);
+size_t File_len(const File *);
 
 // print out locations in a file
 void File_display_at(FILE *, const File *, hsize_t start, hsize_t len);

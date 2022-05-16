@@ -7,6 +7,9 @@
 
 /*
  * 'Structured Intermediate Representation', a second AST
+ *
+ * TODO this seems like a really good candidate to simply write in zig from the
+ * beginning!
  */
 
 #define SIR_TYPE_TYPES\

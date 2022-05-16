@@ -3,30 +3,36 @@
 
 #include "file.h"
 
-#define TOK_TYPES\
-    TYPE(INVALID)\
-    TYPE(WORD)\
-    TYPE(SYMBOLS)\
-    TYPE(BOOL)\
-    TYPE(INT)\
-    TYPE(FLOAT)\
-    TYPE(STRING)
+typedef struct Lang Lang;
 
-#define TYPE(NAME) TOK_##NAME,
-typedef enum TokType { TOK_TYPES TOK_COUNT } TokType;
-#undef TYPE
+typedef enum TokType {
+    TOK_INVALID,
+    TOK_LEXEME,
+    TOK_IDENT,
+    TOK_BOOL,
+    TOK_INT,
+    TOK_FLOAT,
+    TOK_STRING,
+
+    // fungus-specific tokenization stuff:
+    // TODO integrate with parser once implemented
+    TOK_ESCAPE, // '`' for escaping a symbol or word
+    TOK_SCOPE, // from lcurly -> rcurly
+
+    TOK_COUNT
+} TokType;
 
 typedef struct TokBuf {
+    void *zig_tbuf;
+
     TokType *types;
     hsize_t *starts, *lens;
-    size_t len, cap;
-
-    const File *file;
+    size_t len;
 } TokBuf;
 
-TokBuf lex(const File *);
+TokBuf lex(const File *, const Lang *);
 void TokBuf_del(TokBuf *);
 
-void TokBuf_dump(TokBuf *);
+void TokBuf_dump(TokBuf *, const File *);
 
 #endif

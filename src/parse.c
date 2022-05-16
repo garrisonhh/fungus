@@ -3,18 +3,7 @@
 #include "parse.h"
 #include "fungus.h"
 #include "lang/ast_expr.h"
-#include "lex/char_classify.h"
-
-/*
- * parsing works in two stages:
- * 1. turn scopes (`{ ... }`) into a tree. this is the only parsing rule that is
- *    truly hardcoded into Fungus
- * 2. recursively parse scopes given a language context. this requires
- *    integration with semantic analysis, because `language`s must be parsed
- *    before they can be used for parsing
- */
-
-// stage 1: scope tree =========================================================
+#include "lex/lex_strings.h"
 
 static AstExpr *new_atom(Bump *pool, Type type, Type evaltype,
                          hsize_t start, hsize_t len) {
@@ -55,253 +44,84 @@ static AstExpr *rule_copy_of_slice(Bump *pool, const RuleTree *rt, Rule rule,
     return new_rule(pool, rt, rule, exprs, len);
 }
 
-// turns tokens -> list of exprs, separating `{` and `}` as symbols but not
-// creating the tree yet
-static void gen_flat_list(AstCtx *ctx, Vec *list, const TokBuf *tb) {
-    Type evaltype_of_lit[TOK_COUNT] = {
-        [TOK_BOOL] = fun_bool,
-        [TOK_INT] = fun_int,
-        [TOK_FLOAT] = fun_float,
-        [TOK_STRING] = fun_string,
-    };
+// turns tokens -> scope of AstExprs
+static Vec gen_initial_scope(AstCtx *ctx, const TokBuf *tb) {
+    Vec scope = Vec_new();
 
     for (size_t i = 0; i < tb->len; ++i) {
         TokType toktype = tb->types[i];
         hsize_t start = tb->starts[i], len = tb->lens[i];
 
+        AstExpr *expr = NULL;
+
         assert(toktype != TOK_INVALID);
 
-        if (toktype == TOK_SYMBOLS) {
-            const char *text = &tb->file->text.str[start];
-
-            if (text[0] == '`') {
-                AstExpr *expr;
-
-                // escaped literal lexeme
-                if (len == 1) {
-                    // check for consumable word
-                    if (i >= tb->len) {
-                        File_error_at(tb->file, start, len,
-                                      "bare lexeme escape.");
-                        global_error = true;
-                    }
-
-                    ++i;
-
-                    TokType next_type = tb->types[i];
-                    hsize_t next_start = tb->starts[i];
-                    hsize_t next_len = tb->lens[i];
-
-                    if (next_type != TOK_WORD
-                     || next_start != start + len) {
-                        File_error_at(tb->file, start, len,
-                                      "bare lexeme escape.");
-                        global_error = true;
-                    }
-
-                    // word literal lexeme
-                    expr = new_atom(ctx->pool, fun_literal, fun_lexeme, start,
-                                    next_len + 1);
-                } else {
-                    // symbol literal lexeme
-                    expr = new_atom(ctx->pool, fun_literal, fun_lexeme, start,
-                                    len);
-                }
-
-                Vec_push(list, expr);
-            } else {
-                // split symbols on `{` and `}`
-                hsize_t last_split = 0;
-
-                for (hsize_t j = 0; j < len; ++j) {
-                    if (text[j] == '{' || text[j] == '}') {
-                        if (j > last_split) {
-                            AstExpr *expr = new_atom(ctx->pool, fun_lexeme,
-                                                     fun_lexeme,
-                                                     start + last_split,
-                                                     j - last_split);
-
-                            Vec_push(list, expr);
-                        }
-
-                        AstExpr *expr = new_atom(ctx->pool, fun_lexeme,
-                                                 fun_lexeme, start + j, 1);
-
-                        Vec_push(list, expr);
-
-                        last_split = j + 1;
-                    }
-                }
-
-                if (last_split < len) {
-                    AstExpr *expr = new_atom(ctx->pool, fun_lexeme, fun_lexeme,
-                                             start + last_split,
-                                             len - last_split);
-
-                    Vec_push(list, expr);
-                }
+        switch (toktype) {
+        case TOK_ESCAPE:
+            // consume next token, creating a literal lexeme
+            if (i == tb->len
+             || (tb->types[i + 1] != TOK_LEXEME
+              && tb->types[i + 1] != TOK_IDENT)) {
+                File_error_at(ctx->file, start, len,
+                              "escape not followed by a lexeme.");
             }
-        } else if (toktype == TOK_WORD) {
-            AstExpr *expr =
-                new_atom(ctx->pool, fun_lexeme, fun_lexeme, start, len);
 
-            Vec_push(list, expr);
-        } else {
-            // direct token -> expr translation
-            AstExpr *expr = new_atom(ctx->pool, fun_literal,
-                                     evaltype_of_lit[toktype], start, len);
+            ++i;
+            expr = new_atom(ctx->pool, fun_literal, fun_lexeme, tb->starts[i],
+                            tb->lens[i]);
+            break;
+        case TOK_SCOPE:
+            // TODO
+            UNIMPLEMENTED;
 
-            Vec_push(list, expr);
+            break;
+        case TOK_LEXEME:
+            expr = new_atom(ctx->pool, fun_lexeme, fun_lexeme, start, len);
+            break;
+        case TOK_IDENT:
+            expr = new_atom(ctx->pool, fun_ident, fun_unknown, start, len);
+            break;
+        case TOK_BOOL:
+        case TOK_INT:
+        case TOK_FLOAT:
+        case TOK_STRING: {
+            Type evaltype_of_lit[TOK_COUNT] = {
+                [TOK_BOOL] = fun_bool,
+                [TOK_INT] = fun_int,
+                [TOK_FLOAT] = fun_float,
+                [TOK_STRING] = fun_string,
+            };
+
+            // literal; direct token -> expr translation
+            expr = new_atom(ctx->pool, fun_literal, evaltype_of_lit[toktype],
+                            start, len);
+            break;
         }
-    }
-}
-
-static void verify_scopes(AstCtx *ctx, const Vec *list) {
-    const File *file = ctx->file;
-
-    int level = 0;
-
-    for (size_t i = 0; i < list->len; ++i) {
-        AstExpr *expr = list->data[i];
-
-        if (expr->type.id == fun_lexeme.id && expr->tok_len == 1) {
-            char ch = file->text.str[expr->tok_start];
-
-            if (ch == '{') {
-                ++level;
-            } else if (ch == '}') {
-                if (--level < 0)
-                    AstExpr_error(file, expr, "unmatched curly.");
-            }
-        }
-    }
-
-    if (level > 0)
-        File_error_from(file, File_eof(file), "unfinished scope at EOF.");
-}
-
-// takes a verified list from gen_flat_list and makes a scope tree
-static AstExpr *unflatten_list(AstCtx *ctx, const Vec *list) {
-    const RuleTree *rules = &ctx->lang->rules;
-    const char *text = ctx->file->text.str;
-
-    Vec levels[MAX_AST_DEPTH];
-    size_t level = 0;
-
-    levels[level++] = Vec_new();
-
-    for (size_t i = 0; i < list->len; ++i) {
-        AstExpr *expr = list->data[i];
-
-        if (expr->type.id == fun_lexeme.id) {
-            if (text[expr->tok_start] == '{') {
-                // create new scope vec
-                levels[level++] = Vec_new();
-
-                continue;
-            } else if (text[expr->tok_start] == '}') {
-                // turn scope vec into a scope on pool
-                Vec *vec = &levels[--level];
-
-                expr = rule_copy_of_slice(ctx->pool, rules, rules->rule_scope,
-                                          (AstExpr **)vec->data, vec->len);
-
-                Vec_del(vec);
-            }
+        case TOK_INVALID:
+        case TOK_COUNT:
+            UNREACHABLE;
         }
 
-        Vec_push(&levels[level - 1], expr);
+        assert(expr != NULL);
+        Vec_push(&scope, expr);
     }
 
-    AstExpr *tree = rule_copy_of_slice(ctx->pool, rules, rules->rule_scope,
-                                       (AstExpr **)levels[0].data,
-                                       levels[0].len);
+    DEBUG_SCOPE(0,
+        puts(TC_YELLOW "TRANSLATED TOKENS:" TC_RESET);
 
-    Vec_del(&levels[0]);
+        for (size_t i = 0; i < scope.len; ++i) {
+            const AstExpr *expr = scope.data[i];
 
-    return tree;
-}
-
-static AstExpr *gen_scope_tree(AstCtx *ctx, const TokBuf *tb) {
-    Vec root_list = Vec_new();
-
-    gen_flat_list(ctx, &root_list, tb);
-    verify_scopes(ctx, &root_list);
-
-    AstExpr *expr = unflatten_list(ctx, &root_list);
-
-    Vec_del(&root_list);
-
-    return expr;
-}
-
-// translates `scope` into the target language, returns success
-static bool translate_scope(AstCtx *ctx, AstExpr *scope) {
-    const Lang *lang = ctx->lang;
-
-    assert(scope->type.id == fun_scope.id);
-
-    AstExpr **exprs = scope->exprs;
-    size_t len = scope->len;
-    Vec list = Vec_new();
-
-    for (size_t i = 0; i < len; ++i) {
-        AstExpr *expr = exprs[i];
-
-        if (expr->type.id == fun_lexeme.id) {
-            // symbols must be split up and fully matched, words can be idents
-            // or stay lexemes
-            View tok = { &ctx->file->text.str[expr->tok_start], expr->tok_len };
-
-            if (ch_is_symbol(tok.str[0])) {
-                hsize_t sym_start = expr->tok_start;
-                size_t match_len;
-
-                // match as many syms as possible
-                while (tok.len > 0
-                    && (match_len = HashSet_longest(&lang->syms, &tok))) {
-                    AstExpr *sym = new_atom(ctx->pool, fun_lexeme,
-                                            fun_lexeme, sym_start, match_len);
-
-                    Vec_push(&list, sym);
-
-                    tok.str += match_len;
-                    tok.len -= match_len;
-                    sym_start += match_len;
-                }
-
-                if (tok.len > 0) {
-                    File_error_from(ctx->file, sym_start, "unknown symbol");
-
-                    return false;
-                }
-            } else {
-                Word word = Word_new(tok.str, tok.len);
-
-                if (!HashSet_has(&lang->words, &word)) {
-                    expr->type = fun_ident;
-                    expr->evaltype = fun_unknown;
-                }
-
-                Vec_push(&list, expr);
-            }
-        } else {
-            Vec_push(&list, expr);
+            Type_print(expr->type);
+            printf("!");
+            Type_print(expr->evaltype);
+            printf(TC_GRAY "\t--- " TC_RESET);
+            AstExpr_dump(expr, ctx->lang, ctx->file);
         }
-    }
+    );
 
-    scope->len = list.len;
-    scope->exprs = Bump_alloc(ctx->pool, scope->len * sizeof(*scope->exprs));
-
-    for (size_t i = 0; i < list.len; ++i)
-        scope->exprs[i] = list.data[i];
-
-    Vec_del(&list);
-
-    return true;
+    return scope;
 }
-
-// stage 2: rule parsing =======================================================
 
 static size_t try_match_r(AstCtx *ctx, const Vec *nexts, AstExpr **slice,
                           size_t len, size_t depth, Rule *o_rule) {
@@ -341,225 +161,133 @@ static size_t try_match_r(AstCtx *ctx, const Vec *nexts, AstExpr **slice,
 // tries to match a rule on a slice, returns length of rule matched
 static size_t try_match(AstCtx *ctx, AstExpr **slice, size_t len,
                         Rule *o_rule) {
-    size_t match_len =
-        try_match_r(ctx, &ctx->lang->rules.roots, slice, len, 1, o_rule);
-
-    return match_len;
+    return try_match_r(ctx, &ctx->lang->rules.roots, slice, len, 1, o_rule);
 }
 
-typedef struct MatchSlice {
-    size_t start, len;
-    Rule rule;
-} MatchSlice;
+static void debug_slice(AstCtx *ctx, AstExpr **slice, size_t len,
+                        const char *msg, ...){
+#ifdef DEBUG
+    va_list ap;
+    va_start(ap, msg);
+    printf(TC_YELLOW "SLICE: " TC_RESET);
+    vprintf(msg, ap);
+    puts("");
+    va_end(ap);
 
-// collapses matches of slice to left, modifies len to reflect collapse
-static void collapse_left(AstCtx *ctx, AstExpr **slice, size_t *io_len,
-                          const MatchSlice *matches, size_t num_matches) {
-    const RuleTree *rules = &ctx->lang->rules;
+    for (size_t i = 0; i < len; ++i)
+        AstExpr_dump(slice[i], ctx->lang, ctx->file);
 
-    size_t buf_len = *io_len, new_len = 0;
-    size_t shrinkage = 0, consumed = 0;
-
-    for (size_t i = 0; i < num_matches; ++i) {
-        const MatchSlice *match = &matches[i], *prev = &matches[i - 1];
-
-        while (consumed < match->start + match->len)
-            slice[new_len++] = slice[consumed++];
-
-        // guard against match slice conflicts
-        size_t shrunk_start = match->start - shrinkage;
-
-        if (i > 0 && prev->start + prev->len > match->start) {
-            Rule rematch;
-            size_t rematch_len =
-                try_match(ctx, &slice[shrunk_start], match->len, &rematch);
-
-            if (rematch_len != match->len || rematch.id != match->rule.id) {
-                // this rule has been made invalid by last collapse
-                continue;
-            }
-        }
-
-        // collapse
-        slice[shrunk_start] =
-            rule_copy_of_slice(ctx->pool, rules, match->rule,
-                               &slice[shrunk_start], match->len);
-
-        size_t len_diff = match->len - 1;
-
-        shrinkage += len_diff;
-        new_len -= len_diff;
-    }
-
-    // consume to end of slice
-    while (consumed < buf_len)
-        slice[new_len++] = slice[consumed++];
-
-    *io_len = new_len;
+    puts("");
+#endif
 }
 
-// collapses left matches of slice to right, modifies len to reflect collapse
-static void collapse_right(AstCtx *ctx, AstExpr **slice, size_t *io_len,
-                           const MatchSlice *matches, size_t num_matches) {
-    const RuleTree *rules = &ctx->lang->rules;
-
-    size_t buf_len = *io_len;
-    size_t unconsumed = buf_len;
-
-    AstExpr **stack = slice + buf_len;
-    size_t new_len = 0;
-
-    for (size_t i = 0; i < num_matches; ++i) {
-        const MatchSlice *match = &matches[num_matches - i - 1];
-        const MatchSlice *prev = &matches[num_matches - i];
-
-        while (unconsumed > match->start) {
-            *--stack = slice[--unconsumed];
-            ++new_len;
-        }
-
-        // guard against match slice conflicts
-        if (i > 0 && prev->start < match->start + match->len) {
-            Rule rematch;
-            size_t rematch_len =
-                try_match(ctx, stack, match->len, &rematch);
-
-            if (rematch_len != match->len || rematch.id != match->rule.id) {
-                // rule was made invalid by last collapse
-                continue;
-            }
-        }
-
-        // collapse
-        size_t len_diff = match->len - 1;
-
-        stack[len_diff] = rule_copy_of_slice(ctx->pool, rules, match->rule,
-                                             stack, match->len);
-
-        stack += len_diff;
-        new_len -= len_diff;
-    }
-
-    // consume to end of slice
-    while (unconsumed > 0) {
-        *--stack = slice[--unconsumed];
-        ++new_len;
-    }
-
-    // memmove from end of buf to start of buf
-    memmove(slice, stack, new_len * sizeof(*slice));
-
-    *io_len = new_len;
-}
-
-/*
- * the parsing algorithm is dumb simple:
- *
- * 1. iterate through a slice, matching any rules, store the matched rules and
- *    the highest precedence
- * 2. if there were rule matches, collapse all highest precedence rules and
- *    repeat from step 1
- * 3. otherwise, return the slice
- *
- * this algorithm removes all need for messing with precedence, edge cases with
- * rule type checking, etc. though it's probably a lot less efficient than
- * algorithms which do that
- */
-static AstExpr **parse_slice(AstCtx *ctx, AstExpr **slice, size_t len,
-                             size_t *o_len) {
-    const RuleTree *rules = &ctx->lang->rules;
+// parse a slice of unparsed exprs into a tree
+// TODO maybe I should allocate a second buffer and do a write/swap algo instead
+// of in-place modification to help cache performance? not super important
+// in the immediate future
+static AstExpr *parse_scope(AstCtx *ctx, AstExpr **orig_slice, size_t len) {
     const Precs *precs = &ctx->lang->precs;
+    const RuleTree *rules = &ctx->lang->rules;
+    AstExpr **slice = orig_slice;
 
-    // construct buffers for slice matching
-    AstExpr **buf = malloc(len * sizeof(*slice));
-    size_t buf_len = len;
+    Prec prec = Prec_highest(precs);
+#ifdef DEBUG
+    int iterations = 0;
+#endif
 
-    memcpy(buf, slice, len * sizeof(*buf));
-
-    MatchSlice *matches = malloc(len * sizeof(*matches));
-    size_t num_matches;
-
-    // match algo (as described above)
     while (true) {
-        // find all matches at the highest precedence possible
-        Prec highest = {0};
+        bool found_match = false;
 
-        num_matches = 0;
+#ifdef DEBUG
+        ++iterations;
+#endif
 
-        for (size_t i = 0; i < buf_len; ++i) {
-            Rule matched;
-            size_t match_len = try_match(ctx, &buf[i], buf_len - i, &matched);
+        if (Prec_assoc(precs, prec) == ASSOC_LEFT) {
+            for (size_t i = 0; i < len; ) {
+                Rule match;
+                size_t match_len = try_match(ctx, &slice[i], len - i, &match);
 
-            if (match_len > 0) {
-                Prec rule_prec = Rule_get(rules, matched)->prec;
-                int cmp = Prec_cmp(rule_prec, highest);
+                if (match_len && Rule_get(rules, match)->prec.id == prec.id) {
+                    found_match = true;
 
-                // if this is now the highest precedence, reset match list
-                if (!num_matches || cmp > 0) {
-                    highest = rule_prec;
-                    num_matches = 0;
-                } else if (cmp < 0) {
-                    // this match is below the highest precedence
-                    continue;
+                    // collapse rule
+                    size_t match_diff = match_len - 1;
+
+                    slice[i + match_diff] =
+                        rule_copy_of_slice(ctx->pool, rules, match, &slice[i],
+                                           match_len);
+
+                    for (int j = i - 1; j >= 0; --j)
+                        slice[j + match_diff] = slice[j];
+
+                    slice += match_diff;
+                    len -= match_diff;
+                } else {
+                    ++i;
                 }
+            }
+        } else { // right assoc
+            for (int i = len - 1; i >= 0; ) {
+                Rule match;
+                size_t match_len = try_match(ctx, &slice[i], len - i, &match);
 
-                // if this match is contained by a greedy previous match, ignore
-                // it. this can happen with `repeating` rules
-                const MatchSlice *prev = &matches[num_matches - 1];
+                if (match_len && Rule_get(rules, match)->prec.id == prec.id) {
+                    found_match = true;
 
-                if (num_matches > 0 && prev->rule.id == matched.id
-                 && prev->start + prev->len >= i + match_len) {
-                    continue;
+                    /*
+                     * right associativity must check for backwards-reaching
+                     * matches: for a rule that looks like `A* B`, if you have
+                     * exprs that match `C A A A B`, right will first match the
+                     * final `A B`, which is incorrect. this code chunk will
+                     * extend the match backwards until it stops matching the
+                     * pattern.
+                     */
+try_back_match:
+                    if (i > 0) {
+                        Rule back_match;
+                        size_t back_match_len =
+                            try_match(ctx, &slice[i - 1], len - (i - 1),
+                                      &back_match);
+
+                        if (back_match.id == match.id
+                         && back_match_len == match_len + 1) {
+                            ++match_len;
+                            --i;
+                            goto try_back_match;
+                        }
+                    }
+
+                    // collapse rule
+                    slice[i] = rule_copy_of_slice(ctx->pool, rules, match,
+                                                  &slice[i], match_len);
+
+                    size_t match_diff = match_len - 1;
+
+                    for (size_t j = i + 1; j < len - match_diff; ++j)
+                        slice[j] = slice[j + match_diff];
+
+                    len -= match_diff;
+                } else {
+                    --i;
                 }
-
-                matches[num_matches++] = (MatchSlice){
-                    .start = i,
-                    .len = match_len,
-                    .rule = matched
-                };
             }
         }
 
-        // if no matches are found, parsing of slice is done
-        if (!num_matches)
-            break;
+        if (Prec_is_lowest(prec))
+           break;
 
-        // collapse all matches
-        if (Prec_assoc(precs, highest) == ASSOC_RIGHT)
-            collapse_right(ctx, buf, &buf_len, matches, num_matches);
+        // iterate
+        if (found_match)
+            found_match = false;
         else
-            collapse_left(ctx, buf, &buf_len, matches, num_matches);
+            Prec_dec(&prec);
     }
 
-    // copy parsed buffer to bump-allocated slice
-    AstExpr **parsed = Bump_alloc(ctx->pool, buf_len * sizeof(*buf));
-
-    memcpy(parsed, buf, buf_len * sizeof(*parsed));
-
-    // cleanup and return TODO custom arena allocators
-    free(matches);
-    free(buf);
-
-    *o_len = buf_len;
-
-    return parsed;
+    // return AstExpr block as a scope
+    return rule_copy_of_slice(ctx->pool, rules, rules->rule_scope, slice, len);
 }
 
-// given a raw scope, parse it using a lang
-AstExpr *parse_scope(AstCtx *ctx, AstExpr *expr) {
-    if (!translate_scope(ctx, expr))
-        return NULL;
-
-    size_t len;
-    AstExpr **slice = parse_slice(ctx, expr->exprs, expr->len, &len);
-
-    expr->exprs = slice;
-    expr->len = len;
-
-    return expr;
-}
-
-// general =====================================================================
+// interface ===================================================================
 
 static size_t ast_used_memory(AstExpr *expr) {
     size_t used = sizeof(*expr);
@@ -575,31 +303,35 @@ static size_t ast_used_memory(AstExpr *expr) {
 }
 
 AstExpr *parse(AstCtx *ctx, const TokBuf *tb) {
-#if 1
-    double start = time_now();
-#endif
-
 #ifdef DEBUG
-    size_t start_mem = ctx->pool->total;
+    double start;
+    size_t start_mem;
 #endif
 
-    AstExpr *ast = parse_scope(ctx, gen_scope_tree(ctx, tb));
+    DEBUG_SCOPE(0,
+        start = time_now();
+        start_mem = ctx->pool->total;
+    );
+
+    Vec scope = gen_initial_scope(ctx, tb);
+    AstExpr *ast = parse_scope(ctx, (AstExpr **)scope.data, scope.len);
+    Vec_del(&scope);
+
+    assert(ast->type.id == fun_scope.id);
 
     if (!ast)
         global_error = true;
 
-#ifdef DEBUG
-    if (ast) {
-        printf("ast used/total allocated memory: %zu/%zu\n",
-               ast_used_memory(ast), ctx->pool->total - start_mem);
-    }
-#endif
+    DEBUG_SCOPE(0,
+        if (ast) {
+            printf("ast used/total allocated memory: %zu/%zu\n",
+                   ast_used_memory(ast), ctx->pool->total - start_mem);
+        }
 
-#if 1
-    double duration = time_now() - start;
+        double duration = time_now() - start;
 
-    printf("parsing took %.6fs.\n", duration);
-#endif
+        printf("parsing took %.6fs.\n", duration);
+    );
 
     return ast;
 }

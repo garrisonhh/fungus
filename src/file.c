@@ -113,6 +113,14 @@ void File_del(File *f) {
     free(f->lines);
 }
 
+const char *File_str(const File *f) {
+    return f->text.str;
+}
+
+size_t File_len(const File *f) {
+    return f->text.len;
+}
+
 // locations ===================================================================
 
 typedef struct FileLoc {
