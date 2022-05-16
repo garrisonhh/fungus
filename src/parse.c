@@ -182,13 +182,13 @@ static void debug_slice(AstCtx *ctx, AstExpr **slice, size_t len,
 }
 
 // parse a slice of unparsed exprs into a tree
+// TODO maybe I should allocate a second buffer and do a write/swap algo instead
+// of in-place modification to help cache performance? not super important
+// in the immediate future
 static AstExpr *parse_scope(AstCtx *ctx, AstExpr **orig_slice, size_t len) {
     const Precs *precs = &ctx->lang->precs;
     const RuleTree *rules = &ctx->lang->rules;
     AstExpr **slice = orig_slice;
-
-    puts(TC_YELLOW "BEGIN PARSE" TC_RESET);
-    debug_slice(ctx, slice, len, "");
 
     Prec prec = Prec_highest(precs);
 #ifdef DEBUG
@@ -222,10 +222,6 @@ static AstExpr *parse_scope(AstCtx *ctx, AstExpr **orig_slice, size_t len) {
 
                     slice += match_diff;
                     len -= match_diff;
-
-                    debug_slice(ctx, slice, len,
-                                "slice after collapsing %zu %zu left",
-                                i, match_len);
                 } else {
                     ++i;
                 }
@@ -271,10 +267,6 @@ try_back_match:
                         slice[j] = slice[j + match_diff];
 
                     len -= match_diff;
-
-                    debug_slice(ctx, slice, len,
-                                "slice after collapsing %zu %zu right",
-                                i, match_len);
                 } else {
                     --i;
                 }
@@ -291,15 +283,8 @@ try_back_match:
             Prec_dec(&prec);
     }
 
-    debug_slice(ctx, slice, len, "");
-#ifdef DEBUG
-    printf("parsing took %d iterations.\n", iterations);
-#endif
-
-    exit(0);
-
-    // make scope AstExpr
-    AstExpr *tree = new_rule(ctx->pool, rules, rules->rule_scope, slice, len);
+    // return AstExpr block as a scope
+    return rule_copy_of_slice(ctx->pool, rules, rules->rule_scope, slice, len);
 }
 
 // interface ===================================================================
@@ -319,9 +304,14 @@ static size_t ast_used_memory(AstExpr *expr) {
 
 AstExpr *parse(AstCtx *ctx, const TokBuf *tb) {
 #ifdef DEBUG
-    double start = time_now();
-    size_t start_mem = ctx->pool->total;
+    double start;
+    size_t start_mem;
 #endif
+
+    DEBUG_SCOPE(0,
+        start = time_now();
+        start_mem = ctx->pool->total;
+    );
 
     Vec scope = gen_initial_scope(ctx, tb);
     AstExpr *ast = parse_scope(ctx, (AstExpr **)scope.data, scope.len);
@@ -332,16 +322,16 @@ AstExpr *parse(AstCtx *ctx, const TokBuf *tb) {
     if (!ast)
         global_error = true;
 
-#ifdef DEBUG
-    if (ast) {
-        printf("ast used/total allocated memory: %zu/%zu\n",
-               ast_used_memory(ast), ctx->pool->total - start_mem);
-    }
+    DEBUG_SCOPE(0,
+        if (ast) {
+            printf("ast used/total allocated memory: %zu/%zu\n",
+                   ast_used_memory(ast), ctx->pool->total - start_mem);
+        }
 
-    double duration = time_now() - start;
+        double duration = time_now() - start;
 
-    printf("parsing took %.6fs.\n", duration);
-#endif
+        printf("parsing took %.6fs.\n", duration);
+    );
 
     return ast;
 }

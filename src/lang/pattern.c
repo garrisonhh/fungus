@@ -234,9 +234,9 @@ void pattern_lang_init(Names *names) {
 #endif
     pattern_lang = lang;
 
-#ifdef DEBUG
-    Lang_dump(&pattern_lang);
-#endif
+    DEBUG_SCOPE(0,
+        Lang_dump(&pattern_lang);
+    );
 }
 
 void pattern_lang_quit(void) {
@@ -306,16 +306,9 @@ AstExpr *precompile_pattern(Bump *pool, Names *names, const File *file) {
     }, &tokens);
 
     /*
-     * used to do sema here but it ended up being problematic, may want to
+     * used to do sema here but it ended up not being very useful, may want to
      * bring it back in the future? unsure
      */
-
-#if 1
-    puts(TC_YELLOW "precompiled pattern:" TC_RESET);
-    AstExpr_dump(ast, &pattern_lang, file);
-
-    exit(0);
-#endif
 
     TokBuf_del(&tokens);
 
@@ -436,10 +429,6 @@ static void compile_match_atom(MatchAtom *pred, Bump *pool, const Names *names,
         assert(expr->evaltype.id == fun_lexeme.id);
 
         Word word = AstExpr_as_word(file, expr);
-
-        // skip first '`'
-        ++word.str;
-        --word.len;
 
         *pred = (MatchAtom){
             .type = MATCH_LEXEME,

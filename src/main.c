@@ -18,13 +18,6 @@ void repl(Names *names) {
         // lex
         TokBuf tokbuf = lex(&file, &fungus_lang);
 
-#if 1
-        // TODO TESTING REMOVE
-        TokBuf_dump(&tokbuf, &file);
-
-        goto cleanup_lex;
-#endif
-
         if (global_error) goto cleanup_lex;
 
         // parse
