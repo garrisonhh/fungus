@@ -31,6 +31,11 @@ pub const FirError = error {
     InvalidLiteral,
 };
 
+fn sliceOfAstExpr(file: *c.File, expr: *c.AstExpr) []const u8 {
+    const expr_tok = c.AstExpr_tok(expr);
+    return file.text.str[expr_tok.start..expr_tok.start + expr_tok.len];
+}
+
 pub const Fir = struct {
     evaltype: Type,
     data: Data,
@@ -93,12 +98,12 @@ pub const Fir = struct {
         // get expr type
         switch (expr.@"type".id) {
             c.ID_SCOPE => {
-                const expr_scope = c.AstExpr_scope(expr);
+                const rule = c.AstExpr_rule(expr);
                 const scope = Scope{
-                    .exprs = cBumpAlloc(*Fir, ctx.pool, expr_scope.len)
+                    .exprs = cBumpAlloc(*Fir, ctx.pool, rule.len)
                 };
 
-                for (expr_scope.exprs[0..expr_scope.len]) |child, i| {
+                for (rule.exprs[0..rule.len]) |child, i| {
                     scope.exprs[i] = try Fir.fromAstExpr(ctx, child);
                 }
 
@@ -107,9 +112,7 @@ pub const Fir = struct {
                 };
             },
             c.ID_LITERAL => {
-                const expr_tok = c.AstExpr_tok(expr);
-                const tok_end = expr_tok.start + expr_tok.len;
-                const slice = ctx.file.text.str[expr_tok.start..tok_end];
+                const slice = sliceOfAstExpr(ctx.file, expr);
 
                 errdefer {
                     c.AstExpr_error(ctx.file, expr, "could not parse literal.");
@@ -132,6 +135,27 @@ pub const Fir = struct {
                     }
                 };
             },
+            c.ID_ADD, c.ID_SUBTRACT, c.ID_MULTIPLY, c.ID_DIVIDE, c.ID_MODULO
+                => |id| {
+                // binary operators
+                const rule = c.AstExpr_rule(expr);
+                const bin_op = BinOp{
+                    .kind = switch (id) {
+                        c.ID_ADD => .Add,
+                        c.ID_SUBTRACT => .Sub,
+                        c.ID_MULTIPLY => .Mul,
+                        c.ID_DIVIDE => .Div,
+                        c.ID_MODULO => .Mod,
+                        else => unreachable
+                    },
+                    .lhs = try Fir.fromAstExpr(ctx, rule.exprs[0]),
+                    .rhs = try Fir.fromAstExpr(ctx, rule.exprs[2])
+                };
+
+                self.data = Data{
+                    .bin_op = bin_op
+                };
+            },
             else => {
                 const name = @ptrCast(*const c.View, c.Type_name(expr.@"type"));
 
@@ -151,12 +175,14 @@ pub const Fir = struct {
                      @tagName(self.evaltype).ptr,
                      @tagName(self.data).ptr);
 
+        const next_level = level + 1;
+
         switch (self.data) {
             .scope => |scope| {
                 _ = c.printf("\n");
 
                 for (scope.exprs) |child| {
-                    child.dumpR(level + 1);
+                    child.dumpR(next_level);
                 }
             },
             .lit => |lit| {
@@ -174,7 +200,21 @@ pub const Fir = struct {
 
                 _ = c.printf(c.TC_RESET ++ "\n");
             },
-            else => unreachable
+            .bin_op => |bin_op| {
+                const name = @tagName(bin_op.kind);
+                var buf: [32]u8 = undefined;
+                _ = std.ascii.lowerString(buf[0..], name);
+                buf[name.len] = 0;
+
+                _ = c.printf("%s\n", buf);
+
+                bin_op.lhs.dumpR(next_level);
+                bin_op.rhs.dumpR(next_level);
+            },
+            else => |tag| {
+                _ = c.printf("unhandled fir type %s in Fir.dumpR().\n",
+                             @tagName(tag).ptr);
+            }
         }
     }
 

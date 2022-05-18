@@ -42,13 +42,13 @@ typedef struct AstExprTok {
     hsize_t start, len;
 } AstExprTok;
 
-typedef struct AstExprScope {
+typedef struct AstExprRule {
     Rule rule;
     AstExpr **exprs;
     size_t len;
-} AstExprScope;
+} AstExprRule;
 
 AstExprTok AstExpr_tok(const AstExpr *);
-AstExprScope AstExpr_scope(const AstExpr *);
+AstExprRule AstExpr_rule(const AstExpr *);
 
 #endif

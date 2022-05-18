@@ -136,8 +136,8 @@ AstExprTok AstExpr_tok(const AstExpr *expr) {
     };
 }
 
-AstExprScope AstExpr_scope(const AstExpr *expr) {
-    return (AstExprScope){
+AstExprRule AstExpr_rule(const AstExpr *expr) {
+    return (AstExprRule){
         .rule = expr->rule,
         .exprs = expr->exprs,
         .len = expr->len

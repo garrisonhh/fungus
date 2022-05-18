@@ -255,7 +255,7 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                 // strings
                 const start = i;
 
-                while (i < str.len) {
+                while (i < str.len - 1) {
                     i += 1;
 
                     if (str[i] == '"' and str[i - 1] != '\\')
