@@ -119,6 +119,7 @@ const TokBuf = struct {
 };
 
 const LexError = error {
+    EmptyFile,
     SymbolNotFound,
     UnmatchedLCurly,
 };
@@ -160,6 +161,10 @@ fn addWord(
 
 // TODO specific and descriptive errors
 fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
+    if (c.File_len(file) == 0) {
+        return LexError.EmptyFile;
+    }
+
     const str: []const u8 = c.File_str(file)[0..c.File_len(file)];
 
     var i: hsize_t = 0;

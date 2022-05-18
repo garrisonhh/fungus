@@ -5,7 +5,7 @@
 #include "lex.h"
 #include "parse.h"
 #include "sema.h"
-#include "sir.h"
+#include "fir.h"
 
 void repl(Names *names) {
     puts(TC_YELLOW "fungus v0 - by garrisonhh" TC_RESET);
@@ -40,21 +40,21 @@ void repl(Names *names) {
 
         if (global_error) goto cleanup_parse;
 
-        // sir
-        Bump sir_pool = Bump_new();
-        const SirExpr *sir = generate_sir(&sir_pool, &file, ast);
+        // fir
+        Bump fir_pool = Bump_new();
+        const Fir *fir = gen_fir(&fir_pool, &file, ast);
 
-        if (global_error) goto cleanup_sir;
+        if (global_error) goto cleanup_fir;
 
 #if 1
-        puts(TC_CYAN "generated sir:" TC_RESET);
-        SirExpr_dump(sir);
+        puts(TC_CYAN "generated fir:" TC_RESET);
+        Fir_dump(fir);
         puts("");
 #endif
 
         // cleanup
-cleanup_sir:
-        Bump_del(&sir_pool);
+cleanup_fir:
+        Bump_del(&fir_pool);
 cleanup_parse:
         Bump_del(&parse_pool);
 cleanup_lex:
@@ -77,9 +77,9 @@ int main(int argc, char **argv) {
     pattern_lang_init(&name_table);
     fungus_lang_init(&name_table);
 
-#ifdef DEBUG
-    Lang_dump(&fungus_lang);
-#endif
+    DEBUG_SCOPE(0,
+        Lang_dump(&fungus_lang);
+    );
 
     repl(&name_table);
 

@@ -128,3 +128,18 @@ void AstExpr_dump(const AstExpr *expr, const Lang *lang, const File *file) {
         expr = scopes[size - 1]->exprs[indices[size - 1]++];
     }
 }
+
+AstExprTok AstExpr_tok(const AstExpr *expr) {
+    return (AstExprTok){
+        .start = expr->tok_start,
+        .len = expr->tok_len
+    };
+}
+
+AstExprScope AstExpr_scope(const AstExpr *expr) {
+    return (AstExprScope){
+        .rule = expr->rule,
+        .exprs = expr->exprs,
+        .len = expr->len
+    };
+}
