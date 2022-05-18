@@ -28,7 +28,6 @@ pub const FirError = error {
     UnhandledEvalType,
     UnhandledAstExprType,
     UnhandledLiteralType,
-
     InvalidLiteral,
 };
 
@@ -85,7 +84,10 @@ pub const Fir = struct {
             c.ID_INT => .I64,
             c.ID_FLOAT => .F64,
             c.ID_BOOL => .Bool,
-            else => return FirError.UnhandledEvalType
+            else => {
+                c.AstExpr_error(ctx.file, expr, "unknown eval type.");
+                return FirError.UnhandledEvalType;
+            }
         };
 
         // get expr type
@@ -109,6 +111,10 @@ pub const Fir = struct {
                 const tok_end = expr_tok.start + expr_tok.len;
                 const slice = ctx.file.text.str[expr_tok.start..tok_end];
 
+                errdefer {
+                    c.AstExpr_error(ctx.file, expr, "could not parse literal.");
+                }
+
                 self.data = Data{
                     .lit = switch (expr.evaltype.id) {
                         c.ID_INT => Literal{
@@ -126,7 +132,14 @@ pub const Fir = struct {
                     }
                 };
             },
-            else => return FirError.UnhandledAstExprType
+            else => {
+                const name = @ptrCast(*const c.View, c.Type_name(expr.@"type"));
+
+                c.AstExpr_error(ctx.file, expr, "unhandled expr type `%.*s`.",
+                                @intCast(c_int, name.len), name.str);
+
+                return FirError.UnhandledAstExprType;
+            }
         }
 
         return self;
@@ -174,7 +187,7 @@ pub const Fir = struct {
 
 export fn gen_fir(
     pool: *c.Bump, file: *c.File, ast: *c.AstExpr
-) *const Fir {
+) ?*const Fir {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
 
@@ -184,10 +197,9 @@ export fn gen_fir(
         .file = file
     };
 
-    return Fir.fromAstExpr(ctx, ast) catch |e| {
-        c.fungus_panic("FIR generation failed with error %s.",
-                       @errorName(e).ptr);
-        unreachable;
+    return Fir.fromAstExpr(ctx, ast) catch on_err: {
+        c.global_error = true;
+        break :on_err null;
     };
 }
 
