@@ -150,11 +150,13 @@ fn addWord(
     tbuf: *TokBuf, lang: *c.Lang, slice: []const u8, start: hsize_t
 ) LexError!void {
     const token_cword = c.Word_new(slice.ptr, slice.len);
-    var word_type: TokType =
-        if (c.HashSet_has(c.Lang_words(lang), &token_cword))
-            .Lexeme
+    var word_type =
+        if (std.mem.eql(u8, slice, "true") or std.mem.eql(u8, slice, "false"))
+            TokType.Bool
+        else if (c.HashSet_has(c.Lang_words(lang), &token_cword))
+            TokType.Lexeme
         else
-            .Ident;
+            TokType.Ident;
 
     tbuf.emit(word_type, start, @intCast(hsize_t, slice.len));
 }
