@@ -113,11 +113,11 @@ Bump Bump_new(void) {
 }
 
 void Bump_del(Bump *b) {
-#ifdef DEBUG
-    char buf[256];
-    sprintf(buf, "%zu/%zu", b->total, b->allocated);
-    printf("deleting bump: %10s\n", buf);
-#endif
+    DEBUG_SCOPE(0,
+        char buf[256];
+        sprintf(buf, "%zu/%zu", b->total, b->allocated);
+        printf("deleting bump: %10s\n", buf);
+    );
 
     for (size_t i = 0; i < b->pages.len; ++i)
         free(b->pages.data[i]);
