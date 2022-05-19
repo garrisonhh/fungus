@@ -137,8 +137,9 @@ fn splitSymbol(
             @intCast(hsize_t,
                      c.HashSet_longest(c.Lang_syms(lang), &token_view));
 
-        if (match_len == 0)
+        if (match_len == 0) {
             return LexError.SymbolNotFound;
+        }
 
         tbuf.emit(.Lexeme, start + i, match_len);
         i += match_len;
@@ -161,7 +162,7 @@ fn addWord(
     tbuf.emit(word_type, start, @intCast(hsize_t, slice.len));
 }
 
-// TODO specific and descriptive errors
+// TODO specific and descriptive user-facing errors
 fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
     if (c.File_len(file) == 0) {
         return LexError.EmptyFile;
@@ -221,7 +222,12 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                     }
                 }
 
-                try splitSymbol(tbuf, lang, str[start..i], start);
+                // lexemes that aren't literals must be split into valid lexemes
+                splitSymbol(tbuf, lang, str[start..i], start) catch |e| {
+                    c.File_error_at(file, start, i - start,
+                                    "symbol not found.");
+                    return e;
+                };
             },
             .Digit => {
                 // ints and floats
@@ -278,9 +284,12 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                         else => {}
                     }
 
-                    if (level == 0)
+                    if (level == 0) {
+                        i += 1;
                         break;
+                    }
                 } else {
+                    c.File_error_from(file, start, "unmatched curly.");
                     return LexError.UnmatchedLCurly;
                 }
 
@@ -295,7 +304,7 @@ export fn lex(file: *c.File, lang: *c.Lang) TokBuf.CTokBuf {
     tbuf.init() catch c.abort();
 
     tokenize(tbuf, file, lang) catch |e| {
-        // TODO descriptive error report
+        // TODO a more descriptive error report, and don't panic
         c.fungus_panic("tokenization failed with error %s", @errorName(e).ptr);
     };
 
