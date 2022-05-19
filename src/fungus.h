@@ -5,40 +5,40 @@
 #include "sema/types.h"
 #include "sema/names.h"
 
-// table of (name, enum name, fun name, num supers, super list)
+// table of (name, enum name, fun name, list of super types)
 #define BASE_TYPES\
     /* special */\
-    TYPE(unknown,    UNKNOWN,    "Unknown",     0, {0}) /* placeholder; invalid */\
-    TYPE(any,        ANY,        "Any",         0, {0}) /* truly any valid type */\
-    TYPE(any_val,    ANY_VAL,    "AnyValue",    1, { fun_any })\
-    TYPE(any_expr,   ANY_EXPR,   "AnyExpr",     1, { fun_any }) /* any AST expr */\
-    TYPE(rule,       RULE,       "Rule",        1, { fun_any_expr })\
-    TYPE(nil,        NIL,        "nil",         1, { fun_any_val })\
+    TYPE(unknown,    UNKNOWN,    "Unknown",     (Type[0]){}) /* placeholder */\
+    TYPE(any,        ANY,        "Any",         (Type[0]){})\
+    TYPE(any_val,    ANY_VAL,    "AnyValue",    { fun_any })\
+    TYPE(any_expr,   ANY_EXPR,   "AnyExpr",     { fun_any })\
+    TYPE(rule,       RULE,       "Rule",        { fun_any_expr })\
+    TYPE(nil,        NIL,        "nil",         { fun_any_val })\
     /* metatypes + parsing */\
-    TYPE(scope,      SCOPE,      "Scope",       1, { fun_rule })\
-    TYPE(lexeme,     LEXEME,     "Lexeme",      1, { fun_any_expr })\
-    TYPE(literal,    LITERAL,    "Literal",     1, { fun_any_expr })\
-    TYPE(ident,      IDENT,      "Ident",       1, { fun_any_expr })\
-    TYPE(type,       TYPE,       "Type",        1, { fun_any_expr })\
+    TYPE(scope,      SCOPE,      "Scope",       { fun_any_expr })\
+    TYPE(lexeme,     LEXEME,     "Lexeme",      { fun_any_expr })\
+    TYPE(literal,    LITERAL,    "Literal",     { fun_any_expr })\
+    TYPE(ident,      IDENT,      "Ident",       { fun_any_expr })\
+    TYPE(type,       TYPE,       "Type",        { fun_any_expr })\
     /* pattern types */\
-    TYPE(match,      MATCH,      "Match",       1, { fun_rule })\
-    TYPE(match_expr, MATCH_EXPR, "MatchExpr",   1, { fun_rule })\
-    TYPE(type_or,    TYPE_OR,    "TypeOr",      1, { fun_rule })\
-    TYPE(type_bang,  TYPE_BANG,  "TypeBang",    1, { fun_rule })\
-    TYPE(opt_match,  OPT_MATCH,  "OptMatch",    1, { fun_rule })\
-    TYPE(rep_match,  REP_MATCH,  "RepMatch",    1, { fun_rule })\
-    TYPE(returns,    RETURNS,    "Returns",     1, { fun_rule })\
-    TYPE(pattern,    PATTERN,    "Pattern",     1, { fun_rule })\
-    TYPE(wh_clause,  WH_CLAUSE,  "WhereClause", 1, { fun_rule })\
-    TYPE(where,      WHERE,      "Where",       1, { fun_rule })\
+    TYPE(match,      MATCH,      "Match",       { fun_rule })\
+    TYPE(match_expr, MATCH_EXPR, "MatchExpr",   { fun_rule })\
+    TYPE(type_or,    TYPE_OR,    "TypeOr",      { fun_rule })\
+    TYPE(type_bang,  TYPE_BANG,  "TypeBang",    { fun_rule })\
+    TYPE(opt_match,  OPT_MATCH,  "OptMatch",    { fun_rule })\
+    TYPE(rep_match,  REP_MATCH,  "RepMatch",    { fun_rule })\
+    TYPE(returns,    RETURNS,    "Returns",     { fun_rule })\
+    TYPE(pattern,    PATTERN,    "Pattern",     { fun_rule })\
+    TYPE(wh_clause,  WH_CLAUSE,  "WhereClause", { fun_rule })\
+    TYPE(where,      WHERE,      "Where",       { fun_rule })\
     /* primitives */\
-    TYPE(primitive,  PRIMITIVE,  "Primitive",   1, { fun_any_val })\
-    TYPE(bool,       BOOL,       "bool",        1, { fun_primitive })\
+    TYPE(primitive,  PRIMITIVE,  "Primitive",   { fun_any_val })\
+    TYPE(bool,       BOOL,       "bool",        { fun_primitive })\
     /* TODO string probably should be a struct type */\
-    TYPE(string,     STRING,     "string",      1, { fun_primitive })\
-    TYPE(number,     NUMBER,     "Number",      1, { fun_primitive })\
-    TYPE(int,        INT,        "int",         1, { fun_number })\
-    TYPE(float,      FLOAT,      "float",       1, { fun_number })
+    TYPE(string,     STRING,     "string",      { fun_primitive })\
+    TYPE(number,     NUMBER,     "Number",      { fun_primitive })\
+    TYPE(int,        INT,        "int",         { fun_number })\
+    TYPE(float,      FLOAT,      "float",       { fun_number })
 
 #define BASE_PRECS\
     /* 'default' is the precedence of language constructs */\
@@ -73,6 +73,13 @@
          "lhs: AnyExpr!T `<= rhs: AnyExpr!T -> bool where T = Number")\
     RULE(ge, GE, "GreaterThanOrEquals", "Conditional",\
          "lhs: AnyExpr!T `>= rhs: AnyExpr!T -> bool where T = Number")\
+    /* logical operators */\
+    RULE(or, OR, "Or", "LogicalOr",\
+         "lhs: AnyExpr!bool `or rhs: AnyExpr!bool -> bool")\
+    RULE(and, AND, "And", "LogicalAnd",\
+         "lhs: AnyExpr!bool `and rhs: AnyExpr!bool -> bool")\
+    RULE(not, NOT, "Not", "UnaryPrefix",\
+         "`! expr: AnyExpr!bool -> bool")\
     /* math operators */\
     RULE(add, ADD, "Add", "AddSub",\
          "lhs: AnyExpr!T `+ rhs: AnyExpr!T -> T where T = Number")\
