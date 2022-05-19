@@ -221,8 +221,25 @@ static void dump_children(const RuleTree *rt, const Vec *children,
         if (child == exclude)
             continue;
 
+        // print predicate
         printf("%*s", level * INDENT, "");
-        MatchAtom_print(child->pred);
+
+        const MatchAtom *pred = child->pred;
+
+        if (pred->repeating)
+            printf("repeating ");
+
+        switch (pred->type) {
+        case MATCH_EXPR:
+            printf(TC_BLUE);
+            TypeExpr_print(pred->rule_expr);
+            printf(TC_RESET);
+            break;
+        case MATCH_LEXEME:
+            printf("`" TC_GREEN "%.*s" TC_RESET,
+                   (int)pred->lxm->len, pred->lxm->str);
+            break;
+        }
 
         // rule (if exists)
         if (child->has_rule) {

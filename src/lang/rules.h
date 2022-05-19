@@ -30,6 +30,8 @@ typedef struct RuleEntry {
 } RuleEntry;
 
 typedef struct RuleNode {
+    // TODO RuleNode only really uses the rule expr of the MatchAtom, shouldn't
+    // I just store that instead of the whole thing?
     MatchAtom *pred;
     Vec nexts;
 
@@ -37,11 +39,6 @@ typedef struct RuleNode {
     Rule rule;
     bool has_rule;
 } RuleNode;
-
-typedef struct RuleBacktrack {
-    MatchAtom *pred;
-    Vec backs; // points to root nodes in RuleTree
-} RuleBacktrack;
 
 typedef struct RuleTree {
     Bump pool;
