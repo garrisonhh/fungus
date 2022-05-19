@@ -34,37 +34,57 @@
     /* primitives */\
     TYPE(primitive,  PRIMITIVE,  "Primitive",   1, { fun_any_val })\
     TYPE(bool,       BOOL,       "bool",        1, { fun_primitive })\
+    /* TODO string probably should be a struct type */\
     TYPE(string,     STRING,     "string",      1, { fun_primitive })\
     TYPE(number,     NUMBER,     "Number",      1, { fun_primitive })\
     TYPE(int,        INT,        "int",         1, { fun_number })\
     TYPE(float,      FLOAT,      "float",       1, { fun_number })
 
 #define BASE_PRECS\
-    PREC("Lowest",     LEFT)\
-    \
-    PREC("Default",    LEFT)\
-    PREC("Assignment", RIGHT)\
-    PREC("AddSub",     LEFT)\
-    PREC("MulDiv",     LEFT)\
-    \
-    PREC("Highest",    LEFT)
+    /* 'default' is the precedence of language constructs */\
+    PREC("Default",      LEFT)\
+    PREC("FieldAccess",  LEFT)\
+    PREC("Assignment",   RIGHT)\
+    PREC("LogicalOr",    LEFT)\
+    PREC("LogicalAnd",   LEFT)\
+    PREC("Conditional",  LEFT)\
+    PREC("Bitshift",     LEFT)\
+    PREC("BitwiseOr",    LEFT)\
+    PREC("BitwiseAnd",   LEFT)\
+    PREC("AddSub",       LEFT)\
+    PREC("MulDiv",       LEFT)\
+    PREC("UnaryPrefix",  RIGHT)\
+    PREC("UnaryPostfix", LEFT)\
 
-// table of (name, prec, pattern)
+// table of (name, enum name, fun name, prec, pattern)
 #define BASE_RULES\
-    /* basic math stuff */\
-    RULE(parens, PARENS, "Parens", "Highest",\
+    RULE(parens, PARENS, "Parens", "Default",\
          "`( expr: AnyExpr!T `) -> T where T = Any")\
+    /* conditional operators */\
+    RULE(eq, EQ, "Equals", "Conditional",\
+         "lhs: AnyExpr!T `== rhs: AnyExpr!T -> bool where T = Primitive")\
+    RULE(ne, NE, "NotEquals", "Conditional",\
+         "lhs: AnyExpr!T `!= rhs: AnyExpr!T -> bool where T = Primitive")\
+    RULE(lt, LT, "LessThan", "Conditional",\
+         "lhs: AnyExpr!T `< rhs: AnyExpr!T -> bool where T = Number")\
+    RULE(gt, GT, "GreaterThan", "Conditional",\
+         "lhs: AnyExpr!T `> rhs: AnyExpr!T -> bool where T = Number")\
+    RULE(le, LE, "LessThanOrEquals", "Conditional",\
+         "lhs: AnyExpr!T `<= rhs: AnyExpr!T -> bool where T = Number")\
+    RULE(ge, GE, "GreaterThanOrEquals", "Conditional",\
+         "lhs: AnyExpr!T `>= rhs: AnyExpr!T -> bool where T = Number")\
+    /* math operators */\
     RULE(add, ADD, "Add", "AddSub",\
-         "lhs: AnyExpr!T `+ rhs: AnyExpr!T -> T where T = int | float")\
-    RULE(subtract, SUBTRACT, "Subtract", "AddSub",\
-         "lhs: AnyExpr!T `- rhs: AnyExpr!T -> T where T = int | float")\
-    RULE(multiply, MULTIPLY, "Multiply", "MulDiv",\
-         "lhs: AnyExpr!T `* rhs: AnyExpr!T -> T where T = int | float")\
-    RULE(divide, DIVIDE, "Divide", "MulDiv",\
-         "lhs: AnyExpr!T `/ rhs: AnyExpr!T -> T where T = int | float")\
-    RULE(modulo, MODULO, "Modulo", "MulDiv",\
-         "lhs: AnyExpr!T `% rhs: AnyExpr!T -> T where T = int | float")\
-    /* variable assignment */\
+         "lhs: AnyExpr!T `+ rhs: AnyExpr!T -> T where T = Number")\
+    RULE(sub, SUB, "Subtract", "AddSub",\
+         "lhs: AnyExpr!T `- rhs: AnyExpr!T -> T where T = Number")\
+    RULE(mul, MUL, "Multiply", "MulDiv",\
+         "lhs: AnyExpr!T `* rhs: AnyExpr!T -> T where T = Number")\
+    RULE(div, DIV, "Divide", "MulDiv",\
+         "lhs: AnyExpr!T `/ rhs: AnyExpr!T -> T where T = Number")\
+    RULE(mod, MOD, "Modulo", "MulDiv",\
+         "lhs: AnyExpr!T `% rhs: AnyExpr!T -> T where T = Number")\
+    /* assignment */\
     RULE(assign, ASSIGN, "Assign",    "Assignment",\
          "name: Ident!T `= value: AnyExpr!T -> T where T = AnyValue")\
     RULE(const_decl, CONST_DECL, "ConstDecl", "Assignment",\

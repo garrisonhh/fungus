@@ -40,6 +40,12 @@ void repl(Names *names) {
 
         if (global_error) goto cleanup_parse;
 
+#if 1
+        puts(TC_CYAN "generated ast:" TC_RESET);
+        AstExpr_dump(ast, &fungus_lang, &file);
+        puts("");
+#endif
+
         // fir
         Bump fir_pool = Bump_new();
         const Fir *fir = gen_fir(&fir_pool, &file, ast);

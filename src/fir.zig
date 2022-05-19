@@ -1,4 +1,5 @@
 const std = @import("std");
+const utils = @import("utils.zig");
 const Allocator = std.mem.Allocator;
 
 const c = @cImport({
@@ -44,6 +45,11 @@ pub const Fir = struct {
         I64,
         F64,
         Bool,
+
+        fn getName(self: @This()) []const u8 {
+            const names = utils.lowerCaseEnumTags(@This());
+            return names[@enumToInt(self)];
+        }
     };
 
     pub const Data = union(enum) {
@@ -69,11 +75,15 @@ pub const Fir = struct {
 
     pub const BinOp = struct {
         kind: enum {
-            Add,
-            Sub,
-            Mul,
-            Div,
-            Mod,
+            // cond
+            Eq, Ne, Lt, Gt, Le, Ge,
+            // math
+            Add, Sub, Mul, Div, Mod,
+
+            fn getName(self: @This()) []const u8 {
+                const names = utils.lowerCaseEnumTags(@This());
+                return names[@enumToInt(self)];
+            }
         },
         lhs: *Fir,
         rhs: *Fir
@@ -135,17 +145,24 @@ pub const Fir = struct {
                     }
                 };
             },
-            c.ID_ADD, c.ID_SUBTRACT, c.ID_MULTIPLY, c.ID_DIVIDE, c.ID_MODULO
+            c.ID_EQ, c.ID_NE, c.ID_LT, c.ID_GT, c.ID_LE, c.ID_GE,
+            c.ID_ADD, c.ID_SUB, c.ID_MUL, c.ID_DIV, c.ID_MOD,
                 => |id| {
                 // binary operators
                 const rule = c.AstExpr_rule(expr);
                 const bin_op = BinOp{
                     .kind = switch (id) {
+                        c.ID_EQ => .Eq,
+                        c.ID_NE => .Ne,
+                        c.ID_LT => .Lt,
+                        c.ID_GT => .Gt,
+                        c.ID_LE => .Le,
+                        c.ID_GE => .Ge,
                         c.ID_ADD => .Add,
-                        c.ID_SUBTRACT => .Sub,
-                        c.ID_MULTIPLY => .Mul,
-                        c.ID_DIVIDE => .Div,
-                        c.ID_MODULO => .Mod,
+                        c.ID_SUB => .Sub,
+                        c.ID_MUL => .Mul,
+                        c.ID_DIV => .Div,
+                        c.ID_MOD => .Mod,
                         else => unreachable
                     },
                     .lhs = try Fir.fromAstExpr(ctx, rule.exprs[0]),
@@ -172,7 +189,7 @@ pub const Fir = struct {
     fn dumpR(self: Self, level: c_int) void {
         _ = c.printf("%*s", level * 2, "");
         _ = c.printf(c.TC_RED ++ "%s" ++ c.TC_RESET ++ " %s ",
-                     @tagName(self.evaltype).ptr,
+                     self.evaltype.getName().ptr,
                      @tagName(self.data).ptr);
 
         const next_level = level + 1;
@@ -191,7 +208,7 @@ pub const Fir = struct {
                 switch (lit) {
                     .int => |value|
                         _ = c.printf("%jd", @intCast(c.uintmax_t, value)),
-                    .float => |value| _ = c.printf("%f\n", value),
+                    .float => |value| _ = c.printf("%f", value),
                     .boolean => |value| {
                         const str = if (value) "true" else "false";
                         _ = c.printf("%s", str.ptr);
@@ -201,12 +218,7 @@ pub const Fir = struct {
                 _ = c.printf(c.TC_RESET ++ "\n");
             },
             .bin_op => |bin_op| {
-                const name = @tagName(bin_op.kind);
-                var buf: [32]u8 = undefined;
-                _ = std.ascii.lowerString(buf[0..], name);
-                buf[name.len] = 0;
-
-                _ = c.printf("%s\n", buf);
+                _ = c.printf("%s\n", bin_op.kind.getName().ptr);
 
                 bin_op.lhs.dumpR(next_level);
                 bin_op.rhs.dumpR(next_level);
