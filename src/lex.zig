@@ -121,59 +121,61 @@ const TokBuf = struct {
     }
 };
 
-const LexError = error {
-    EmptyFile,
-    SymbolNotFound,
-    UnmatchedLCurly,
-};
+fn lexErrorAt(
+    file: *c.File, start: hsize_t, len: hsize_t, msg: []const u8
+) noreturn {
+    c.File_error_at(file, start, len, msg.ptr);
+    std.os.exit(255);
+}
 
-fn splitSymbol(
-    tbuf: *TokBuf, lang: *c.Lang, slice: []const u8, start: hsize_t
-) LexError!void {
+fn lexErrorFrom(file: *c.File, start: hsize_t, msg: []const u8) noreturn {
+    c.File_error_from(file, start, msg.ptr);
+    std.os.exit(255);
+}
+
+fn splitSymbol(ctx: LexContext, start: hsize_t, len: hsize_t) void {
     var i: hsize_t = 0;
-    while (i < slice.len) {
+    while (i < len) {
         const token_view = c.View{
-            .str = &slice[i],
-            .len = slice.len - i,
+            .str = &c.File_str(ctx.file)[start + i],
+            .len = len - i,
         };
         const match_len =
             @intCast(hsize_t,
-                     c.HashSet_longest(c.Lang_syms(lang), &token_view));
+                     c.HashSet_longest(c.Lang_syms(ctx.lang), &token_view));
 
         if (match_len == 0) {
-            return LexError.SymbolNotFound;
+            lexErrorAt(ctx.file, start + i, len - i, "unknown symbol");
         }
 
-        tbuf.emit(.Lexeme, start + i, match_len);
+        ctx.tbuf.emit(.Lexeme, start + i, match_len);
         i += match_len;
     }
 }
 
 // words can be lexemes or identifiers, this checks and adds the correct one
-fn addWord(
-    tbuf: *TokBuf, lang: *c.Lang, slice: []const u8, start: hsize_t
-) LexError!void {
+fn addWord(ctx: LexContext, slice: []const u8, start: hsize_t) void {
     const token_cword = c.Word_new(slice.ptr, slice.len);
     var word_type =
         if (std.mem.eql(u8, slice, "true") or std.mem.eql(u8, slice, "false"))
             TokType.Bool
-        else if (c.HashSet_has(c.Lang_words(lang), &token_cword))
+        else if (c.HashSet_has(c.Lang_words(ctx.lang), &token_cword))
             TokType.Lexeme
         else
             TokType.Ident;
 
-    tbuf.emit(word_type, start, @intCast(hsize_t, slice.len));
+    ctx.tbuf.emit(word_type, start, @intCast(hsize_t, slice.len));
 }
 
-// TODO specific and descriptive user-facing errors
-fn tokenize(
+const LexContext = struct {
     tbuf: *TokBuf,
     file: *c.File,
     lang: *c.Lang,
-    scope_start: usize,
-    scope_len: usize
-) LexError!void {
-    const str = c.File_str(file)[scope_start..scope_start + scope_len];
+};
+
+// TODO specific and descriptive user-facing errors
+fn tokenize(ctx: LexContext, scope_start: usize, scope_len: usize) void {
+    const str = c.File_str(ctx.file)[scope_start..scope_start + scope_len];
 
     var i: hsize_t = 0;
     while (true) {
@@ -206,7 +208,7 @@ fn tokenize(
                     }
                 }
 
-                try addWord(tbuf, lang, str[start..i], start);
+                addWord(ctx, str[start..i], start);
             },
             .Symbol => blk: {
                 // symbols
@@ -220,19 +222,15 @@ fn tokenize(
                 }
 
                 // check for literal lexeme
-                if (tbuf.peek()) |last| {
+                if (ctx.tbuf.peek()) |last| {
                     if (last == .Escape) {
-                        tbuf.emit(.Lexeme, start, i - start);
+                        ctx.tbuf.emit(.Lexeme, start, i - start);
                         break :blk;
                     }
                 }
 
                 // lexemes that aren't literals must be split into valid lexemes
-                splitSymbol(tbuf, lang, str[start..i], start) catch |e| {
-                    c.File_error_at(file, start, i - start,
-                                    "symbol not found.");
-                    return e;
-                };
+                splitSymbol(ctx, start, i - start);
             },
             .Digit => {
                 // ints and floats
@@ -258,10 +256,10 @@ fn tokenize(
                     }
                 }
 
-                tbuf.emit(tok_type, start, i - start);
+                ctx.tbuf.emit(tok_type, start, i - start);
             },
             .Escape => {
-                tbuf.emit(.Escape, i, 1);
+                ctx.tbuf.emit(.Escape, i, 1);
                 i += 1;
             },
             .DQuote => {
@@ -275,7 +273,7 @@ fn tokenize(
                         break;
                 }
 
-                tbuf.emit(.String, start, i - start);
+                ctx.tbuf.emit(.String, start, i - start);
             },
             .LCurly => {
                 // scopes
@@ -294,11 +292,10 @@ fn tokenize(
                         break;
                     }
                 } else {
-                    c.File_error_from(file, start, "unmatched curly.");
-                    return LexError.UnmatchedLCurly;
+                    lexErrorFrom(ctx.file, start, "unmatched curly.");
                 }
 
-                tbuf.emit(.Scope, start, i - start);
+                ctx.tbuf.emit(.Scope, start, i - start);
             }
         }
     }
@@ -321,12 +318,16 @@ export fn TokBuf_del(ctbuf: *TokBuf.CTokBuf) void {
 export fn lex(
     file: *c.File, lang: *c.Lang, start: usize, len: usize
 ) TokBuf.CTokBuf {
-    var tbuf = c_allocator.create(TokBuf) catch c.abort();
-    tbuf.init() catch c.abort();
+    var tbuf = utils.must(c_allocator.create(TokBuf));
+    utils.must(tbuf.init());
 
-    // TODO a more descriptive error report, and don't panic
-    tokenize(tbuf, file, lang, start, len)
-        catch |e| utils.reportErrorAndPanic(e);
+    const ctx = LexContext{
+        .tbuf = tbuf,
+        .file = file,
+        .lang = lang
+    };
+
+    tokenize(ctx, start, len);
 
     return tbuf.asCTokBuf();
 }

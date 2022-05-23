@@ -9,8 +9,15 @@ pub fn reportErrorAndPanic(e: anyerror) noreturn {
     unreachable;
 }
 
-// submit an enum type, returns an array of strings with names in lowercase
-// names include a nul terminator for c interop
+/// `fungus_panic`s on error. only for things that would invalidate the internal
+/// state of fungus.
+pub fn must(value: anytype) @typeInfo(@TypeOf(value)).ErrorUnion.payload {
+    std.debug.assert(@typeInfo(@TypeOf(value)) == .ErrorUnion);
+    return value catch |e| reportErrorAndPanic(e);
+}
+
+/// submit an enum type, returns an array of strings with names in lowercase
+/// names include a nul terminator for c interop
 pub fn lowerCaseEnumTags(comptime T: type) [][]u8 {
     comptime {
         const info = @typeInfo(T);
