@@ -5,8 +5,8 @@
 #include "sema/names.h"
 
 /*
- * sema verifies the AST and interprets fungus languages before the AST is
- * turned into the much more static fungus IR (FIR)
+ * sema verifies the AST and applies interpretation of the dynamic compile-time
+ * layer of fungus into the static layer
  */
 
 typedef struct SemaCtx {

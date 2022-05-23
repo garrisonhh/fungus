@@ -10,7 +10,9 @@
 // returns success
 bool try_compile_file(File *file, Names *names) {
     // lex
-    TokBuf tokbuf = lex(file, &fungus_lang);
+    TokBuf tokbuf = TokBuf_new();
+
+    lex(&tokbuf, file, &fungus_lang, 0, file->text.len);
 
     if (global_error) goto cleanup_lex;
 
@@ -107,7 +109,7 @@ int main(int argc, char **argv) {
     pattern_lang_init(&name_table);
     fungus_lang_init(&name_table);
 
-    DEBUG_SCOPE(0,
+    DEBUG_SCOPE(1,
         Lang_dump(&fungus_lang);
     );
 

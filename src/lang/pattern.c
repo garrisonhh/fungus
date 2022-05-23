@@ -297,18 +297,14 @@ File pattern_file(const char *str) {
 
 AstExpr *precompile_pattern(Bump *pool, Names *names, const File *file) {
     // create ast
-    TokBuf tokens = lex(file, &pattern_lang);
+    TokBuf tokens = TokBuf_new();
+    lex(&tokens, file, &pattern_lang, 0, file->text.len);
 
     AstExpr *ast = parse(&(AstCtx){
         .pool = pool,
         .file = file,
         .lang = &pattern_lang
     }, &tokens);
-
-    /*
-     * used to do sema here but it ended up not being very useful, may want to
-     * bring it back in the future? unsure
-     */
 
     TokBuf_del(&tokens);
 

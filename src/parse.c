@@ -71,9 +71,7 @@ static Vec gen_initial_scope(AstCtx *ctx, const TokBuf *tb) {
                             tb->lens[i]);
             break;
         case TOK_SCOPE:
-            // TODO
-            UNIMPLEMENTED;
-
+            expr = new_atom(ctx->pool, fun_scope, fun_raw_scope, start, len);
             break;
         case TOK_LEXEME:
             expr = new_atom(ctx->pool, fun_lexeme, fun_lexeme, start, len);
@@ -317,7 +315,7 @@ AstExpr *parse(AstCtx *ctx, const TokBuf *tb) {
     AstExpr *ast = parse_scope(ctx, (AstExpr **)scope.data, scope.len);
     Vec_del(&scope);
 
-    assert(ast->type.id == fun_scope.id);
+    assert(ast->type.id == ID_SCOPE && ast->evaltype.id != ID_RAW_SCOPE);
 
     if (!ast)
         global_error = true;

@@ -4,7 +4,8 @@
 #include "../fungus.h"
 
 bool AstExpr_is_atom(const AstExpr *expr) {
-    return !Type_is(expr->type, fun_rule);
+    return !Type_is(expr->type, fun_rule)
+        || (expr->type.id == ID_SCOPE && expr->evaltype.id == ID_RAW_SCOPE);
 }
 
 static hsize_t AstExpr_tok_start(const AstExpr *expr) {

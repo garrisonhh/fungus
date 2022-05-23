@@ -1,4 +1,5 @@
 const std = @import("std");
+const utils = @import("utils.zig");
 const Allocator = std.mem.Allocator;
 const c_allocator = std.heap.c_allocator;
 
@@ -45,7 +46,9 @@ const TokBuf = struct {
         len: usize
     };
 
-    fn asCTokBuf(self: *TokBuf) CTokBuf {
+    const Self = @This();
+
+    fn asCTokBuf(self: *Self) CTokBuf {
         return CTokBuf{
             .tbuf = self,
             .types = self.*.types.ptr,
@@ -55,17 +58,17 @@ const TokBuf = struct {
         };
     }
 
-    fn init(self: *TokBuf) Allocator.Error!void {
-        self.*.types = try c_allocator.alloc(TokType, INIT_CAP);
-        self.*.starts = try c_allocator.alloc(hsize_t, INIT_CAP);
-        self.*.lens = try c_allocator.alloc(hsize_t, INIT_CAP);
-        self.*.len = 0;
+    fn init(self: *Self) Allocator.Error!void {
+        self.types = try c_allocator.alloc(TokType, INIT_CAP);
+        self.starts = try c_allocator.alloc(hsize_t, INIT_CAP);
+        self.lens = try c_allocator.alloc(hsize_t, INIT_CAP);
+        self.len = 0;
     }
 
-    fn deinit(self: *TokBuf) void {
-        c_allocator.free(self.*.types);
-        c_allocator.free(self.*.starts);
-        c_allocator.free(self.*.lens);
+    fn deinit(self: *Self) void {
+        c_allocator.free(self.types);
+        c_allocator.free(self.starts);
+        c_allocator.free(self.lens);
     }
 
     fn doubleBufSize(buf: anytype) @TypeOf(buf) {
@@ -73,45 +76,45 @@ const TokBuf = struct {
             catch @panic("couldn't resize buffer.");
     }
 
-    fn emit(self: *TokBuf, ty: TokType, start: hsize_t, len: hsize_t) void {
-        if (self.*.len == self.*.types.len) {
-            self.*.types = doubleBufSize(self.*.types);
-            self.*.starts = doubleBufSize(self.*.starts);
-            self.*.lens = doubleBufSize(self.*.lens);
+    fn emit(self: *Self, ty: TokType, start: hsize_t, len: hsize_t) void {
+        if (self.len == self.types.len) {
+            self.types = doubleBufSize(self.types);
+            self.starts = doubleBufSize(self.starts);
+            self.lens = doubleBufSize(self.lens);
         }
 
-        self.*.types[self.*.len] = ty;
-        self.*.starts[self.*.len] = start;
-        self.*.lens[self.*.len] = len;
-        self.*.len += 1;
+        self.types[self.len] = ty;
+        self.starts[self.len] = start;
+        self.lens[self.len] = len;
+        self.len += 1;
     }
 
-    fn peek(self: *TokBuf) ?TokType {
-        return if (self.*.types.len == 0)
+    fn peek(self: *Self) ?TokType {
+        return if (self.types.len == 0)
             null
         else
-            self.*.types[self.*.len - 1];
+            self.types[self.len - 1];
     }
 
-    fn dump(self: *TokBuf, file: *c.File) void {
-        _ = c.printf(c.TC_CYAN ++ "TokBuf:" ++ c.TC_RESET ++ "\n");
+    fn dump(self: *Self, file: *c.File) void {
+        _ = c.printf(c.TC_CYAN ++ "Self:" ++ c.TC_RESET ++ "\n");
 
         var i: usize = 0;
-        while (i < self.*.len) : (i += 1) {
-            const color = switch (self.*.types[i]) {
+        while (i < self.len) : (i += 1) {
+            const color = switch (self.types[i]) {
                 .Ident => c.TC_BLUE,
                 .Bool, .Int, .Float => c.TC_MAGENTA,
                 .String => c.TC_GREEN,
                 else => c.TC_WHITE
             };
-            const tag_name = @tagName(self.*.types[i]);
+            const tag_name = @tagName(self.types[i]);
 
             _ = c.printf("%.*s: '%s%.*s" ++ c.TC_RESET ++ "'\n",
                          @intCast(c_int, tag_name.len),
                          tag_name.ptr,
                          color,
-                         @intCast(c_int, self.*.lens[i]),
-                         &c.File_str(file)[self.*.starts[i]]);
+                         @intCast(c_int, self.lens[i]),
+                         &c.File_str(file)[self.starts[i]]);
         }
 
         _ = c.printf("\n");
@@ -163,12 +166,14 @@ fn addWord(
 }
 
 // TODO specific and descriptive user-facing errors
-fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
-    if (c.File_len(file) == 0) {
-        return LexError.EmptyFile;
-    }
-
-    const str: []const u8 = c.File_str(file)[0..c.File_len(file)];
+fn tokenize(
+    tbuf: *TokBuf,
+    file: *c.File,
+    lang: *c.Lang,
+    scope_start: usize,
+    scope_len: usize
+) LexError!void {
+    const str = c.File_str(file)[scope_start..scope_start + scope_len];
 
     var i: hsize_t = 0;
     while (true) {
@@ -299,23 +304,31 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
     }
 }
 
-export fn lex(file: *c.File, lang: *c.Lang) TokBuf.CTokBuf {
-    var tbuf = c_allocator.create(TokBuf) catch c.abort();
-    tbuf.init() catch c.abort();
+// c interface =================================================================
 
-    tokenize(tbuf, file, lang) catch |e| {
-        // TODO a more descriptive error report, and don't panic
-        c.fungus_panic("tokenization failed with error %s", @errorName(e).ptr);
-    };
+export fn TokBuf_new() TokBuf.CTokBuf {
+    var tbuf: TokBuf = undefined;
+    tbuf.init() catch |e| utils.reportErrorAndPanic(e);
 
     return tbuf.asCTokBuf();
 }
 
 export fn TokBuf_del(ctbuf: *TokBuf.CTokBuf) void {
-    const tbuf = ctbuf.tbuf;
+    ctbuf.tbuf.deinit();
+    c_allocator.destroy(ctbuf.tbuf);
+}
 
-    tbuf.deinit();
-    c_allocator.destroy(tbuf);
+export fn lex(
+    file: *c.File, lang: *c.Lang, start: usize, len: usize
+) TokBuf.CTokBuf {
+    var tbuf = c_allocator.create(TokBuf) catch c.abort();
+    tbuf.init() catch c.abort();
+
+    // TODO a more descriptive error report, and don't panic
+    tokenize(tbuf, file, lang, start, len)
+        catch |e| utils.reportErrorAndPanic(e);
+
+    return tbuf.asCTokBuf();
 }
 
 export fn TokBuf_dump(ctbuf: *TokBuf.CTokBuf, file: *c.File) void {

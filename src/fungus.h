@@ -9,13 +9,15 @@
 #define BASE_TYPES\
     /* special */\
     TYPE(unknown,    UNKNOWN,    "Unknown",     (Type[0]){}) /* placeholder */\
+    /* placeholder to encode when a scope is raw for ast parsing */\
+    TYPE(raw_scope,  RAW_SCOPE,  "RawScope",    (Type[0]){})\
     TYPE(any,        ANY,        "Any",         (Type[0]){})\
     TYPE(any_val,    ANY_VAL,    "AnyValue",    { fun_any })\
     TYPE(any_expr,   ANY_EXPR,   "AnyExpr",     { fun_any })\
     TYPE(rule,       RULE,       "Rule",        { fun_any_expr })\
     TYPE(nil,        NIL,        "nil",         { fun_any_val })\
     /* metatypes + parsing */\
-    TYPE(scope,      SCOPE,      "Scope",       { fun_any_expr })\
+    TYPE(scope,      SCOPE,      "Scope",       { fun_rule })\
     TYPE(lexeme,     LEXEME,     "Lexeme",      { fun_any_expr })\
     TYPE(literal,    LITERAL,    "Literal",     { fun_any_expr })\
     TYPE(ident,      IDENT,      "Ident",       { fun_any_expr })\

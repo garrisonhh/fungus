@@ -42,6 +42,7 @@ pub const Fir = struct {
     data: Data,
 
     pub const Type = enum {
+        Nil,
         I64,
         F64,
         Bool,
@@ -96,11 +97,17 @@ pub const Fir = struct {
 
         // get evaltype
         self.evaltype = switch (expr.evaltype.id) {
+            c.ID_NIL => .Nil,
             c.ID_INT => .I64,
             c.ID_FLOAT => .F64,
             c.ID_BOOL => .Bool,
             else => {
-                c.AstExpr_error(ctx.file, expr, "unknown eval type.");
+                const name =
+                    @ptrCast(*const c.View,c.Type_name(expr.evaltype));
+
+                c.AstExpr_error(ctx.file, expr,
+                                "fir can't process eval type `%.*s`.",
+                                @intCast(c_int, name.*.len), name.*.str);
                 return FirError.UnhandledEvalType;
             }
         };
@@ -146,7 +153,7 @@ pub const Fir = struct {
                 };
             },
             c.ID_EQ, c.ID_NE, c.ID_LT, c.ID_GT, c.ID_LE, c.ID_GE,
-            c.ID_ADD, c.ID_SUB, c.ID_MUL, c.ID_DIV, c.ID_MOD,
+            c.ID_ADD, c.ID_SUB, c.ID_MUL, c.ID_DIV, c.ID_MOD
                 => |id| {
                 // binary operators
                 const rule = c.AstExpr_rule(expr);
@@ -188,7 +195,7 @@ pub const Fir = struct {
 
     fn dumpR(self: Self, level: c_int) void {
         _ = c.printf("%*s", level * 2, "");
-        _ = c.printf(c.TC_RED ++ "%s" ++ c.TC_RESET ++ " %s ",
+        _ = c.printf(c.TC_RED ++ "%s " ++ c.TC_BLUE ++ "%s " ++ c.TC_RESET,
                      self.evaltype.getName().ptr,
                      @tagName(self.data).ptr);
 

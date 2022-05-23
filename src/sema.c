@@ -122,10 +122,11 @@ static bool pattern_check_and_infer(const SemaCtx *ctx, AstExpr *expr,
  * walks the tree, performing several tasks:
  * - evaluating types for variables + type aliases
  * - typing untyped exprs and checking types for exprs
+ * - ensuring identifiers are valid
+ *   - however, does not actually store this info -- this is done in analysis of
+ *     fir
  *
- * TODO should this also generate variable backrefs?
- *
- * return success
+ * returns success
  */
 static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
     Names *names = ctx->names;
@@ -140,7 +141,7 @@ static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
             const NameEntry *entry = name_lookup(names, &word);
 
             if (!entry) {
-                AstExpr_error(ctx->file, expr, "unidentified identifer");
+                AstExpr_error(ctx->file, expr, "unidentified identifier");
 
                 return false;
             } else {
@@ -156,13 +157,26 @@ static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
             }
         }
 
-        assert(expr->evaltype.id != fun_unknown.id);
+#ifdef DEBUG
+        if (expr->evaltype.id != ID_RAW_SCOPE
+         && expr->evaltype.id == ID_UNKNOWN) {
+            const Word *tname = Type_name(expr->type);
+            const Word *ename = Type_name(expr->evaltype);
+
+            fungus_panic("found a %.*s!%.*s, which isn't good :(",
+                         (int)tname->len, tname->str,
+                         (int)ename->len, ename->str);
+        }
+#endif
 
         return true;
     }
 
     // rules
-    if (expr->type.id == fun_scope.id) {
+    switch (expr->type.id) {
+    case ID_SCOPE:
+        assert(expr->evaltype.id != ID_RAW_SCOPE);
+
         // scopes
         Names_push_scope(names);
 
@@ -177,8 +191,9 @@ static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
             expr->evaltype = fun_nil;
         else
             expr->evaltype = expr->exprs[expr->len - 1]->evaltype;
-    } else if (expr->type.id == fun_let_decl.id
-            || expr->type.id == fun_const_decl.id) {
+        break;
+    case ID_LET_DECL:
+    case ID_CONST_DECL:
         // declarations
         if (!type_check_and_infer(ctx, expr->exprs[1]->exprs[2]))
             return false;
@@ -192,7 +207,8 @@ static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
             return false;
 
         expr->evaltype = fun_nil;
-    } else {
+        break;
+    default: {
         const RuleEntry *entry = Rule_get(&ctx->lang->rules, expr->rule);
 
         assert(entry != NULL);
@@ -206,16 +222,24 @@ static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
 
         if (!pattern_check_and_infer(ctx, expr, pat))
             return false;
+        break;
+    }
     }
 
     return true;
 }
 
-void sema(SemaCtx *ctx, AstExpr *ast) {
-    if (!type_check_and_infer(ctx, ast)) {
-        global_error = true;
-        return;
-    }
+// interface ===================================================================
 
-    // TODO other stuff
+void sema(SemaCtx *ctx, AstExpr *ast) {
+    bool (*sema_passes[])(SemaCtx *, AstExpr *) = {
+        type_check_and_infer,
+    };
+
+    for (size_t i = 0; i < ARRAY_SIZE(sema_passes); ++i) {
+        if (!sema_passes[i](ctx, ast)) {
+            global_error = true;
+            return;
+        }
+    }
 }

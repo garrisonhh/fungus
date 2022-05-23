@@ -1,7 +1,16 @@
 const std = @import("std");
 
+const c = @cImport({
+    @cInclude("utils.h");
+});
+
+pub fn reportErrorAndPanic(e: anyerror) noreturn {
+    c.fungus_panic("failed with error %s", @errorName(e).ptr);
+    unreachable;
+}
+
 // submit an enum type, returns an array of strings with names in lowercase
-// names include a nul terminator
+// names include a nul terminator for c interop
 pub fn lowerCaseEnumTags(comptime T: type) [][]u8 {
     comptime {
         const info = @typeInfo(T);
