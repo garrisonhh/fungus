@@ -16,6 +16,12 @@ pub fn must(value: anytype) @typeInfo(@TypeOf(value)).ErrorUnion.payload {
     return value catch |e| reportErrorAndPanic(e);
 }
 
+pub fn ptrCastAligned(comptime T: type, ptr: anytype) T {
+    std.debug.assert(@typeInfo(T) == .Pointer);
+
+    comptime return @ptrCast(T, @alignCast(@alignOf(T), ptr));
+}
+
 /// submit an enum type, returns an array of strings with names in lowercase
 /// names include a nul terminator for c interop
 pub fn lowerCaseEnumTags(comptime T: type) [][]u8 {
