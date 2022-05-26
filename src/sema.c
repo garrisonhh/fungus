@@ -131,10 +131,15 @@ static bool pattern_check_and_infer(const SemaCtx *ctx, AstExpr *expr,
 static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
     Names *names = ctx->names;
 
+    DEBUG_SCOPE(1,
+        puts(TC_YELLOW "TYPING:" TC_RESET);
+        AstExpr_dump(expr, ctx->lang, ctx->file);
+    );
+
     if (AstExpr_is_atom(expr)) {
         // identify identifiers, all other atoms should have been identified
         // previously
-        if (expr->type.id == fun_ident.id) {
+        if (expr->type.id == ID_IDENT) {
             Word word =
                 Word_new(&ctx->file->text.str[expr->tok_start], expr->tok_len);
 
@@ -155,19 +160,11 @@ static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
                 default: UNREACHABLE;
                 }
             }
-        }
+        } else if (expr->type.id == ID_UNKNOWN) {
+            AstExpr_error(ctx->file, expr, "unknown symbol remaining in AST.");
 
-#ifdef DEBUG
-        if (expr->evaltype.id != ID_RAW_SCOPE
-         && expr->evaltype.id == ID_UNKNOWN) {
-            const Word *tname = Type_name(expr->type);
-            const Word *ename = Type_name(expr->evaltype);
-
-            fungus_panic("found a %.*s!%.*s, which isn't good :(",
-                         (int)tname->len, tname->str,
-                         (int)ename->len, ename->str);
+            return false;
         }
-#endif
 
         return true;
     }
@@ -192,19 +189,17 @@ static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
         else
             expr->evaltype = expr->exprs[expr->len - 1]->evaltype;
         break;
-    case ID_LET_DECL:
     case ID_CONST_DECL:
+    case ID_VAL_DECL:
+    case ID_LET_DECL:
         // declarations
-        if (!type_check_and_infer(ctx, expr->exprs[1]->exprs[2]))
+        if (!type_check_and_infer(ctx, expr->exprs[3]))
             return false;
 
-        Word name = AstExpr_as_word(ctx->file, expr->exprs[1]->exprs[0]);
-        Type var_type = expr->exprs[1]->exprs[2]->evaltype;
+        Word name = AstExpr_as_word(ctx->file, expr->exprs[1]);
+        Type var_type = expr->exprs[3]->evaltype;
 
         Names_define_var(names, &name, var_type);
-
-        if (!type_check_and_infer(ctx, expr->exprs[1]))
-            return false;
 
         expr->evaltype = fun_nil;
         break;

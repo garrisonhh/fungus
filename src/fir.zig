@@ -58,6 +58,7 @@ pub const Fir = struct {
         ident: Ident,
         lit: Literal,
         bin_op: BinOp,
+        decl: Decl,
     };
 
     pub const Scope = struct {
@@ -80,6 +81,8 @@ pub const Fir = struct {
             Eq, Ne, Lt, Gt, Le, Ge,
             // math
             Add, Sub, Mul, Div, Mod,
+            // other
+            Assign,
 
             fn getName(self: @This()) []const u8 {
                 const names = utils.lowerCaseEnumTags(@This());
@@ -87,7 +90,20 @@ pub const Fir = struct {
             }
         },
         lhs: *Fir,
-        rhs: *Fir
+        rhs: *Fir,
+    };
+
+    pub const Decl = struct {
+        kind: enum {
+            Const, Val, Let,
+
+            fn getName(self: @This()) []const u8 {
+                const names = utils.lowerCaseEnumTags(@This());
+                return names[@enumToInt(self)];
+            }
+        },
+        ident: []const u8,
+        value: *Fir,
     };
 
     const Self = @This();
@@ -103,7 +119,7 @@ pub const Fir = struct {
             c.ID_BOOL => .Bool,
             else => {
                 const name =
-                    @ptrCast(*const c.View,c.Type_name(expr.evaltype));
+                    @ptrCast(*const c.View, c.Type_name(expr.evaltype));
 
                 c.AstExpr_error(ctx.file, expr,
                                 "fir can't process eval type `%.*s`.",
@@ -126,6 +142,13 @@ pub const Fir = struct {
 
                 self.data = Data{
                     .scope = scope
+                };
+            },
+            c.ID_IDENT => {
+                self.data = Data{
+                    .ident = Ident{
+                        .str = sliceOfAstExpr(ctx.file, expr),
+                    },
                 };
             },
             c.ID_LITERAL => {
@@ -152,10 +175,11 @@ pub const Fir = struct {
                     }
                 };
             },
+            // binary operators
             c.ID_EQ, c.ID_NE, c.ID_LT, c.ID_GT, c.ID_LE, c.ID_GE,
-            c.ID_ADD, c.ID_SUB, c.ID_MUL, c.ID_DIV, c.ID_MOD
+            c.ID_ADD, c.ID_SUB, c.ID_MUL, c.ID_DIV, c.ID_MOD,
+            c.ID_ASSIGN,
                 => |id| {
-                // binary operators
                 const rule = c.AstExpr_rule(expr);
                 const bin_op = BinOp{
                     .kind = switch (id) {
@@ -170,6 +194,7 @@ pub const Fir = struct {
                         c.ID_MUL => .Mul,
                         c.ID_DIV => .Div,
                         c.ID_MOD => .Mod,
+                        c.ID_ASSIGN => .Assign,
                         else => unreachable
                     },
                     .lhs = try Fir.fromAstExpr(ctx, rule.exprs[0]),
@@ -178,6 +203,24 @@ pub const Fir = struct {
 
                 self.data = Data{
                     .bin_op = bin_op
+                };
+            },
+            // decls
+            c.ID_CONST_DECL, c.ID_VAL_DECL, c.ID_LET_DECL => |id| {
+                const rule = c.AstExpr_rule(expr);
+                const decl = Decl{
+                    .kind = switch (id) {
+                        c.ID_CONST_DECL => .Const,
+                        c.ID_VAL_DECL => .Val,
+                        c.ID_LET_DECL => .Let,
+                        else => unreachable
+                    },
+                    .ident = sliceOfAstExpr(ctx.file, rule.exprs[1]),
+                    .value = try Fir.fromAstExpr(ctx, rule.exprs[3]),
+                };
+
+                self.data = Data{
+                    .decl = decl
                 };
             },
             else => {
@@ -209,6 +252,10 @@ pub const Fir = struct {
                     child.dumpR(next_level);
                 }
             },
+            .ident => |ident| {
+                _ = c.printf("%.*s\n",
+                             @intCast(c_int, ident.str.len), ident.str.ptr);
+            },
             .lit => |lit| {
                 _ = c.printf(c.TC_MAGENTA);
 
@@ -230,10 +277,14 @@ pub const Fir = struct {
                 bin_op.lhs.dumpR(next_level);
                 bin_op.rhs.dumpR(next_level);
             },
-            else => |tag| {
-                _ = c.printf("unhandled fir type %s in Fir.dumpR().\n",
-                             @tagName(tag).ptr);
-            }
+            .decl => |decl| {
+                _ = c.printf("%s %.*s\n",
+                             decl.kind.getName().ptr,
+                             @intCast(c_int, decl.ident.len),
+                             decl.ident.ptr);
+
+                decl.value.dumpR(next_level);
+            },
         }
     }
 

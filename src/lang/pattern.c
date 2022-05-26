@@ -60,7 +60,7 @@ void pattern_lang_init(Names *names) {
             Lang_make_prec(&lang, prec_names[i], prec_assocs[i]);
     }
 
-    // rules (pattern lang does not use sema for type checking, you can ignore)
+    // rules
     {
         RuleTree *rules = &lang.rules;
         Bump *p = &rules->pool;
@@ -118,7 +118,7 @@ void pattern_lang_init(Names *names) {
             .returns = TypeExpr_atom(p, fun_type),
         });
 
-        // type sep (bang)
+        // type bang
         len = 3;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_expr(p, TypeExpr_atom(p, fun_any_expr),
@@ -465,6 +465,10 @@ static void compile_match_atom(MatchAtom *pred, Bump *pool, const Names *names,
 Pattern compile_pattern(Bump *pool, Names *names, const File *file,
                         const AstExpr *ast) {
     Pattern pat = {0};
+
+    DEBUG_SCOPE(1,
+        AstExpr_dump(ast, &pattern_lang, file);
+    );
 
     // count number of match atoms
     const AstExpr *pat_expr = ast->exprs[0];

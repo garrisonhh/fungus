@@ -47,6 +47,7 @@
     PREC("Default",      LEFT)\
     PREC("FieldAccess",  LEFT)\
     PREC("Assignment",   RIGHT)\
+    PREC("Declaration",  LEFT)\
     PREC("LogicalOr",    LEFT)\
     PREC("LogicalAnd",   LEFT)\
     PREC("Conditional",  LEFT)\
@@ -61,7 +62,7 @@
 // table of (name, enum name, fun name, prec, pattern)
 #define BASE_RULES\
     RULE(parens, PARENS, "Parens", "Default",\
-         "`( expr: AnyExpr!T `) -> T where T = Any")\
+         "`( expr: AnyExpr!T `) -> T where T = AnyValue")\
     /* conditional operators */\
     RULE(eq, EQ, "Equals", "Conditional",\
          "lhs: AnyExpr!T `== rhs: AnyExpr!T -> bool where T = Primitive")\
@@ -94,12 +95,14 @@
     RULE(mod, MOD, "Modulo", "MulDiv",\
          "lhs: AnyExpr!T `% rhs: AnyExpr!T -> T where T = Number")\
     /* assignment */\
-    RULE(assign, ASSIGN, "Assign",    "Assignment",\
+    RULE(assign, ASSIGN, "Assign", "Assignment",\
          "name: Ident!T `= value: AnyExpr!T -> T where T = AnyValue")\
-    RULE(const_decl, CONST_DECL, "ConstDecl", "Assignment",\
-         "`const assign: Assign!AnyValue -> nil")\
-    RULE(let_decl, LET_DECL, "LetDecl", "Assignment",\
-         "`let assign: Assign!AnyValue -> nil")\
+    RULE(const_decl, CONST_DECL, "ConstDecl", "Declaration",\
+         "`const name: Ident!Unknown|Any `= value: AnyExpr!AnyValue -> nil")\
+    RULE(val_decl, VAL_DECL, "ValDecl", "Declaration",\
+         "`val name: Ident!Unknown|Any `= value: AnyExpr!AnyValue -> nil")\
+    RULE(let_decl, LET_DECL, "LetDecl", "Declaration",\
+         "`let name: Ident!Unknown|Any `= value: AnyExpr!AnyValue -> nil")\
     /* control flow */\
     RULE(if, IF, "If", "Default",\
          "`if cond: AnyExpr!bool body: Scope!T -> T"\
