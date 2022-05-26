@@ -4,7 +4,8 @@
 #include "../fungus.h"
 
 bool AstExpr_is_atom(const AstExpr *expr) {
-    return !Type_is(expr->type, fun_rule);
+    return !Type_is(expr->type, fun_rule)
+        || (expr->type.id == ID_SCOPE && expr->evaltype.id == ID_RAW_SCOPE);
 }
 
 static hsize_t AstExpr_tok_start(const AstExpr *expr) {
@@ -127,4 +128,19 @@ void AstExpr_dump(const AstExpr *expr, const Lang *lang, const File *file) {
 
         expr = scopes[size - 1]->exprs[indices[size - 1]++];
     }
+}
+
+AstExprTok AstExpr_tok(const AstExpr *expr) {
+    return (AstExprTok){
+        .start = expr->tok_start,
+        .len = expr->tok_len
+    };
+}
+
+AstExprRule AstExpr_rule(const AstExpr *expr) {
+    return (AstExprRule){
+        .rule = expr->rule,
+        .exprs = expr->exprs,
+        .len = expr->len
+    };
 }

@@ -19,11 +19,11 @@ pub fn build(b: *std.build.Builder) anyerror!void {
 
     const src_dir = b.pathFromRoot("src");
 
-    // zig sources (compiled as separate object and linked with C source)
+    // zig sources (compiled as separate objects and linked with C source)
     {
         const zig_sources = [_][2][]const u8{
-            // .{ "char_classify", "lex/char_classify.zig" },
             .{ "lex", "lex.zig" },
+            .{ "fir", "fir.zig" },
         };
 
         for (zig_sources) |name_and_path| {
@@ -66,10 +66,6 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             "main.c",
             "fungus.c",
 
-            // lexical analysis
-            //"lex.c",
-
-            // parsing
             "parse.c",
             "lang.c",
             "lang/rules.c",
@@ -77,15 +73,10 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             "lang/pattern.c",
             "lang/ast_expr.c",
 
-            // sema
             "sema.c",
             "sema/types.c",
             "sema/names.c",
 
-            // sir
-            "sir.c",
-
-            // utility
             "file.c",
             "utils.c",
             "data.c",

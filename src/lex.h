@@ -30,8 +30,12 @@ typedef struct TokBuf {
     size_t len;
 } TokBuf;
 
-TokBuf lex(const File *, const Lang *);
+// TODO direly needs an allocator context to avoid `malloc` calls
+TokBuf TokBuf_new(void);
 void TokBuf_del(TokBuf *);
+
+// adds tokens to tokbuf, returns success
+bool lex(TokBuf *, const File *, const Lang *, size_t start, size_t len);
 
 void TokBuf_dump(TokBuf *, const File *);
 

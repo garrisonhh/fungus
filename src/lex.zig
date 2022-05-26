@@ -1,4 +1,5 @@
 const std = @import("std");
+const utils = @import("utils.zig");
 const Allocator = std.mem.Allocator;
 const c_allocator = std.heap.c_allocator;
 
@@ -17,25 +18,26 @@ const hsize_t = c.hsize_t;
 
 const TokType = enum(c_int) {
     Invalid = c.TOK_INVALID,
-    Lexeme = c.TOK_LEXEME,
-    Ident = c.TOK_IDENT,
-    Bool = c.TOK_BOOL,
-    Int = c.TOK_INT,
-    Float = c.TOK_FLOAT,
-    String = c.TOK_STRING,
-    Escape = c.TOK_ESCAPE,
-    Scope = c.TOK_SCOPE
+    Lexeme  = c.TOK_LEXEME,
+    Ident   = c.TOK_IDENT,
+    Bool    = c.TOK_BOOL,
+    Int     = c.TOK_INT,
+    Float   = c.TOK_FLOAT,
+    String  = c.TOK_STRING,
+    Escape  = c.TOK_ESCAPE,
+    Scope   = c.TOK_SCOPE
 };
 
 // TODO once I can remove CTokBuf, pretty sure I can replace this entirely
 // with a MultiArrayList
 const TokBuf = struct {
-    const INIT_CAP: usize = 64;
+    const allocator = c_allocator;
 
-    types: []TokType,
-    starts: []hsize_t,
-    lens: []hsize_t,
-    len: usize,
+    tokens: std.MultiArrayList(struct {
+        toktype: TokType,
+        start: hsize_t,
+        len: hsize_t,
+    }),
 
     const CTokBuf = extern struct {
         tbuf: *TokBuf,
@@ -45,122 +47,127 @@ const TokBuf = struct {
         len: usize
     };
 
-    fn asCTokBuf(self: *TokBuf) CTokBuf {
+    const Self = @This();
+
+    fn asCTokBuf(self: *Self) CTokBuf {
+        const slice = self.tokens.slice();
+
         return CTokBuf{
             .tbuf = self,
-            .types = self.*.types.ptr,
-            .starts = self.*.starts.ptr,
-            .lens = self.*.lens.ptr,
-            .len = self.*.len
+            .types = slice.items(.toktype).ptr,
+            .starts = slice.items(.start).ptr,
+            .lens = slice.items(.len).ptr,
+            .len = self.tokens.len,
         };
     }
 
-    fn init(self: *TokBuf) Allocator.Error!void {
-        self.*.types = try c_allocator.alloc(TokType, INIT_CAP);
-        self.*.starts = try c_allocator.alloc(hsize_t, INIT_CAP);
-        self.*.lens = try c_allocator.alloc(hsize_t, INIT_CAP);
-        self.*.len = 0;
+    pub fn init(self: *Self) void {
+        self.tokens = @TypeOf(self.tokens){};
     }
 
-    fn deinit(self: *TokBuf) void {
-        c_allocator.free(self.*.types);
-        c_allocator.free(self.*.starts);
-        c_allocator.free(self.*.lens);
+    pub fn deinit(self: *Self) void {
+        self.tokens.deinit(Self.allocator);
     }
 
-    fn doubleBufSize(buf: anytype) @TypeOf(buf) {
-        return c_allocator.realloc(buf, buf.len * 2)
-            catch @panic("couldn't resize buffer.");
+    pub fn emit(self: *Self, ty: TokType, start: hsize_t, len: hsize_t) !void {
+        try self.tokens.append(Self.allocator, .{
+            .toktype = ty,
+            .start = start,
+            .len = len
+        });
     }
 
-    fn emit(self: *TokBuf, ty: TokType, start: hsize_t, len: hsize_t) void {
-        if (self.*.len == self.*.types.len) {
-            self.*.types = doubleBufSize(self.*.types);
-            self.*.starts = doubleBufSize(self.*.starts);
-            self.*.lens = doubleBufSize(self.*.lens);
-        }
-
-        self.*.types[self.*.len] = ty;
-        self.*.starts[self.*.len] = start;
-        self.*.lens[self.*.len] = len;
-        self.*.len += 1;
-    }
-
-    fn peek(self: *TokBuf) ?TokType {
-        return if (self.*.types.len == 0)
+    pub fn peek(self: *Self) ?TokType {
+        return if (self.tokens.len == 0)
             null
         else
-            self.*.types[self.*.len - 1];
+            self.tokens.get(self.tokens.len - 1).toktype;
     }
 
-    fn dump(self: *TokBuf, file: *c.File) void {
-        _ = c.printf(c.TC_CYAN ++ "TokBuf:" ++ c.TC_RESET ++ "\n");
+    pub fn dump(self: *Self, file: *c.File) void {
+        _ = c.printf(c.TC_CYAN ++ "Self:" ++ c.TC_RESET ++ "\n");
 
         var i: usize = 0;
-        while (i < self.*.len) : (i += 1) {
-            const color = switch (self.*.types[i]) {
+        while (i < self.tokens.len) : (i += 1) {
+            const token = self.tokens.get(i);
+
+            const color = switch (token.toktype) {
                 .Ident => c.TC_BLUE,
                 .Bool, .Int, .Float => c.TC_MAGENTA,
                 .String => c.TC_GREEN,
                 else => c.TC_WHITE
             };
-            const tag_name = @tagName(self.*.types[i]);
+            const tag_name = @tagName(token.toktype);
 
             _ = c.printf("%.*s: '%s%.*s" ++ c.TC_RESET ++ "'\n",
                          @intCast(c_int, tag_name.len),
                          tag_name.ptr,
                          color,
-                         @intCast(c_int, self.*.lens[i]),
-                         &c.File_str(file)[self.*.starts[i]]);
+                         @intCast(c_int, token.len),
+                         &c.File_str(file)[token.start]);
         }
 
         _ = c.printf("\n");
     }
 };
 
-const LexError = error {
-    SymbolNotFound,
-    UnmatchedLCurly,
-};
+/// syntax error display region of a file
+fn lexErrorAt(
+    file: *c.File, start: hsize_t, len: hsize_t, msg: []const u8
+) noreturn {
+    c.File_error_at(file, start, len, msg.ptr);
+    std.os.exit(255);
+}
 
-fn splitSymbol(
-    tbuf: *TokBuf, lang: *c.Lang, slice: []const u8, start: hsize_t
-) LexError!void {
+/// syntax error displaying start of a region of a file
+fn lexErrorFrom(file: *c.File, start: hsize_t, msg: []const u8) noreturn {
+    c.File_error_from(file, start, msg.ptr);
+    std.os.exit(255);
+}
+
+fn splitSymbol(ctx: LexContext, start: hsize_t, len: hsize_t) !void {
     var i: hsize_t = 0;
-    while (i < slice.len) {
+    while (i < len) {
         const token_view = c.View{
-            .str = &slice[i],
-            .len = slice.len - i,
+            .str = &c.File_str(ctx.file)[start + i],
+            .len = len - i,
         };
         const match_len =
             @intCast(hsize_t,
-                     c.HashSet_longest(c.Lang_syms(lang), &token_view));
+                     c.HashSet_longest(c.Lang_syms(ctx.lang), &token_view));
 
-        if (match_len == 0)
-            return LexError.SymbolNotFound;
+        if (match_len == 0) {
+            lexErrorAt(ctx.file, start + i, len - i, "unknown symbol");
+        }
 
-        tbuf.emit(.Lexeme, start + i, match_len);
+        try ctx.tbuf.emit(.Lexeme, start + i, match_len);
         i += match_len;
     }
 }
 
 // words can be lexemes or identifiers, this checks and adds the correct one
-fn addWord(
-    tbuf: *TokBuf, lang: *c.Lang, slice: []const u8, start: hsize_t
-) LexError!void {
+fn addWord(ctx: LexContext, slice: []const u8, start: hsize_t) !void {
     const token_cword = c.Word_new(slice.ptr, slice.len);
-    var word_type: TokType =
-        if (c.HashSet_has(c.Lang_words(lang), &token_cword))
-            .Lexeme
+    var word_type =
+        if (std.mem.eql(u8, slice, "true") or std.mem.eql(u8, slice, "false"))
+            TokType.Bool
+        else if (c.HashSet_has(c.Lang_words(ctx.lang), &token_cword))
+            TokType.Lexeme
         else
-            .Ident;
+            TokType.Ident;
 
-    tbuf.emit(word_type, start, @intCast(hsize_t, slice.len));
+    try ctx.tbuf.emit(word_type, start, @intCast(hsize_t, slice.len));
 }
 
-// TODO specific and descriptive errors
-fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
-    const str: []const u8 = c.File_str(file)[0..c.File_len(file)];
+const LexContext = struct {
+    tbuf: *TokBuf,
+    file: *c.File,
+    lang: *c.Lang,
+};
+
+// TODO specific and descriptive user-facing errors
+fn tokenize(ctx: LexContext, scope_start: usize, scope_len: usize) !void {
+    const str = c.File_str(ctx.file)[scope_start..scope_start + scope_len];
 
     var i: hsize_t = 0;
     while (true) {
@@ -193,7 +200,7 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                     }
                 }
 
-                try addWord(tbuf, lang, str[start..i], start);
+                try addWord(ctx, str[start..i], start);
             },
             .Symbol => blk: {
                 // symbols
@@ -207,14 +214,15 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                 }
 
                 // check for literal lexeme
-                if (tbuf.peek()) |last| {
+                if (ctx.tbuf.peek()) |last| {
                     if (last == .Escape) {
-                        tbuf.emit(.Lexeme, start, i - start);
+                        try ctx.tbuf.emit(.Lexeme, start, i - start);
                         break :blk;
                     }
                 }
 
-                try splitSymbol(tbuf, lang, str[start..i], start);
+                // lexemes that aren't literals must be split into valid lexemes
+                try splitSymbol(ctx, start, i - start);
             },
             .Digit => {
                 // ints and floats
@@ -240,24 +248,24 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                     }
                 }
 
-                tbuf.emit(tok_type, start, i - start);
+                try ctx.tbuf.emit(tok_type, start, i - start);
             },
             .Escape => {
-                tbuf.emit(.Escape, i, 1);
+                try ctx.tbuf.emit(.Escape, i, 1);
                 i += 1;
             },
             .DQuote => {
                 // strings
                 const start = i;
 
-                while (i < str.len) {
+                while (i < str.len - 1) {
                     i += 1;
 
                     if (str[i] == '"' and str[i - 1] != '\\')
                         break;
                 }
 
-                tbuf.emit(.String, start, i - start);
+                try ctx.tbuf.emit(.String, start, i - start);
             },
             .LCurly => {
                 // scopes
@@ -271,35 +279,49 @@ fn tokenize(tbuf: *TokBuf, file: *c.File, lang: *c.Lang) LexError!void {
                         else => {}
                     }
 
-                    if (level == 0)
+                    if (level == 0) {
+                        i += 1;
                         break;
+                    }
                 } else {
-                    return LexError.UnmatchedLCurly;
+                    lexErrorFrom(ctx.file, start, "unmatched curly.");
                 }
 
-                tbuf.emit(.Scope, start, i - start);
+                try ctx.tbuf.emit(.Scope, start, i - start);
             }
         }
     }
 }
 
-export fn lex(file: *c.File, lang: *c.Lang) TokBuf.CTokBuf {
-    var tbuf = c_allocator.create(TokBuf) catch c.abort();
-    tbuf.init() catch c.abort();
+// c interface =================================================================
 
-    tokenize(tbuf, file, lang) catch |e| {
-        // TODO descriptive error report
-        c.fungus_panic("tokenization failed with error %s", @errorName(e).ptr);
-    };
+export fn TokBuf_new() TokBuf.CTokBuf {
+    var tbuf: TokBuf = undefined;
+    tbuf.init();
 
     return tbuf.asCTokBuf();
 }
 
 export fn TokBuf_del(ctbuf: *TokBuf.CTokBuf) void {
-    const tbuf = ctbuf.tbuf;
+    ctbuf.tbuf.deinit();
+    c_allocator.destroy(ctbuf.tbuf);
+}
 
-    tbuf.deinit();
-    c_allocator.destroy(tbuf);
+export fn lex(
+    file: *c.File, lang: *c.Lang, start: usize, len: usize
+) TokBuf.CTokBuf {
+    var tbuf = utils.must(c_allocator.create(TokBuf));
+    tbuf.init();
+
+    const ctx = LexContext{
+        .tbuf = tbuf,
+        .file = file,
+        .lang = lang
+    };
+
+    utils.must(tokenize(ctx, start, len));
+
+    return tbuf.asCTokBuf();
 }
 
 export fn TokBuf_dump(ctbuf: *TokBuf.CTokBuf, file: *c.File) void {

@@ -12,9 +12,9 @@ BASE_RULES
 #undef RULE
 
 void fungus_define_base(Names *names) {
-#define TYPE(NAME, ENUM_NAME, STR, NUM_SUPERS, SUPERS) {\
+#define TYPE(NAME, ENUM_NAME, STR, SUPERS) {\
     Type supers[] = SUPERS;\
-    fun_##NAME = Type_define(names, WORD(STR), supers, NUM_SUPERS);\
+    fun_##NAME = Type_define(names, WORD(STR), supers, ARRAY_SIZE(supers));\
 }
     BASE_TYPES
 #undef TYPE

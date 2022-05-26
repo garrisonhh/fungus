@@ -37,4 +37,18 @@ void AstExpr_error(const File *, const AstExpr *, const char *fmt, ...);
 void AstExpr_error_from(const File *, const AstExpr *, const char *fmt, ...);
 void AstExpr_dump(const AstExpr *, const Lang *, const File *);
 
+// for zig interop
+typedef struct AstExprTok {
+    hsize_t start, len;
+} AstExprTok;
+
+typedef struct AstExprRule {
+    Rule rule;
+    AstExpr **exprs;
+    size_t len;
+} AstExprRule;
+
+AstExprTok AstExpr_tok(const AstExpr *);
+AstExprRule AstExpr_rule(const AstExpr *);
+
 #endif

@@ -60,7 +60,7 @@ void pattern_lang_init(Names *names) {
             Lang_make_prec(&lang, prec_names[i], prec_assocs[i]);
     }
 
-    // rules (pattern lang does not use sema for type checking, you can ignore)
+    // rules
     {
         RuleTree *rules = &lang.rules;
         Bump *p = &rules->pool;
@@ -118,7 +118,7 @@ void pattern_lang_init(Names *names) {
             .returns = TypeExpr_atom(p, fun_type),
         });
 
-        // type sep (bang)
+        // type bang
         len = 3;
         matches = Bump_alloc(p, len * sizeof(*matches));
         matches[0] = new_match_expr(p, TypeExpr_atom(p, fun_any_expr),
@@ -297,18 +297,14 @@ File pattern_file(const char *str) {
 
 AstExpr *precompile_pattern(Bump *pool, Names *names, const File *file) {
     // create ast
-    TokBuf tokens = lex(file, &pattern_lang);
+    TokBuf tokens = TokBuf_new();
+    lex(&tokens, file, &pattern_lang, 0, file->text.len);
 
     AstExpr *ast = parse(&(AstCtx){
         .pool = pool,
         .file = file,
         .lang = &pattern_lang
     }, &tokens);
-
-    /*
-     * used to do sema here but it ended up not being very useful, may want to
-     * bring it back in the future? unsure
-     */
 
     TokBuf_del(&tokens);
 
@@ -469,6 +465,10 @@ static void compile_match_atom(MatchAtom *pred, Bump *pool, const Names *names,
 Pattern compile_pattern(Bump *pool, Names *names, const File *file,
                         const AstExpr *ast) {
     Pattern pat = {0};
+
+    DEBUG_SCOPE(1,
+        AstExpr_dump(ast, &pattern_lang, file);
+    );
 
     // count number of match atoms
     const AstExpr *pat_expr = ast->exprs[0];
