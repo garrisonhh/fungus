@@ -1,5 +1,5 @@
-#ifndef SIR_H
-#define SIR_H
+#ifndef FIR_H
+#define FIR_H
 
 #include <assert.h>
 

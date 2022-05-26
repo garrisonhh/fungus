@@ -25,13 +25,6 @@ const FirCtx = struct {
     file: *c.File
 };
 
-pub const FirError = error {
-    UnhandledEvalType,
-    UnhandledAstExprType,
-    UnhandledLiteralType,
-    InvalidLiteral,
-};
-
 fn sliceOfAstExpr(file: *c.File, expr: *c.AstExpr) []const u8 {
     const expr_tok = c.AstExpr_tok(expr);
     return file.text.str[expr_tok.start..expr_tok.start + expr_tok.len];
@@ -40,6 +33,13 @@ fn sliceOfAstExpr(file: *c.File, expr: *c.AstExpr) []const u8 {
 pub const Fir = struct {
     evaltype: Type,
     data: Data,
+
+    pub const Error = error {
+        UnhandledEvalType,
+        UnhandledAstExprType,
+        UnhandledLiteralType,
+        InvalidLiteral,
+    };
 
     pub const Type = enum {
         Nil,
@@ -108,7 +108,7 @@ pub const Fir = struct {
 
     const Self = @This();
 
-    fn fromAstExpr(ctx: FirCtx, expr: *c.AstExpr) FirError!*Self {
+    fn fromAstExpr(ctx: FirCtx, expr: *c.AstExpr) Fir.Error!*Self {
         var self = cBumpCreate(Self, ctx.pool);
 
         // get evaltype
@@ -124,7 +124,7 @@ pub const Fir = struct {
                 c.AstExpr_error(ctx.file, expr,
                                 "fir can't process eval type `%.*s`.",
                                 @intCast(c_int, name.*.len), name.*.str);
-                return FirError.UnhandledEvalType;
+                return Error.UnhandledEvalType;
             }
         };
 
@@ -162,16 +162,16 @@ pub const Fir = struct {
                     .lit = switch (expr.evaltype.id) {
                         c.ID_INT => Literal{
                             .int = std.fmt.parseInt(u64, slice, 0)
-                                catch return FirError.InvalidLiteral
+                                catch return Error.InvalidLiteral
                         },
                         c.ID_FLOAT => Literal{
                             .float = std.fmt.parseFloat(f64, slice)
-                                catch return FirError.InvalidLiteral
+                                catch return Error.InvalidLiteral
                         },
                         c.ID_BOOL => Literal{
                             .boolean = slice[0] == 't'
                         },
-                        else => return FirError.UnhandledLiteralType
+                        else => return Error.UnhandledLiteralType
                     }
                 };
             },
@@ -229,7 +229,7 @@ pub const Fir = struct {
                 c.AstExpr_error(ctx.file, expr, "unhandled expr type `%.*s`.",
                                 @intCast(c_int, name.len), name.str);
 
-                return FirError.UnhandledAstExprType;
+                return Error.UnhandledAstExprType;
             }
         }
 
