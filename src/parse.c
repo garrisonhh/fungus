@@ -48,36 +48,46 @@ static AstExpr *rule_copy_of_slice(Bump *pool, const RuleTree *rt, Rule rule,
 static Vec gen_initial_scope(AstCtx *ctx, const TokBuf *tb) {
     Vec scope = Vec_new();
 
-    for (size_t i = 0; i < tb->len; ++i) {
-        TokType toktype = tb->types[i];
-        hsize_t start = tb->starts[i], len = tb->lens[i];
-
+    for (size_t i = 0; i < TokBuf_len(tb); ++i) {
+        Token tok = TokBuf_get(tb, i);
         AstExpr *expr = NULL;
 
-        assert(toktype != TOK_INVALID);
+        assert(tok.type != TOK_INVALID);
 
-        switch (toktype) {
-        case TOK_ESCAPE:
+        switch (tok.type) {
+        case TOK_ESCAPE: {
             // consume next token, creating a literal lexeme
-            if (i == tb->len
-             || (tb->types[i + 1] != TOK_LEXEME
-              && tb->types[i + 1] != TOK_IDENT)) {
-                File_error_at(ctx->file, start, len,
-                              "escape not followed by a lexeme.");
+            bool invalid = false;
+
+            if (i + 1 == TokBuf_len(tb)) {
+                invalid = true;
+            } else {
+                tok = TokBuf_get(tb, ++i);
+
+                if (tok.type != TOK_LEXEME && tok.type != TOK_IDENT)
+                    invalid = true;
             }
 
-            ++i;
-            expr = new_atom(ctx->pool, fun_literal, fun_lexeme, tb->starts[i],
-                            tb->lens[i]);
+            if (invalid) {
+                    File_error_at(ctx->file, tok.start, tok.len,
+                                  "escape not followed by a lexeme.");
+            }
+
+            expr = new_atom(ctx->pool, fun_literal, fun_lexeme, tok.start,
+                            tok.len);
             break;
+        }
         case TOK_SCOPE:
-            expr = new_atom(ctx->pool, fun_scope, fun_raw_scope, start, len);
+            expr = new_atom(ctx->pool, fun_scope, fun_raw_scope, tok.start,
+                            tok.len);
             break;
         case TOK_LEXEME:
-            expr = new_atom(ctx->pool, fun_lexeme, fun_lexeme, start, len);
+            expr = new_atom(ctx->pool, fun_lexeme, fun_lexeme, tok.start,
+                            tok.len);
             break;
         case TOK_IDENT:
-            expr = new_atom(ctx->pool, fun_ident, fun_unknown, start, len);
+            expr = new_atom(ctx->pool, fun_ident, fun_unknown, tok.start,
+                            tok.len);
             break;
         case TOK_BOOL:
         case TOK_INT:
@@ -91,8 +101,8 @@ static Vec gen_initial_scope(AstCtx *ctx, const TokBuf *tb) {
             };
 
             // literal; direct token -> expr translation
-            expr = new_atom(ctx->pool, fun_literal, evaltype_of_lit[toktype],
-                            start, len);
+            expr = new_atom(ctx->pool, fun_literal, evaltype_of_lit[tok.type],
+                            tok.start, tok.len);
             break;
         }
         case TOK_INVALID:
@@ -329,6 +339,13 @@ AstExpr *parse(AstCtx *ctx, const TokBuf *tb) {
         double duration = time_now() - start;
 
         printf("parsing took %.6fs.\n", duration);
+    );
+
+    DEBUG_SCOPE(0,
+        puts(TC_YELLOW "PARSING:" TC_RESET);
+        TokBuf_dump(tb, ctx->file);
+        AstExpr_dump(ast, ctx->lang, ctx->file);
+        puts("");
     );
 
     return ast;

@@ -55,7 +55,7 @@ static bool pattern_check_and_infer(const SemaCtx *ctx, AstExpr *expr,
         const AstExpr *child = expr->exprs[i];
         const MatchAtom *pred = &pat->matches[match_forms[i]];
 
-        if (!MatchAtom_matches_type(ctx->file, pred, child)) {
+        if (!MatchAtom_matches_type(pred, child)) {
             // TODO make this error better, will require some error api work
             AstExpr_error(ctx->file, child, "invalid evaltype");
 
@@ -80,16 +80,16 @@ static bool pattern_check_and_infer(const SemaCtx *ctx, AstExpr *expr,
             size_t idx = 0;
 
             for (size_t j = 0;
-                 j < clause->num_constrains && idx < expr->len;
+                 idx < expr->len || j < clause->num_constrains;
                  ++j) {
                 size_t constrained = clause->constrains[j];
 
                 // move up to constrained value
-                while (match_forms[idx] < constrained && idx < expr->len)
+                while (idx < expr->len && match_forms[idx] < constrained)
                     ++idx;
 
                 // check constrained value
-                while (match_forms[idx] == constrained && idx < expr->len) {
+                while (idx < expr->len && match_forms[idx] == constrained) {
                     if (!model)
                         model = expr->exprs[idx];
                     else if (!check_evaltype(ctx, model, expr->exprs[idx]))
@@ -131,7 +131,7 @@ static bool pattern_check_and_infer(const SemaCtx *ctx, AstExpr *expr,
 static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
     Names *names = ctx->names;
 
-    DEBUG_SCOPE(1,
+    DEBUG_SCOPE(0,
         puts(TC_YELLOW "TYPING:" TC_RESET);
         AstExpr_dump(expr, ctx->lang, ctx->file);
     );

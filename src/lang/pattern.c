@@ -44,7 +44,7 @@ static MatchAtom new_match_lxm(Bump *pool, const char *lxm) {
     };
 }
 
-void pattern_lang_init(Names *names) {
+void pattern_lang_init(void) {
     Lang lang = Lang_new(WORD("PatternLang"));
 
     // precedences
@@ -261,8 +261,7 @@ bool MatchAtom_matches_rule(const File *file, const MatchAtom *pred,
     return matches;
 }
 
-bool MatchAtom_matches_type(const File *file, const MatchAtom *pred,
-                            const AstExpr *expr) {
+bool MatchAtom_matches_type(const MatchAtom *pred, const AstExpr *expr) {
     if (pred->type == MATCH_LEXEME)
         return true;
 
@@ -297,16 +296,16 @@ File pattern_file(const char *str) {
 
 AstExpr *precompile_pattern(Bump *pool, Names *names, const File *file) {
     // create ast
-    TokBuf tokens = TokBuf_new();
-    lex(&tokens, file, &pattern_lang, 0, file->text.len);
+    TokBuf *tokens = TokBuf_new();
+    lex(tokens, file, &pattern_lang, 0, file->text.len);
 
     AstExpr *ast = parse(&(AstCtx){
         .pool = pool,
         .file = file,
         .lang = &pattern_lang
-    }, &tokens);
+    }, tokens);
 
-    TokBuf_del(&tokens);
+    TokBuf_del(tokens);
 
     return ast;
 }
@@ -420,15 +419,16 @@ static WhereClause compile_where_clause(Bump *pool, const Names *names,
 
 static void compile_match_atom(MatchAtom *pred, Bump *pool, const Names *names,
                                const File *file, const AstExpr *expr) {
-    if (expr->type.id == fun_literal.id) {
+    if (expr->type.id == ID_LITERAL) {
         // match lexeme
-        assert(expr->evaltype.id == fun_lexeme.id);
+        assert(expr->evaltype.id == ID_LEXEME);
 
         Word word = AstExpr_as_word(file, expr);
+        const Word *copy = Word_copy_of(&word, pool);
 
         *pred = (MatchAtom){
             .type = MATCH_LEXEME,
-            .lxm = Word_copy_of(&word, pool),
+            .lxm = copy
         };
     } else {
         // pred expr
@@ -466,19 +466,15 @@ Pattern compile_pattern(Bump *pool, Names *names, const File *file,
                         const AstExpr *ast) {
     Pattern pat = {0};
 
-    DEBUG_SCOPE(1,
-        AstExpr_dump(ast, &pattern_lang, file);
-    );
-
     // count number of match atoms
     const AstExpr *pat_expr = ast->exprs[0];
 
     while (pat.len < pat_expr->len) {
         const AstExpr *expr = pat_expr->exprs[pat.len];
 
-        bool is_match_expr = expr->type.id == fun_match_expr.id;
-        bool is_literal_lexeme = expr->type.id == fun_literal.id
-                              && expr->evaltype.id == fun_lexeme.id;
+        bool is_match_expr = expr->type.id == ID_MATCH_EXPR;
+        bool is_literal_lexeme = expr->type.id == ID_LITERAL
+                              && expr->evaltype.id == ID_LEXEME;
 
         if (!(is_match_expr || is_literal_lexeme))
             break;
@@ -491,7 +487,7 @@ Pattern compile_pattern(Bump *pool, Names *names, const File *file,
 
     const AstExpr *where_expr = pat_expr->exprs[pat_expr->len - 1];
 
-    if (where_expr->type.id == fun_where.id) {
+    if (where_expr->type.id == ID_WHERE) {
         pat.wheres_len = where_expr->len - 1;
         pat.wheres = Bump_alloc(pool, pat.wheres_len * sizeof(*pat.wheres));
 
@@ -523,13 +519,6 @@ Pattern compile_pattern(Bump *pool, Names *names, const File *file,
 
     // drop `where` scope
     Names_drop_scope(names);
-
-#if 0
-    printf(TC_CYAN "compiled pattern: " TC_RESET);
-    Pattern_print(&pat);
-    printf("\n" TC_CYAN "from: " TC_RESET "%.*s\n", (int)file->text.len,
-           file->text.str);
-#endif
 
     return pat;
 }

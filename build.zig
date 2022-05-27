@@ -24,6 +24,7 @@ pub fn build(b: *std.build.Builder) anyerror!void {
         const zig_sources = [_][2][]const u8{
             .{ "lex", "lex.zig" },
             .{ "fir", "fir.zig" },
+            .{ "compile", "compile.zig" },
         };
 
         for (zig_sources) |name_and_path| {
@@ -56,7 +57,7 @@ pub fn build(b: *std.build.Builder) anyerror!void {
             try c_flags.append("-ggdb");
             try c_flags.append("-O0");
             // ubsan makes it impossible to debug segfaults w/ valgrind
-            try c_flags.append("-fno-sanitize=undefined");
+            // try c_flags.append("-fno-sanitize=undefined");
         } else {
             try c_flags.append("-DNDEBUG");
             try c_flags.append("-O3");

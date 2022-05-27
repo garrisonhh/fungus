@@ -184,8 +184,20 @@ void RuleTree_crystallize(RuleTree *rt, Names *names) {
 
         RuleEntry *entry = rt->entries.data[i];
 
+        DEBUG_SCOPE(0,
+            puts(TC_CYAN "compiling pattern:" TC_RESET);
+            AstExpr_dump(entry->pre_pat, &pattern_lang, entry->pre_file);
+        );
+
         entry->pat =
             compile_pattern(&rt->pool, names, entry->pre_file, entry->pre_pat);
+
+        DEBUG_SCOPE(0,
+            puts(TC_CYAN "compiled into:" TC_RESET);
+            Pattern_print(&entry->pat);
+            puts("\n");
+        );
+
         place_rule(rt, &entry->pat, Rule_by_name(rt, entry->name));
     }
 
@@ -226,11 +238,11 @@ static void dump_children(const RuleTree *rt, const Vec *children,
 
         const MatchAtom *pred = child->pred;
 
-        if (pred->repeating)
-            printf("repeating ");
-
         switch (pred->type) {
         case MATCH_EXPR:
+            if (pred->repeating)
+                printf("repeating ");
+
             printf(TC_BLUE);
             TypeExpr_print(pred->rule_expr);
             printf(TC_RESET);

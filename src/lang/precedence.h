@@ -40,8 +40,8 @@ const Word *Prec_name(const Precs *, Prec prec);
 // for parser iteration
 static inline Prec Prec_highest(const Precs *p)
     { return (Prec){ (unsigned)p->len - 1 }; }
-static inline void Prec_dec(Prec *prec) { --prec->id; };
-static inline bool Prec_is_lowest(Prec prec) { return prec.id == 0; };
+static inline void Prec_dec(Prec *prec) { --prec->id; }
+static inline bool Prec_is_lowest(Prec prec) { return prec.id == 0; }
 
 void Precs_dump(const Precs *);
 

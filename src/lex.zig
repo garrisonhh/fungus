@@ -39,27 +39,7 @@ const TokBuf = struct {
         len: hsize_t,
     }),
 
-    const CTokBuf = extern struct {
-        tbuf: *TokBuf,
-        types: [*]TokType,
-        starts: [*]hsize_t,
-        lens: [*]hsize_t,
-        len: usize
-    };
-
     const Self = @This();
-
-    fn asCTokBuf(self: *Self) CTokBuf {
-        const slice = self.tokens.slice();
-
-        return CTokBuf{
-            .tbuf = self,
-            .types = slice.items(.toktype).ptr,
-            .starts = slice.items(.start).ptr,
-            .lens = slice.items(.len).ptr,
-            .len = self.tokens.len,
-        };
-    }
 
     pub fn init(self: *Self) void {
         self.tokens = @TypeOf(self.tokens){};
@@ -111,7 +91,7 @@ const TokBuf = struct {
     }
 };
 
-/// syntax error display region of a file
+/// syntax error displaying region of a file
 fn lexErrorAt(
     file: *c.File, start: hsize_t, len: hsize_t, msg: []const u8
 ) noreturn {
@@ -165,7 +145,6 @@ const LexContext = struct {
     lang: *c.Lang,
 };
 
-// TODO specific and descriptive user-facing errors
 fn tokenize(ctx: LexContext, scope_start: usize, scope_len: usize) !void {
     const str = c.File_str(ctx.file)[scope_start..scope_start + scope_len];
 
@@ -295,23 +274,42 @@ fn tokenize(ctx: LexContext, scope_start: usize, scope_len: usize) !void {
 
 // c interface =================================================================
 
-export fn TokBuf_new() TokBuf.CTokBuf {
-    var tbuf: TokBuf = undefined;
+export fn TokBuf_new() *TokBuf {
+    var tbuf = utils.must(c_allocator.create(TokBuf));
     tbuf.init();
 
-    return tbuf.asCTokBuf();
+    return tbuf;
 }
 
-export fn TokBuf_del(ctbuf: *TokBuf.CTokBuf) void {
-    ctbuf.tbuf.deinit();
-    c_allocator.destroy(ctbuf.tbuf);
+export fn TokBuf_del(tbuf: *TokBuf) void {
+    tbuf.deinit();
+    c_allocator.destroy(tbuf);
+}
+
+export fn TokBuf_len(tbuf: *TokBuf) usize {
+    return tbuf.tokens.len;
+}
+
+export fn TokBuf_get(tbuf: *TokBuf, index: usize) c.Token {
+    const data = tbuf.tokens.get(index);
+
+    return c.Token{
+        .@"type" = @intCast(c.TokType, @enumToInt(data.toktype)),
+        .start = data.start,
+        .len = data.len
+    };
 }
 
 export fn lex(
-    file: *c.File, lang: *c.Lang, start: usize, len: usize
-) TokBuf.CTokBuf {
-    var tbuf = utils.must(c_allocator.create(TokBuf));
-    tbuf.init();
+    tbuf: *TokBuf,
+    file: *c.File,
+    lang: *c.Lang,
+    start: usize,
+    len: usize
+) bool {
+    if (len == 0) {
+        return true;
+    }
 
     const ctx = LexContext{
         .tbuf = tbuf,
@@ -319,11 +317,16 @@ export fn lex(
         .lang = lang
     };
 
-    utils.must(tokenize(ctx, start, len));
+    tokenize(ctx, start, len) catch |e| {
+        _ = c.printf("tokenization failed with error %s.\n",
+                     @errorName(e).ptr);
 
-    return tbuf.asCTokBuf();
+        return false;
+    };
+
+    return true;
 }
 
-export fn TokBuf_dump(ctbuf: *TokBuf.CTokBuf, file: *c.File) void {
-    ctbuf.tbuf.dump(file);
+export fn TokBuf_dump(tbuf: *TokBuf, file: *c.File) void {
+    tbuf.dump(file);
 }

@@ -22,21 +22,23 @@ typedef enum TokType {
     TOK_COUNT
 } TokType;
 
-typedef struct TokBuf {
-    void *zig_tbuf;
+typedef struct Token {
+    TokType type;
+    hsize_t start, len;
+} Token;
 
-    TokType *types;
-    hsize_t *starts, *lens;
-    size_t len;
-} TokBuf;
+typedef struct TokBuf TokBuf; // opaque ptr; impl'd in zig
 
 // TODO direly needs an allocator context to avoid `malloc` calls
-TokBuf TokBuf_new(void);
+TokBuf *TokBuf_new(void);
 void TokBuf_del(TokBuf *);
+
+size_t TokBuf_len(const TokBuf *);
+Token TokBuf_get(const TokBuf *, size_t index);
 
 // adds tokens to tokbuf, returns success
 bool lex(TokBuf *, const File *, const Lang *, size_t start, size_t len);
 
-void TokBuf_dump(TokBuf *, const File *);
+void TokBuf_dump(const TokBuf *, const File *);
 
 #endif

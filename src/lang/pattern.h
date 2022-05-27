@@ -53,17 +53,19 @@ typedef struct Pattern {
     size_t wheres_len;
 } Pattern;
 
-void pattern_lang_init(Names *);
+void pattern_lang_init(void);
 void pattern_lang_quit(void);
 
 // for internal use only:
+extern Lang pattern_lang;
+
 File pattern_file(const char *str);
 AstExpr *precompile_pattern(Bump *, Names *names, const File *file);
 Pattern compile_pattern(Bump *, Names *names, const File *file,
                         const AstExpr *ast);
 
 bool MatchAtom_matches_rule(const File *, const MatchAtom *, const AstExpr *);
-bool MatchAtom_matches_type(const File *, const MatchAtom *, const AstExpr *);
+bool MatchAtom_matches_type(const MatchAtom *, const AstExpr *);
 bool MatchAtom_equals(const MatchAtom *, const MatchAtom *);
 
 void MatchAtom_print(const MatchAtom *);
