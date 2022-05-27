@@ -109,10 +109,6 @@ int main(int argc, char **argv) {
     pattern_lang_init(&name_table);
     fungus_lang_init(&name_table);
 
-    DEBUG_SCOPE(1,
-        Lang_dump(&fungus_lang);
-    );
-
     if (argc > 1) {
         for (char **list = &argv[1]; *list; ++list)
             if (!test_file(*list, &name_table))

@@ -466,10 +466,6 @@ Pattern compile_pattern(Bump *pool, Names *names, const File *file,
                         const AstExpr *ast) {
     Pattern pat = {0};
 
-    DEBUG_SCOPE(1,
-        AstExpr_dump(ast, &pattern_lang, file);
-    );
-
     // count number of match atoms
     const AstExpr *pat_expr = ast->exprs[0];
 

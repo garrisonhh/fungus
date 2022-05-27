@@ -131,11 +131,6 @@ static bool pattern_check_and_infer(const SemaCtx *ctx, AstExpr *expr,
 static bool type_check_and_infer(SemaCtx *ctx, AstExpr *expr) {
     Names *names = ctx->names;
 
-    DEBUG_SCOPE(1,
-        puts(TC_YELLOW "TYPING:" TC_RESET);
-        AstExpr_dump(expr, ctx->lang, ctx->file);
-    );
-
     if (AstExpr_is_atom(expr)) {
         // identify identifiers, all other atoms should have been identified
         // previously

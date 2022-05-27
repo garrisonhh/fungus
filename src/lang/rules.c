@@ -226,11 +226,11 @@ static void dump_children(const RuleTree *rt, const Vec *children,
 
         const MatchAtom *pred = child->pred;
 
-        if (pred->repeating)
-            printf("repeating ");
-
         switch (pred->type) {
         case MATCH_EXPR:
+            if (pred->repeating)
+                printf("repeating ");
+
             printf(TC_BLUE);
             TypeExpr_print(pred->rule_expr);
             printf(TC_RESET);
