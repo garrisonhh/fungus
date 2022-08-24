@@ -1,5 +1,7 @@
 # fungus
 
+***I've taken the ideas and lessons from this project and started off in a new direction with a much more focused scope. check out [fluent](https://github.com/garrisonhh/fluent)! leaving this here for posterity, though!***
+
 An organic language-oriented programming language.
 
 ## v1 checklist
